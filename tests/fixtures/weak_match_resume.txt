@@ -1,0 +1,13 @@
+John Smith
+john@email.com
+
+SUMMARY
+Product Manager with 2 years of experience.
+
+EXPERIENCE
+StartupX | PM | 2021 - Present
+- Worked on a consumer app.
+- Talked to users and wrote tickets.
+
+EDUCATION
+BA English, State University, 2020

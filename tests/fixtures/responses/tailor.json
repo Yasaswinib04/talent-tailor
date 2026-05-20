@@ -1,0 +1,11 @@
+{
+  "fullText": "Jane Doe\njanedoe@email.com\n\nPROFESSIONAL SUMMARY\nSenior B2B SaaS Product Manager with 8+ years of experience...\n\nEXPERIENCE\nAcme Corp | Senior Product Manager\n- Situation: The enterprise platform needed a unified direction.\n- Task: Create a comprehensive roadmap.\n- Action: Owned the product Roadmap, collaborating with 5 engineering teams.\n- Result: Delivered a new billing module that increased revenue by 15%.",
+  "changes": [
+    {
+      "id": "change-1",
+      "original": "Owned the product Roadmap for the core enterprise platform, collaborating with 5 engineering teams.",
+      "suggested": "Situation: The enterprise platform needed a unified direction. Task: Create a comprehensive roadmap. Action: Owned the product Roadmap, collaborating with 5 engineering teams. Result: Delivered a new billing module that increased revenue by 15%.",
+      "reason": "Converted to STAR format"
+    }
+  ]
+}

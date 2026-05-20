@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. User Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.userId == request.auth.uid 
+          && data.email is string 
+          && data.email.size() > 0
+          && data.createdAt == request.time;
+      }
+
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().keys().size() == 4;
+      allow update: if isOwner(userId) && incoming().userId == existing().userId 
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'createdAt']);
+    }
+
+    // 3. Analysis Rules
+    match /analyses/{analysisId} {
+      function isValidAnalysis(data) {
+        return data.userId == request.auth.uid
+          && data.role is string
+          && data.jdContent is string
+          && data.candidates is list
+          && data.createdAt == request.time;
+      }
+
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidAnalysis(incoming()) && isValidId(analysisId);
+      allow update: if isSignedIn() && existing().userId == request.auth.uid 
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && (
+          // Action: Update candidates (answers, feedback, tailoring)
+          incoming().diff(existing()).affectedKeys().hasOnly(['candidates'])
+        );
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

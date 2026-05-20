@@ -1,0 +1,22 @@
+Jane Doe
+janedoe@email.com | 555-0100 | San Francisco, CA
+
+PROFESSIONAL SUMMARY
+Senior B2B SaaS Product Manager with 8+ years of experience leading cross-functional teams. Proven track record in Roadmap planning, Stakeholder Management, and delivering features that drive ARR.
+
+EXPERIENCE
+Acme Corp | Senior Product Manager | 2018 - Present
+- Owned the product Roadmap for the core enterprise platform, collaborating with 5 engineering teams.
+- Excelled in Stakeholder Management, regularly presenting to C-level executives.
+- Delivered a new billing module that increased revenue by 15%.
+
+TechLogix | Product Manager | 2015 - 2018
+- Managed Agile sprint planning and backlog grooming.
+- Conducted user research to prioritize feature development.
+
+EDUCATION
+MBA, Stanford University, 2015
+BS Computer Science, UC Berkeley, 2013
+
+SKILLS
+Roadmap, Stakeholder Management, Agile, Jira, SQL, Python

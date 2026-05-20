@@ -1,0 +1,9 @@
+Role: Senior Backend Developer
+We are looking for a Senior Backend Developer to join our core infrastructure team.
+Responsibilities:
+- Write high-quality, scalable code in Node.js and TypeScript.
+- Design database schemas in PostgreSQL.
+- Optimize application performance.
+Requirements:
+- 5+ years of software engineering experience.
+- Deep knowledge of React and Node.js.

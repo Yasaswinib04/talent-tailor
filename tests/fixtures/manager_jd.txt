@@ -1,0 +1,9 @@
+Role: Engineering Manager
+We need an Engineering Manager to lead a squad of 8 developers.
+Responsibilities:
+- Manage headcount, hiring, and team velocity.
+- Mentor engineers and conduct 1-on-1s.
+- Define cross-functional strategy with Product and Design.
+Requirements:
+- 3+ years of engineering management experience.
+- Strong leadership and communication skills.
