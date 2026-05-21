@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, RoleType, CandidateAnalysis, CandidateProfile, HiringPreferences, ExperienceTier } from "../../types.js";
 import { ROLE_WEIGHTS, RoleWeight, TIER_CONFIG, getEffectiveWeights } from "../../constants/roles.js";
-import db, { updateSession } from "../db.js";
-import fs from "fs";
+import { getSessionById, updateSession, supabase } from "../db.js";
 
 let genAI: GoogleGenAI | null = null;
 
@@ -467,29 +466,33 @@ export async function extractProfile(resume: string | { data: string, mimeType: 
   };
 }
 
-export async function runScreeningAnalysis(sessionId: string) {
+export async function runScreeningAnalysis(sessionId: string, hrUserId: string) {
   try {
-    const stmt = db.prepare('SELECT * FROM screening_sessions WHERE id = ?');
-    const row: any = stmt.get(sessionId);
-    if (!row) {
+    const session = await getSessionById(sessionId, hrUserId);
+    if (!session) {
       console.error(`Session ${sessionId} not found`);
       return;
     }
 
-    const hrUserId = row.hr_user_id;
-    const jobProfile = row.job_profile ? JSON.parse(row.job_profile) : {};
-    const uploadedFiles = row.uploaded_files ? JSON.parse(row.uploaded_files) : [];
+    const jobProfile = session.jobProfile || {};
+    const uploadedFiles = session.uploadedFiles || [];
     
-    // Read files from disk
-    const resumes = uploadedFiles.map((file: any) => {
+    // Download files from Supabase Storage
+    const resumes = [];
+    for (const file of uploadedFiles) {
       try {
-        const content = fs.readFileSync(file.path, 'utf8');
-        return content;
+        const { data, error } = await supabase.storage.from('resumes').download(file.path);
+        if (error) throw error;
+        
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64Data = buffer.toString('base64');
+        
+        resumes.push({ data: base64Data, mimeType: file.mimeType || 'application/pdf' });
       } catch (e) {
-        console.error(`Error reading file ${file.path}:`, e);
-        return "";
+        console.error(`Error downloading file ${file.path} from Supabase:`, e);
       }
-    }).filter((content: string) => content.length > 0);
+    }
 
     if (resumes.length === 0) {
       throw new Error("No readable resumes found for analysis.");
@@ -514,22 +517,18 @@ export async function runScreeningAnalysis(sessionId: string) {
     );
 
     // Update session
-    updateSession(sessionId, hrUserId, {
+    await updateSession(sessionId, hrUserId, {
       status: 'completed',
-      analysis_results: results
+      analysisResults: results
     });
 
   } catch (error: any) {
     console.error(`Error in runScreeningAnalysis for session ${sessionId}:`, error);
     try {
-      const stmt = db.prepare('SELECT hr_user_id FROM screening_sessions WHERE id = ?');
-      const row: any = stmt.get(sessionId);
-      if (row) {
-        updateSession(sessionId, row.hr_user_id, {
-          status: 'error',
-          analysis_results: { error: error.message }
-        });
-      }
+      await updateSession(sessionId, hrUserId, {
+        status: 'error',
+        analysisResults: { error: error.message }
+      });
     } catch (e) {
       console.error("Failed to update session error status:", e);
     }

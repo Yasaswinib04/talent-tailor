@@ -1,52 +1,48 @@
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import db, { createSession, getSessionById, updateSession, listSessionsByUser, deleteSession } from '../db.js';
+import { createSession, getSessionById, updateSession, listSessionsByUser, deleteSession } from '../db.js';
 import { runScreeningAnalysis } from '../services/ai.js';
 
 const router = Router();
 
+// ALL endpoints require standard Firebase Auth header
 router.use(requireAuth);
 
 const sessionSchema = z.object({
-  job_profile: z.any().optional()
+  jobProfile: z.any().optional()
 });
 
-router.post('/', (req: AuthRequest, res) => {
+router.post('/', async (req: AuthRequest, res): Promise<void> => {
   try {
     const userId = req.userId!;
-    const sessionId = uuidv4();
-    
     const parsedBody = sessionSchema.parse(req.body);
     
-    const session = createSession({
-      id: sessionId,
-      hr_user_id: userId,
-      job_profile: parsedBody.job_profile || {},
-      status: 'draft',
-      uploaded_files: [],
-      analysis_results: null
-    });
+    const sessionId = await createSession(userId);
     
-    res.status(201).json({ sessionId: session.id, session });
+    if (parsedBody.jobProfile) {
+      await updateSession(sessionId, userId, { jobProfile: parsedBody.jobProfile });
+    }
+    
+    const session = await getSessionById(sessionId, userId);
+    res.status(201).json({ sessionId, session });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/', (req: AuthRequest, res) => {
+router.get('/', async (req: AuthRequest, res): Promise<void> => {
   try {
-    const sessions = listSessionsByUser(req.userId!);
+    const sessions = await listSessionsByUser(req.userId!);
     res.json(sessions);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/:id', (req: AuthRequest, res) => {
+router.get('/:id', async (req: AuthRequest, res): Promise<void> => {
   try {
-    const session = getSessionById(req.params.id, req.userId!);
+    const session = await getSessionById(req.params.id, req.userId!);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -57,47 +53,56 @@ router.get('/:id', (req: AuthRequest, res) => {
   }
 });
 
-router.put('/:id/preferences', (req: AuthRequest, res) => {
+router.put('/:id/preferences', async (req: AuthRequest, res): Promise<void> => {
   try {
-    const session = updateSession(req.params.id, req.userId!, {
-      job_profile: req.body
+    await updateSession(req.params.id, req.userId!, {
+      jobProfile: req.body
     });
+    const session = await getSessionById(req.params.id, req.userId!);
     res.json(session);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.put('/:id/resumes', (req: AuthRequest, res) => {
+router.put('/:id/resumes', async (req: AuthRequest, res): Promise<void> => {
   try {
-    // Expected to receive an array of uploaded files metadata
-    const session = updateSession(req.params.id, req.userId!, {
-      uploaded_files: req.body.uploaded_files
+    await updateSession(req.params.id, req.userId!, {
+      // Support both camelCase and snake_case from the frontend for robust backwards compatibility
+      uploadedFiles: req.body.uploaded_files || req.body.uploadedFiles
     });
+    const session = await getSessionById(req.params.id, req.userId!);
     res.json(session);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.post('/:id/analyze', (req: AuthRequest, res) => {
+router.post('/:id/analyze', async (req: AuthRequest, res): Promise<void> => {
   try {
-    const session = updateSession(req.params.id, req.userId!, {
+    const session = await getSessionById(req.params.id, req.userId!);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    await updateSession(req.params.id, req.userId!, {
       status: 'analyzing'
     });
     
-    // Fire asynchronously
-    runScreeningAnalysis(session.id);
+    // Fire asynchronously and explicitly pass the hrUserId
+    runScreeningAnalysis(req.params.id, req.userId!);
     
-    res.json({ status: 'analyzing', session });
+    const updatedSession = await getSessionById(req.params.id, req.userId!);
+    res.json({ status: 'analyzing', session: updatedSession });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.delete('/:id', (req: AuthRequest, res) => {
+router.delete('/:id', async (req: AuthRequest, res): Promise<void> => {
   try {
-    const session = getSessionById(req.params.id, req.userId!);
+    const session = await getSessionById(req.params.id, req.userId!);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -106,7 +111,7 @@ router.delete('/:id', (req: AuthRequest, res) => {
       res.status(400).json({ error: 'Cannot delete session while analyzing' });
       return;
     }
-    deleteSession(req.params.id, req.userId!);
+    await deleteSession(req.params.id, req.userId!);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

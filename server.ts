@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
+import { initDb } from "./src/server/db.js";
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -62,6 +63,8 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  await initDb();
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

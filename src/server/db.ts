@@ -1,123 +1,128 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import postgres from 'postgres';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+dotenv.config();
+
+// Ensure critical environment variables exist
+if (!process.env.DATABASE_URL || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn("WARNING: Missing Supabase environment variables. Database operations will fail in production.");
 }
 
-const dbPath = path.join(dataDir, 'screening.db');
-const db = new Database(dbPath);
+// 1. Initialize PostgreSQL Connection Pool
+const sql = postgres(process.env.DATABASE_URL || '', {
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 
-db.pragma('journal_mode = WAL');
+// 2. Initialize Supabase Client for Storage access
+export const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
+);
 
-// Initialize tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS screening_sessions (
-    id TEXT PRIMARY KEY,
-    hr_user_id TEXT NOT NULL,
-    job_profile TEXT NOT NULL,
-    status TEXT DEFAULT 'draft',
-    uploaded_files TEXT DEFAULT '[]',
-    analysis_results TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-export interface ScreeningSession {
-  id: string;
-  hr_user_id: string;
-  job_profile: any; // parsed JSON
-  status: string;
-  uploaded_files: any[]; // parsed JSON
-  analysis_results: any | null; // parsed JSON
-  created_at: string;
-  updated_at: string;
+/**
+ * Ensures the target PostgreSQL table schema exists.
+ */
+export async function initDb() {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS screening_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        hr_user_id TEXT NOT NULL,
+        job_profile JSONB NOT NULL DEFAULT '{}'::jsonb,
+        status TEXT NOT NULL DEFAULT 'draft',
+        uploaded_files JSONB DEFAULT '[]'::jsonb,
+        analysis_results JSONB,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
+    console.log("PostgreSQL schema validated successfully.");
+  } catch (error) {
+    console.error("Failed to initialize PostgreSQL schema:", error);
+  }
 }
 
-function parseSession(row: any): ScreeningSession {
-  if (!row) return row;
+/**
+ * Creates a new screening session securely bound to the HR User ID.
+ */
+export async function createSession(hrUserId: string): Promise<string> {
+  const [row] = await sql`
+    INSERT INTO screening_sessions (hr_user_id, status)
+    VALUES (${hrUserId}, 'draft')
+    RETURNING id
+  `;
+  return row.id;
+}
+
+/**
+ * Retrieves a session, strictly checking hrUserId ownership.
+ */
+export async function getSessionById(sessionId: string, hrUserId: string) {
+  const [row] = await sql`
+    SELECT * FROM screening_sessions
+    WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
+  `;
+  if (!row) return null;
+
+  // Map snake_case to camelCase for the frontend
   return {
     ...row,
-    job_profile: row.job_profile ? JSON.parse(row.job_profile) : null,
-    uploaded_files: row.uploaded_files ? JSON.parse(row.uploaded_files) : [],
-    analysis_results: row.analysis_results ? JSON.parse(row.analysis_results) : null,
+    jobProfile: row.job_profile,
+    uploadedFiles: row.uploaded_files,
+    analysisResults: row.analysis_results,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
-export function createSession(session: Omit<ScreeningSession, 'created_at' | 'updated_at'>) {
-  const stmt = db.prepare(`
-    INSERT INTO screening_sessions (id, hr_user_id, job_profile, status, uploaded_files, analysis_results)
-    VALUES (@id, @hr_user_id, @job_profile, @status, @uploaded_files, @analysis_results)
-  `);
+/**
+ * Updates a screening session, mapped from camelCase to snake_case.
+ */
+export async function updateSession(sessionId: string, hrUserId: string, updates: any) {
+  const toUpdate: any = { updated_at: sql`now()` };
   
-  stmt.run({
-    id: session.id,
-    hr_user_id: session.hr_user_id,
-    job_profile: JSON.stringify(session.job_profile || {}),
-    status: session.status || 'draft',
-    uploaded_files: JSON.stringify(session.uploaded_files || []),
-    analysis_results: session.analysis_results ? JSON.stringify(session.analysis_results) : null
-  });
-  
-  return getSessionById(session.id, session.hr_user_id)!;
+  if (updates.jobProfile !== undefined) toUpdate.job_profile = sql.json(updates.jobProfile);
+  if (updates.status !== undefined) toUpdate.status = updates.status;
+  if (updates.uploadedFiles !== undefined) toUpdate.uploaded_files = sql.json(updates.uploadedFiles);
+  if (updates.analysisResults !== undefined) toUpdate.analysis_results = sql.json(updates.analysisResults);
+
+  await sql`
+    UPDATE screening_sessions
+    SET ${sql(toUpdate)}
+    WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
+  `;
 }
 
-export function getSessionById(id: string, hr_user_id: string): ScreeningSession | null {
-  const stmt = db.prepare(`SELECT * FROM screening_sessions WHERE id = ? AND hr_user_id = ?`);
-  const row = stmt.get(id, hr_user_id);
-  return row ? parseSession(row) : null;
+/**
+ * Lists all active sessions for an HR user.
+ */
+export async function listSessionsByUser(hrUserId: string) {
+  const rows = await sql`
+    SELECT * FROM screening_sessions
+    WHERE hr_user_id = ${hrUserId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map((row: any) => ({
+    ...row,
+    jobProfile: row.job_profile,
+    uploadedFiles: row.uploaded_files,
+    analysisResults: row.analysis_results,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
 }
 
-export function updateSession(id: string, hr_user_id: string, updates: Partial<ScreeningSession>) {
-  const current = getSessionById(id, hr_user_id);
-  if (!current) throw new Error("Session not found or unauthorized");
-
-  const fields = [];
-  const values: any = { id, hr_user_id };
-
-  if (updates.job_profile !== undefined) {
-    fields.push('job_profile = @job_profile');
-    values.job_profile = JSON.stringify(updates.job_profile);
-  }
-  if (updates.status !== undefined) {
-    fields.push('status = @status');
-    values.status = updates.status;
-  }
-  if (updates.uploaded_files !== undefined) {
-    fields.push('uploaded_files = @uploaded_files');
-    values.uploaded_files = JSON.stringify(updates.uploaded_files);
-  }
-  if (updates.analysis_results !== undefined) {
-    fields.push('analysis_results = @analysis_results');
-    values.analysis_results = updates.analysis_results ? JSON.stringify(updates.analysis_results) : null;
-  }
-
-  if (fields.length === 0) return current;
-
-  fields.push('updated_at = CURRENT_TIMESTAMP');
-
-  const stmt = db.prepare(`
-    UPDATE screening_sessions 
-    SET ${fields.join(', ')} 
-    WHERE id = @id AND hr_user_id = @hr_user_id
-  `);
-  
-  stmt.run(values);
-  return getSessionById(id, hr_user_id)!;
+/**
+ * Deletes a session securely.
+ */
+export async function deleteSession(sessionId: string, hrUserId: string) {
+  await sql`
+    DELETE FROM screening_sessions
+    WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
+  `;
 }
 
-export function listSessionsByUser(hr_user_id: string): ScreeningSession[] {
-  const stmt = db.prepare(`SELECT * FROM screening_sessions WHERE hr_user_id = ? ORDER BY updated_at DESC`);
-  const rows = stmt.all(hr_user_id);
-  return rows.map(parseSession);
-}
-
-export function deleteSession(id: string, hr_user_id: string) {
-  const stmt = db.prepare(`DELETE FROM screening_sessions WHERE id = ? AND hr_user_id = ?`);
-  stmt.run(id, hr_user_id);
-}
-
-export default db;
+export default sql;
