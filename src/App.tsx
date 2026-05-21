@@ -90,6 +90,7 @@ import {
 } from './components/AnalysisComponents';
 import { HRInsightsReport } from './components/HRInsightsReport';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { HRLayout } from './layouts/HRLayout';
 
 import { CandidateDashboard } from './components/CandidateDashboard';
 import { BuilderControls } from './components/BuilderControls';
@@ -544,7 +545,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
   );
 };
 
-export default function App() {
+export function LegacyCandidateApp() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -1104,5 +1105,14 @@ export default function App() {
     </Routes>
     <BuilderControls />
   </>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/hr/*" element={<HRLayout />} />
+      <Route path="/*" element={<LegacyCandidateApp />} />
+    </Routes>
   );
 }
