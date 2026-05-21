@@ -1,5 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
+import sessionsRouter from "./src/server/routes/sessions.js";
+import uploadRouter from "./src/server/routes/upload.js";
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -12,6 +14,9 @@ async function startServer() {
   const PORT = 3001;
 
   app.use(express.json());
+
+  app.use("/api/hr/sessions", sessionsRouter);
+  app.use("/api/hr/upload", uploadRouter);
 
   // API Route to fetch URL content
   app.get("/api/proxy", async (req, res) => {
