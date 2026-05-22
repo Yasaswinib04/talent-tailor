@@ -59,7 +59,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
           <header className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                <div className="h-10 w-10 bg-primary rounded-md flex items-center justify-center shadow-lg shadow-primary/20">
                   <Sliders className="h-5 w-5 text-white" />
                 </div>
                 <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase italic">HR Protocols</h2>
@@ -70,7 +70,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
                     key={p.id}
                     onClick={() => setActiveId(p.id)}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      "px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
                       activeId === p.id ? "bg-slate-900 text-white shadow-xl" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
                     )}
                   >
@@ -88,9 +88,9 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between px-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Job Description Context</Label>
-              <Badge className="bg-indigo-50 text-indigo-600 border-none text-[8px] font-black px-2 py-0.5 uppercase tracking-widest">Grounded AI Vetting</Badge>
+              <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black px-2 py-0.5 uppercase tracking-widest">Grounded AI Vetting</Badge>
             </div>
-            <div className="bg-white p-2 rounded-[2rem] border border-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <div className="bg-white p-2 rounded-md border border-slate-200 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
               <textarea
                 value={activeProfile.jdContent}
                 onChange={(e) => handleUpdateActive({ jdContent: e.target.value })}
@@ -101,11 +101,11 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-8 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm relative overflow-hidden">
+            <div className="space-y-8 bg-white p-10 rounded-md border border-slate-100 shadow-sm relative overflow-hidden">
               <div className="space-y-8 relative z-10">
                 <div className="flex items-center justify-between">
                   <div className="mono-label">Scoring Rubric: {activeProfile.role}</div>
-                  <Badge className="bg-indigo-50 text-indigo-600 border-none text-[8px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tighter">
+                  <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter">
                     {currentTier.focus}
                   </Badge>
                 </div>
@@ -131,7 +131,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
             </div>
 
             <div className="space-y-8">
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white space-y-6 shadow-2xl relative overflow-hidden">
+              <div className="p-8 bg-slate-900 rounded-md text-white space-y-6 shadow-2xl relative overflow-hidden">
                 <div className="relative z-10 space-y-6">
                   <div className="mono-label !text-indigo-400">Hard Filters</div>
                   <div className="space-y-4">
@@ -141,7 +141,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
                         id="tier1"
                         checked={activeProfile.preferences.isTierIMandatory}
                         onCheckedChange={(v) => handleUpdatePrefs({ isTierIMandatory: v })}
-                        className="data-[state=checked]:bg-indigo-500 scale-90"
+                        className="data-[state=checked]:bg-primary/100 scale-90"
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -150,7 +150,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
                         id="mba"
                         checked={activeProfile.preferences.isMBAMandatory}
                         onCheckedChange={(v) => handleUpdatePrefs({ isMBAMandatory: v })}
-                        className="data-[state=checked]:bg-indigo-500 scale-90"
+                        className="data-[state=checked]:bg-primary/100 scale-90"
                       />
                     </div>
                   </div>
@@ -160,7 +160,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-2">
                   <Label className="mono-label">Min Experience</Label>
-                  <span className="text-xs font-black text-indigo-600 uppercase tracking-tighter">{activeProfile.preferences.minExperienceYears} Years+</span>
+                  <span className="text-xs font-black text-primary uppercase tracking-tighter">{activeProfile.preferences.minExperienceYears} Years+</span>
                 </div>
                 <div className="px-2 pt-2">
                   <Slider
@@ -183,7 +183,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
             <div className="space-y-3">
               <Input 
                 placeholder="Add skill..." 
-                className="rounded-xl h-10 text-xs font-bold border-slate-200"
+                className="rounded-md h-10 text-xs font-bold border-slate-200"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const val = (e.target as HTMLInputElement).value.trim();
@@ -196,7 +196,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
               />
               <div className="flex flex-wrap gap-2">
                 {activeProfile.preferences.mandatorySkills.map((skill, i) => (
-                  <Badge key={i} className="bg-indigo-50 text-indigo-600 border-indigo-100 flex items-center gap-2 px-3 py-1.5 rounded-xl group transition-all">
+                  <Badge key={i} className="bg-primary/10 text-primary border-primary/20 flex items-center gap-2 px-3 py-1.5 rounded-md group transition-all">
                     <span className="text-[10px] font-black uppercase tracking-tight">{skill}</span>
                     <button onClick={() => handleUpdatePrefs({ mandatorySkills: activeProfile.preferences.mandatorySkills.filter((_, idx) => idx !== i) })}>
                       <X className="h-3 w-3 text-slate-300 group-hover:text-rose-500" />
@@ -212,7 +212,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
             <div className="space-y-3">
               <Input 
                 placeholder="Add company..." 
-                className="rounded-xl h-10 text-xs font-bold border-slate-200"
+                className="rounded-md h-10 text-xs font-bold border-slate-200"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const val = (e.target as HTMLInputElement).value.trim();
@@ -225,7 +225,7 @@ export const HiringPreferencesUI: React.FC<HiringPreferencesUIProps> = ({
               />
               <div className="flex flex-wrap gap-2">
                 {activeProfile.preferences.preferredCompanies.map((comp, i) => (
-                  <Badge key={i} className="bg-slate-50 text-slate-500 border-slate-100 flex items-center gap-2 px-3 py-1.5 rounded-xl group transition-all">
+                  <Badge key={i} className="bg-slate-50 text-slate-500 border-slate-100 flex items-center gap-2 px-3 py-1.5 rounded-md group transition-all">
                     <span className="text-[10px] font-black uppercase tracking-tight">{comp}</span>
                     <button onClick={() => handleUpdatePrefs({ preferredCompanies: activeProfile.preferences.preferredCompanies.filter((_, idx) => idx !== i) })}>
                       <X className="h-3 w-3 text-slate-300 group-hover:text-rose-500" />

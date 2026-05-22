@@ -101,7 +101,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-indigo-600 rounded-[3rem] p-10 lg:p-16 text-white relative overflow-hidden shadow-2xl shadow-indigo-100 mb-12"
+                  className="bg-primary rounded-md p-10 lg:p-16 text-white relative overflow-hidden shadow-2xl shadow-primary/20 mb-12"
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,255,255,0.1),transparent)] pointer-events-none" />
                   <div className="relative z-10 grid lg:grid-cols-2 gap-12 items-center">
@@ -113,7 +113,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                       <h1 className="text-5xl lg:text-6xl font-black tracking-tighter leading-[0.95]">
                         Stop filling forms. <span className="text-indigo-200 italic">Get hired.</span>
                       </h1>
-                      <p className="text-lg text-indigo-50 font-medium leading-relaxed max-w-md">
+                      <p className="text-lg text-primary/10 font-medium leading-relaxed max-w-md">
                         Drop your resume and a job description. We'll audit your profile, fix the gaps, and prep you for 1-click apply.
                       </p>
                       <div className="flex flex-wrap gap-4 pt-4">
@@ -125,7 +125,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                         </div>
                       </div>
                     </div>
-                    <div className="hidden lg:block bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 font-mono text-[11px] text-indigo-100 space-y-3">
+                    <div className="hidden lg:block bg-white/5 backdrop-blur-md rounded-md p-8 border border-white/10 font-mono text-[11px] text-primary/20 space-y-3">
                       <div className="flex items-center gap-2 mb-4">
                         <div className="h-2 w-2 rounded-full bg-rose-400" />
                         <div className="h-2 w-2 rounded-full bg-amber-400" />
@@ -144,20 +144,20 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                 <motion.div 
                     whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)" }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 transition-colors hover:border-indigo-200 group"
+                    className="bg-white p-6 rounded-md border border-slate-200 space-y-4 transition-colors hover:border-indigo-200 group"
                   >
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic uppercase group-hover:text-indigo-900 transition-colors">
-                        <FileText className="h-5 w-5 text-indigo-600 group-hover:scale-110 transition-transform" /> Resume Profile
+                        <FileText className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" /> Resume Profile
                       </h2>
-                      <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                      <div className="flex bg-slate-100 p-0.5 rounded-md border border-slate-200">
                         {['file', 'text', 'url'].map((m) => (
                           <button
                             key={m}
                             onClick={() => setResumeInputMode(m as any)}
                             className={cn(
-                              "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                              resumeInputMode === m ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                              "px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all",
+                              resumeInputMode === m ? "bg-white text-primary shadow-sm" : "text-slate-400 hover:text-slate-600"
                             )}
                           >
                             {m}
@@ -179,7 +179,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                           value={resume}
                           onChange={(e) => setResume(e.target.value)}
                           placeholder="Paste your resume text here..."
-                          className="h-32 bg-slate-50 border-slate-100 rounded-xl text-sm font-medium focus:ring-indigo-500/20 resize-none"
+                          className="h-32 bg-slate-50 border-slate-100 rounded-md text-sm font-medium focus:ring-indigo-500/20 resize-none"
                         />
                       )}
                       {resumeInputMode === 'url' && (
@@ -187,7 +187,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                           value={resumeUrl}
                           onChange={(e) => setResumeUrl(e.target.value)}
                           placeholder="Paste LinkedIn URL..."
-                          className="h-12 bg-slate-50 border-slate-100 rounded-xl px-4 text-sm font-medium"
+                          className="h-12 bg-slate-50 border-slate-100 rounded-md px-4 text-sm font-medium"
                         />
                       )}
                     </div>
@@ -196,20 +196,20 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                   <motion.div 
                     whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05)" }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 transition-colors hover:border-indigo-200 group"
+                    className="bg-white p-6 rounded-md border border-slate-200 space-y-4 transition-colors hover:border-indigo-200 group"
                   >
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic uppercase group-hover:text-indigo-900 transition-colors">
-                        <Target className="h-5 w-5 text-indigo-600 group-hover:scale-110 transition-transform" /> Target Job
+                        <Target className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" /> Target Job
                       </h2>
-                      <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                      <div className="flex bg-slate-100 p-0.5 rounded-md border border-slate-200">
                         {['file', 'text', 'url'].map((m) => (
                           <button
                             key={m}
                             onClick={() => setJdInputMode(m as any)}
                             className={cn(
-                              "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                              jdInputMode === m ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                              "px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all",
+                              jdInputMode === m ? "bg-white text-primary shadow-sm" : "text-slate-400 hover:text-slate-600"
                             )}
                           >
                             {m}
@@ -231,7 +231,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                           value={jd}
                           onChange={(e) => setJd(e.target.value)}
                           placeholder="Paste the Job Description text here..."
-                          className="h-32 bg-slate-50 border-slate-100 rounded-xl text-sm font-medium focus:ring-indigo-500/20 resize-none"
+                          className="h-32 bg-slate-50 border-slate-100 rounded-md text-sm font-medium focus:ring-indigo-500/20 resize-none"
                         />
                       )}
                       {jdInputMode === 'url' && (
@@ -239,7 +239,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                           value={jdUrl}
                           onChange={(e) => setJdUrl(e.target.value)}
                           placeholder="Paste Job URL..."
-                          className="h-12 bg-slate-50 border-slate-100 rounded-xl px-4 text-sm font-medium"
+                          className="h-12 bg-slate-50 border-slate-100 rounded-md px-4 text-sm font-medium"
                         />
                       )}
                     </div>
@@ -252,7 +252,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleAnalyze()}
                   disabled={isAnalyzing}
-                  className="w-full max-w-md py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="w-full max-w-md py-4 bg-slate-900 text-white rounded-md text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {isAnalyzing ? (
                     <RefreshCw className="h-5 w-5 animate-spin" />
@@ -288,20 +288,20 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                       {activeStep === 1 && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                           <div className="lg:col-span-4">
-                            <div className="bg-slate-900 p-12 rounded-[3rem] text-center space-y-6 relative overflow-hidden h-full flex flex-col justify-center shadow-2xl">
+                            <div className="bg-slate-900 p-12 rounded-md text-center space-y-6 relative overflow-hidden h-full flex flex-col justify-center shadow-2xl">
                               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(99,102,241,0.15),transparent)] pointer-events-none" />
                               <div className="space-y-2">
                                 <div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Total Alignment Score</div>
                                 <div className="flex items-baseline justify-center">
                                   <span className="text-8xl font-black text-white tracking-tighter">{((activeCandidate.atsScore || activeCandidate.score) * 10).toFixed(0)}</span>
-                                  <span className="text-2xl font-black text-indigo-500 ml-1">%</span>
+                                  <span className="text-2xl font-black text-primary/100 ml-1">%</span>
                                 </div>
                               </div>
                               <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                                 <motion.div
                                   initial={{ width: 0 }}
                                   animate={{ width: `${(activeCandidate.atsScore || activeCandidate.score) * 10}%` }}
-                                  className="h-full bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)]"
+                                  className="h-full bg-primary/100 shadow-[0_0_20px_rgba(99,102,241,0.5)]"
                                 />
                               </div>
                               <p className="text-[10px] text-white/40 font-medium leading-relaxed uppercase tracking-widest">
@@ -309,7 +309,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                               </p>
                             </div>
                           </div>
-                          <div className="lg:col-span-8 bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
+                          <div className="lg:col-span-8 bg-white p-10 rounded-md border border-slate-200 shadow-sm">
                             <KeywordCoverage
                               keywords={activeCandidate.keywords || { present: [], missing: activeCandidate.gaps || [] }}
                               atsScore={activeCandidate.atsScore || activeCandidate.score}
@@ -324,8 +324,8 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
 
                       {activeStep === 2 && (
                         <div className="space-y-12">
-                          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row gap-10 items-center">
-                            <div className="p-4 rounded-3xl bg-indigo-50 text-indigo-600">
+                          <div className="bg-white p-10 rounded-md border border-slate-200 shadow-sm flex flex-col md:flex-row gap-10 items-center">
+                            <div className="p-4 rounded-md bg-primary/10 text-primary">
                               <BrainCircuit className="h-8 w-8" />
                             </div>
                             <div className="space-y-2">
@@ -353,13 +353,13 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                             </div>
 
                             <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
                                 <Zap className="h-4 w-4" /> Strategic Gaps
                               </div>
                               <div className="space-y-3">
                                 {activeCandidate.gaps?.map((g, idx) => (
-                                  <div key={idx} className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 flex items-start gap-3">
-                                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                  <div key={idx} className="p-4 bg-primary/10/50 rounded-md border border-primary/20/50 flex items-start gap-3">
+                                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/100 shrink-0" />
                                     <p className="text-xs font-bold text-indigo-900 leading-relaxed">{g}</p>
                                   </div>
                                 ))}
@@ -387,13 +387,13 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                       )}
 
                       {activeStep === 3 && (
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm min-h-[600px]">
+                        <div className="bg-white p-10 rounded-md border border-slate-200 shadow-sm min-h-[600px]">
                            <div className="flex items-center justify-between mb-8">
                              <div>
                                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic">Interactive Improvement</h3>
                                <p className="text-slate-500 text-xs font-medium">Refine your resume bullets in real-time. Changes are grounded in your experience.</p>
                              </div>
-                             <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">
+                             <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest">
                                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Grounded Vetting
                              </div>
                            </div>
@@ -409,23 +409,23 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
 
                       {activeStep === 4 && (
                         <div className="space-y-8">
-                          <div className="bg-indigo-600 p-10 rounded-[3rem] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-indigo-200">
+                          <div className="bg-primary p-10 rounded-md text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-primary/40">
                             <div className="space-y-2">
                               <h3 className="text-3xl font-black tracking-tight uppercase italic">Your Tailored Resume is Ready</h3>
-                              <p className="text-indigo-100 font-medium max-w-xl">Optimized for the {role} role in the {targetMarket} market. Highlighting your impact while maintaining zero hallucination.</p>
+                              <p className="text-primary/20 font-medium max-w-xl">Optimized for the {role} role in the {targetMarket} market. Highlighting your impact while maintaining zero hallucination.</p>
                             </div>
                             <button
                               onClick={() => activeCandidate && handleTailor(activeCandidate)}
                               disabled={isTailoring}
-                              className="px-8 py-4 bg-white text-indigo-600 rounded-[2rem] text-sm font-black uppercase tracking-widest hover:bg-indigo-50 transition-all flex items-center gap-2 whitespace-nowrap shadow-xl"
+                              className="px-8 py-4 bg-white text-primary rounded-md text-sm font-black uppercase tracking-widest hover:bg-primary/10 transition-all flex items-center gap-2 whitespace-nowrap shadow-xl"
                             >
                               {isTailoring ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                               Generate Final PDF
                             </button>
                           </div>
 
-                          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
-                            <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100 font-mono text-sm leading-relaxed whitespace-pre-wrap text-slate-700">
+                          <div className="bg-white p-10 rounded-md border border-slate-200 shadow-sm">
+                            <div className="p-8 bg-slate-50 rounded-md border border-slate-100 font-mono text-sm leading-relaxed whitespace-pre-wrap text-slate-700">
                               {activeCandidate.tailoredResume || "Click 'Generate' to see your rewritten resume highlights."}
                             </div>
                           </div>
@@ -446,12 +446,12 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
               exit={{ opacity: 0, x: -10 }}
               className="max-w-4xl mx-auto py-32 px-6 text-center"
             >
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-widest mb-12">
                 <Zap className="h-3 w-3" />
                 Coming Late 2026
               </div>
               <h2 className="text-5xl lg:text-7xl font-black text-slate-900 tracking-tighter mb-8 leading-[0.9]">
-                Apply <span className="text-indigo-600 italic">Autopilot.</span>
+                Apply <span className="text-primary italic">Autopilot.</span>
               </h2>
               <p className="text-lg text-slate-500 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
                 Tired of copying and pasting the same info into LinkedIn, Indeed, and company portals? Soon, your T.E.P profile will automatically fill job applications for you.
@@ -464,15 +464,15 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                   { title: "Tracking Dashboard", desc: "See where you've applied and track your status in one place." },
                   { title: "Agentic Vetting", desc: "Our AI double-checks the JD before applying to ensure a good fit." }
                 ].map((feature, i) => (
-                  <div key={i} className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm">
-                    <CheckCircle2 className="h-5 w-5 text-indigo-600 mb-3" />
+                  <div key={i} className="p-6 bg-white border border-slate-200 rounded-md shadow-sm">
+                    <CheckCircle2 className="h-5 w-5 text-primary mb-3" />
                     <h4 className="font-black text-slate-900 uppercase text-xs tracking-widest mb-2">{feature.title}</h4>
                     <p className="text-slate-500 text-xs font-medium leading-relaxed">{feature.desc}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="bg-slate-900 p-10 rounded-[3rem] text-white space-y-6 shadow-2xl">
+              <div className="bg-slate-900 p-10 rounded-md text-white space-y-6 shadow-2xl">
                 <h3 className="text-xl font-black uppercase tracking-widest italic">Join the Beta Waitlist</h3>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <input 
@@ -480,7 +480,7 @@ export const CandidateDashboard: React.FC<DashboardShellProps> = (props) => {
                     placeholder="Enter your email"
                     className="flex-1 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 backdrop-blur-md"
                   />
-                  <button className="px-8 py-4 bg-indigo-600 text-white rounded-full text-sm font-black uppercase tracking-widest hover:bg-indigo-700 transition-all">
+                  <button className="px-8 py-4 bg-primary text-white rounded-full text-sm font-black uppercase tracking-widest hover:bg-primary/90 transition-all">
                     Get Early Access
                   </button>
                 </div>

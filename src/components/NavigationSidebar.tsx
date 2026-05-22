@@ -44,7 +44,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
               onClick={() => setActiveTab(tab.id as any)}
               disabled={tab.isBeta && activeTab !== tab.id}
               className={cn(
-                "w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all",
+                "w-full flex items-center justify-between px-4 py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-all",
                 activeTab === tab.id
                   ? "bg-slate-900 text-white shadow-xl shadow-slate-200"
                   : tab.isBeta 
@@ -75,7 +75,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           ].map((feature) => (
             <div key={feature.id} className="flex items-center justify-between group">
               <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 group-hover:text-slate-900 transition-colors">
-                <feature.icon className="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-500" />
+                <feature.icon className="h-3.5 w-3.5 text-slate-300 group-hover:text-primary/100" />
                 {feature.label}
               </div>
               <Switch
@@ -83,7 +83,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                 onCheckedChange={(checked) => {
                   setSelectedFeatures(prev => checked ? [...prev, feature.id] : prev.filter(f => f !== feature.id));
                 }}
-                className="scale-[0.6] data-[state=checked]:bg-indigo-600"
+                className="scale-[0.6] data-[state=checked]:bg-primary"
               />
             </div>
           ))}

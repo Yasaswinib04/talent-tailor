@@ -10,44 +10,44 @@
   --color-secondary-fixed-dim: #71717a;
   --color-on-tertiary-fixed: #003318;
   --color-secondary: #71717a;
-  --color-primary-container: #7c3aed;
+  --color-primary-container: #0f3f35;
   --color-on-secondary-container: #a1a1aa;
   --color-surface-bright: #18181b;
   --color-secondary-container: #27272a;
   --color-surface-container-highest: #1e1e22;
-  --color-primary-fixed: #ede9fe;
+  --color-primary-fixed: #ccfbf1;
   --color-surface-container: #121215;
   --color-on-surface: #fafafa;
-  --color-background: #09090b;
+  --color-background: #0c0c0f;
   --color-on-background: #fafafa;
   --color-outline-variant: #27272a;
-  --color-on-primary-container: #ede9fe;
+  --color-on-primary-container: #ccfbf1;
   --color-tertiary: #34d399;
   --color-inverse-surface: #fafafa;
-  --color-inverse-primary: #5b21b6;
+  --color-inverse-primary: #042f2e;
   --color-on-secondary-fixed-variant: #3f3f46;
-  --color-primary-fixed-dim: #c4b5fd;
+  --color-primary-fixed-dim: #99f6e4;
   --color-on-tertiary-fixed-variant: #047857;
   --color-on-secondary: #09090b;
   --color-on-error: #1a0000;
-  --color-on-primary-fixed-variant: #5b21b6;
+  --color-on-primary-fixed-variant: #042f2e;
   --color-outline: #52525b;
-  --color-surface-tint: #a78bfa;
+  --color-surface-tint: #57f1db;
   --color-on-tertiary-container: #bbf7d0;
   --color-surface-container-high: #18181b;
   --color-error: #ef4444;
   --color-surface: #0c0c0f;
   --color-tertiary-fixed: #bbf7d0;
-  --color-primary: #a78bfa;
+  --color-primary: #57f1db;
   --color-tertiary-fixed-dim: #6ee7b7;
-  --color-surface-container-lowest: #09090b;
+  --color-surface-container-lowest: #0c0c0f;
   --color-secondary-fixed: #a1a1aa;
   --color-inverse-on-surface: #09090b;
   --color-on-surface-variant: #a1a1aa;
-  --color-on-primary-fixed: #2e1065;
+  --color-on-primary-fixed: #042f2e;
   --color-error-container: #3b1111;
   --color-surface-variant: #18181b;
-  --color-on-primary: #0a0012;
+  --color-on-primary: #022c22;
   --color-tertiary-container: #065f46;
   --color-surface-container-low: #0f0f12;
   --color-on-secondary-fixed: #18181b;
@@ -58,6 +58,8 @@
   --font-display: "Geist", "sans-serif";
   --font-body: "Geist", "sans-serif";
   --font-label: "Geist", "sans-serif";
+
+  --radius: 0.5rem;
 }
 
 @layer base {
@@ -67,19 +69,69 @@
 }
 
 @layer utilities {
-  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #27272a; border-radius: 9999px; }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #27272a;
+    border-radius: 9999px;
+  }
 
   /* High density table custom scrollbar */
-  .high-density-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-  .high-density-scrollbar::-webkit-scrollbar-track { background: #0c0c0f; }
-  .high-density-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
-  .high-density-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
+  .high-density-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-  .circular-chart { display: block; margin: 0 auto; max-width: 80%; max-height: 250px; }
-  .circle-bg { fill: none; stroke: #27272a; stroke-width: 3.8; }
-  .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; animation: progress 1s ease-out forwards; }
-  @keyframes progress { 0% { stroke-dasharray: 0 100; } }
-  .percentage { fill: #fafafa; font-family: 'Geist', sans-serif; font-size: 0.5em; text-anchor: middle; font-weight: 600; }
+  .high-density-scrollbar::-webkit-scrollbar-track {
+    background: #0c0c0f;
+  }
+
+  .high-density-scrollbar::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 4px;
+  }
+
+  .high-density-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+  }
+
+  .circular-chart {
+    display: block;
+    margin: 0 auto;
+    max-width: 80%;
+    max-height: 250px;
+  }
+
+  .circle-bg {
+    fill: none;
+    stroke: #27272a;
+    stroke-width: 3.8;
+  }
+
+  .circle {
+    fill: none;
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    animation: progress 1s ease-out forwards;
+  }
+
+  @keyframes progress {
+    0% {
+      stroke-dasharray: 0 100;
+    }
+  }
+
+  .percentage {
+    fill: #fafafa;
+    font-family: 'Geist', sans-serif;
+    font-size: 0.5em;
+    text-anchor: middle;
+    font-weight: 600;
+  }
 }

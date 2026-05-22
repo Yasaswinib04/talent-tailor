@@ -41,18 +41,18 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       {currentFiles.length > 0 ? (
         <div className="space-y-2">
           {currentFiles.map((file, idx) => (
-            <div key={idx} className="flex items-center justify-between p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div key={idx} className="flex items-center justify-between p-2 bg-primary/10 border border-indigo-200 rounded-md">
               <div className="flex items-center gap-2 overflow-hidden">
-                <FileText className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
                 <span className="text-xs font-medium text-indigo-900 truncate">{file.name}</span>
               </div>
-              <button onClick={() => onClear(idx)} className="text-indigo-600 hover:text-indigo-800">
+              <button onClick={() => onClear(idx)} className="text-primary hover:text-primary/80">
                 <XCircle className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
           {multiple && (
-            <div {...getRootProps()} className="p-2 border border-dashed border-slate-200 rounded-lg text-center cursor-pointer hover:bg-slate-50">
+            <div {...getRootProps()} className="p-2 border border-dashed border-slate-200 rounded-md text-center cursor-pointer hover:bg-slate-50">
               <input {...getInputProps()} />
               <span className="text-[10px] font-bold text-slate-400">+ ADD MORE FILES</span>
             </div>
@@ -62,8 +62,8 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         <div
           {...getRootProps()}
           className={cn(
-            "h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer transition-all",
-            isDragActive ? "border-indigo-500 bg-indigo-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+            "h-32 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-2 cursor-pointer transition-all",
+            isDragActive ? "border-primary/100 bg-primary/10" : "border-slate-200 bg-slate-50 hover:bg-slate-100"
           )}
         >
           <input {...getInputProps()} />

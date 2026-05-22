@@ -36,7 +36,7 @@ export function HRRoleDashboard() {
 
       {/* Bento Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 shrink-0">
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col justify-between">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-4 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm text-on-surface-variant font-medium">Avg. Match Score</p>
             <span className="material-symbols-outlined text-primary text-sm">show_chart</span>
@@ -44,7 +44,7 @@ export function HRRoleDashboard() {
           <p className="text-2xl font-headline font-bold text-on-surface">84<span className="text-sm text-on-surface-variant font-normal">%</span></p>
         </div>
         
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col justify-between">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-4 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm text-on-surface-variant font-medium">Technical Cleared</p>
             <span className="material-symbols-outlined text-tertiary text-sm">verified</span>
@@ -52,7 +52,7 @@ export function HRRoleDashboard() {
           <p className="text-2xl font-headline font-bold text-on-surface">18<span className="text-sm text-on-surface-variant font-normal"> / 42</span></p>
         </div>
         
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col justify-between">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-4 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
             <p className="text-sm text-on-surface-variant font-medium">Critical Skill Gaps</p>
             <span className="material-symbols-outlined text-error text-sm">warning</span>
@@ -60,7 +60,7 @@ export function HRRoleDashboard() {
           <p className="text-2xl font-headline font-bold text-on-surface">7<span className="text-sm text-on-surface-variant font-normal"> candidates</span></p>
         </div>
         
-        <div className="bg-surface-container border border-outline-variant rounded-lg p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:border-primary transition-colors">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:border-primary transition-colors">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent z-0"></div>
           <div className="relative z-10 flex justify-between items-start mb-2">
             <p className="text-sm text-primary font-medium">Generate Report</p>
@@ -71,7 +71,7 @@ export function HRRoleDashboard() {
       </div>
 
       {/* High Density Ranking Table */}
-      <div className="bg-surface-container border border-outline-variant rounded-lg flex flex-col flex-1 min-h-[400px]">
+      <div className="bg-surface-container border border-outline-variant rounded-md flex flex-col flex-1 min-h-[400px]">
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-outline-variant bg-surface-container-highest/50 text-xs font-medium text-on-surface-variant uppercase tracking-wider sticky top-0 z-10 rounded-t-lg shrink-0">
           <div className="col-span-3 flex items-center gap-2">

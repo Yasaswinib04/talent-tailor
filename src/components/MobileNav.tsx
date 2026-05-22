@@ -75,10 +75,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
           className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm bg-white z-[90] lg:hidden shadow-2xl flex flex-col"
         >
           <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-indigo-600 font-black text-xl italic tracking-tighter">
+            <div className="flex items-center gap-2 text-primary font-black text-xl italic tracking-tighter">
               <ShieldCheck className="h-6 w-6" /> T.E.P
             </div>
-            <button onClick={onClose} className="p-2 bg-slate-50 text-slate-400 rounded-lg">
+            <button onClick={onClose} className="p-2 bg-slate-50 text-slate-400 rounded-md">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -89,11 +89,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               <div className="space-y-4">
                 <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Account Mode</div>
                 <Tabs value={persona} onValueChange={(v) => setPersona(v as Persona)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 rounded-2xl h-12 p-1 bg-slate-100">
-                    <TabsTrigger value="candidate" className="rounded-xl text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 shadow-none transition-all">
+                  <TabsList className="grid w-full grid-cols-2 rounded-md h-12 p-1 bg-slate-100">
+                    <TabsTrigger value="candidate" className="rounded-md text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-primary shadow-none transition-all">
                       Candidate
                     </TabsTrigger>
-                    <TabsTrigger value="hr" className="rounded-xl text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 shadow-none transition-all">
+                    <TabsTrigger value="hr" className="rounded-md text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-primary shadow-none transition-all">
                       HR Expert
                     </TabsTrigger>
                   </TabsList>
@@ -104,7 +104,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               <div className="space-y-4">
                 <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Experience</div>
                 <Select value={tier} onValueChange={(v) => setTier(v as ExperienceTier)}>
-                  <SelectTrigger className="w-full h-12 text-xs font-bold bg-white border-slate-200 rounded-2xl">
+                  <SelectTrigger className="w-full h-12 text-xs font-bold bg-white border-slate-200 rounded-md">
                     <SelectValue placeholder="Experience Bucket" />
                   </SelectTrigger>
                   <SelectContent>
@@ -133,9 +133,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                         onClose();
                       }}
                       className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-2xl border transition-all gap-2",
+                        "flex flex-col items-center justify-center p-4 rounded-md border transition-all gap-2",
                         activeTab === tab.id
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100"
+                          ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
                           : "bg-white border-slate-100 text-slate-500"
                       )}
                     >
@@ -160,10 +160,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                         onSelectHistory(item);
                         onClose();
                       }}
-                      className="w-full flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-all text-left"
+                      className="w-full flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-md hover:bg-slate-100 transition-all text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 bg-white rounded-lg border border-slate-200 flex items-center justify-center text-indigo-600 font-bold text-[10px]">
+                        <div className="h-8 w-8 bg-white rounded-md border border-slate-200 flex items-center justify-center text-primary font-bold text-[10px]">
                           {(item.candidates[0]?.score || 0).toFixed(1)}
                         </div>
                         <div className="truncate">
@@ -193,7 +193,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
             ) : (
               <button
                 onClick={onLogin}
-                className="w-full h-12 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                className="w-full h-12 bg-primary text-white rounded-md text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
               >
                 <Globe className="h-4 w-4" /> Sign In
               </button>

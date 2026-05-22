@@ -29,17 +29,17 @@ export const CandidateNavbar: React.FC<CandidateNavbarProps> = ({
   return (
     <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-2">
-        <Link to="/" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors">
+        <Link to="/" className="flex items-center gap-2 text-primary hover:text-primary transition-colors">
           <ShieldCheck className="h-7 w-7 stroke-[2.5]" />
           <span className="font-black text-lg tracking-tighter italic hidden sm:inline">Talent Engine Pro</span>
         </Link>
       </div>
 
-      <div className="hidden md:flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+      <div className="hidden md:flex items-center gap-4 bg-slate-50 p-1.5 rounded-md border border-slate-200">
         <select 
           value={role}
           onChange={(e) => setRole(e.target.value as RoleType)}
-          className="h-9 px-4 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer hover:bg-slate-50 max-w-[180px]"
+          className="h-9 px-4 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer hover:bg-slate-50 max-w-[180px]"
         >
           {Object.keys(ROLE_WEIGHTS).map(r => (
             <option key={r} value={r}>{r}</option>
@@ -51,7 +51,7 @@ export const CandidateNavbar: React.FC<CandidateNavbarProps> = ({
         <select
           value={targetMarket}
           onChange={(e) => setTargetMarket(e.target.value)}
-          className="h-9 px-4 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer hover:bg-slate-50 max-w-[140px]"
+          className="h-9 px-4 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer hover:bg-slate-50 max-w-[140px]"
         >
           {markets.map(m => (
             <option key={m} value={m}>{m}</option>
@@ -66,8 +66,8 @@ export const CandidateNavbar: React.FC<CandidateNavbarProps> = ({
               {user.photoURL ? (
                 <img src={user.photoURL} alt="Avatar" className="h-6 w-6 rounded-full" />
               ) : (
-                <div className="h-6 w-6 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <UserIcon className="h-3 w-3 text-indigo-600" />
+                <div className="h-6 w-6 bg-primary/20 rounded-full flex items-center justify-center">
+                  <UserIcon className="h-3 w-3 text-primary" />
                 </div>
               )}
               <span className="text-xs font-bold text-slate-700 hidden sm:inline">{user.displayName || 'User'}</span>

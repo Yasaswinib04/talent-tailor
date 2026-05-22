@@ -48,7 +48,7 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0.5 }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="bg-white h-full w-full max-w-4xl rounded-[2.5rem] shadow-[0_32px_128px_-32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col border border-white"
+      className="bg-white h-full w-full max-w-4xl rounded-md shadow-[0_32px_128px_-32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col border border-white"
     >
       <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white sticky top-0 z-10">
         <div className="flex items-center gap-6">
@@ -58,7 +58,7 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h2 className="text-2xl font-black tracking-tighter text-slate-900 uppercase italic leading-none">{candidate.name}</h2>
-              <Badge className="bg-indigo-600 text-white border-none font-black text-[9px] px-2 py-0.5 rounded-lg">
+              <Badge className="bg-primary text-white border-none font-black text-[9px] px-2 py-0.5 rounded-md">
                 {candidate.score.toFixed(1)} MATCH
               </Badge>
             </div>
@@ -69,12 +69,12 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
           <button 
             onClick={onTailor}
             disabled={isTailoring}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
           >
             {isTailoring ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             AI Tailor
           </button>
-          <button onClick={onClose} className="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-200 transition-all">
+          <button onClick={onClose} className="p-3 bg-slate-100 text-slate-400 rounded-md hover:bg-slate-200 transition-all">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -87,13 +87,13 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
             <div className="lg:col-span-2 space-y-8">
               <div className="space-y-4">
                 <div className="mono-label">Professional Summary</div>
-                <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic">
+                <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 p-6 rounded-md border border-slate-100 italic">
                   "{candidate.overallFeedback}"
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-6 bg-emerald-50/50 rounded-[2rem] border border-emerald-100 space-y-4">
+                <div className="p-6 bg-emerald-50/50 rounded-md border border-emerald-100 space-y-4">
                   <div className="flex items-center gap-2 text-emerald-700">
                     <Target className="h-4 w-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Key Strengths</span>
@@ -107,7 +107,7 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
                     ))}
                   </div>
                 </div>
-                <div className="p-6 bg-rose-50/50 rounded-[2rem] border border-rose-100 space-y-4">
+                <div className="p-6 bg-rose-50/50 rounded-md border border-rose-100 space-y-4">
                   <div className="flex items-center gap-2 text-rose-700">
                     <HelpCircle className="h-4 w-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Growth Areas</span>
@@ -127,12 +127,12 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
             <div className="space-y-8">
               <div className="space-y-4">
                 <div className="mono-label text-center">Competency Heatmap</div>
-                <div className="space-y-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                <div className="space-y-4 bg-white p-6 rounded-md border border-slate-100 shadow-sm">
                   {candidate.competencies.map((comp, idx) => (
                     <div key={idx} className="space-y-2">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-tight">
                         <span className="text-slate-600">{comp.name}</span>
-                        <span className="text-indigo-600">{comp.score.toFixed(1)}</span>
+                        <span className="text-primary">{comp.score.toFixed(1)}</span>
                       </div>
                       <Progress value={comp.score * 10} className="h-1.5 bg-slate-100" />
                     </div>
@@ -143,10 +143,10 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
               <div className="space-y-4">
                 <div className="mono-label text-center">Quick Actions</div>
                 <div className="grid grid-cols-1 gap-2">
-                  <button className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all">
+                  <button className="flex items-center justify-between p-4 bg-slate-50 rounded-md border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all">
                     Generate Interview Script <ChevronRight className="h-3 w-3" />
                   </button>
-                  <button className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all">
+                  <button className="flex items-center justify-between p-4 bg-slate-50 rounded-md border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all">
                     Share with Stakeholders <ExternalLink className="h-3 w-3" />
                   </button>
                 </div>
@@ -155,14 +155,14 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
           </div>
 
           <Tabs defaultValue="experience" className="w-full">
-            <TabsList className="bg-slate-100 p-1 rounded-2xl h-14 w-full max-w-md mx-auto grid grid-cols-3">
-              <TabsTrigger value="experience" className="rounded-xl text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-indigo-600">Experience</TabsTrigger>
-              <TabsTrigger value="tailoring" className="rounded-xl text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-indigo-600">AI Tailoring</TabsTrigger>
-              <TabsTrigger value="questions" className="rounded-xl text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-indigo-600">Discovery</TabsTrigger>
+            <TabsList className="bg-slate-100 p-1 rounded-md h-14 w-full max-w-md mx-auto grid grid-cols-3">
+              <TabsTrigger value="experience" className="rounded-md text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary">Experience</TabsTrigger>
+              <TabsTrigger value="tailoring" className="rounded-md text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary">AI Tailoring</TabsTrigger>
+              <TabsTrigger value="questions" className="rounded-md text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-primary">Discovery</TabsTrigger>
             </TabsList>
             
             <TabsContent value="experience" className="pt-8 space-y-8">
-              <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden group">
+              <div className="bg-slate-900 rounded-md p-10 text-white relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                   <ShieldCheck className="h-32 w-32" />
                 </div>
@@ -184,7 +184,7 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
               {candidate.proposedChanges && candidate.proposedChanges.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6">
                   {candidate.proposedChanges.map((change) => (
-                    <div key={change.id} className="bg-white border-2 border-slate-100 rounded-[2rem] overflow-hidden flex flex-col">
+                    <div key={change.id} className="bg-white border-2 border-slate-100 rounded-md overflow-hidden flex flex-col">
                       <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Badge className="bg-slate-900 text-white border-none text-[8px] font-black px-2 py-0.5 uppercase tracking-widest">Suggested Change</Badge>
@@ -193,13 +193,13 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={() => onRejectChange(change.id)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-md transition-all"
                           >
                             <X className="h-4 w-4" />
                           </button>
                           <button 
                             onClick={() => onAcceptChange(change.id)}
-                            className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
+                            className="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-md hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
                           >
                             Apply Change
                           </button>
@@ -211,12 +211,12 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
                           <p className="text-xs text-slate-400 leading-relaxed italic line-through">{change.original}</p>
                         </div>
                         <div className="space-y-4">
-                          <div className="mono-label text-indigo-600">AI Suggested (STAR Format)</div>
+                          <div className="mono-label text-primary">AI Suggested (STAR Format)</div>
                           <p className="text-xs text-slate-900 font-bold leading-relaxed">{change.suggested}</p>
                         </div>
                       </div>
                       <div className="px-8 pb-8">
-                        <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 text-[10px] font-bold text-indigo-700 leading-relaxed">
+                        <div className="p-4 bg-primary/10/50 rounded-md border border-primary/20 text-[10px] font-bold text-primary leading-relaxed">
                           <span className="font-black uppercase mr-2 tracking-widest">Reason:</span> {change.reason}
                         </div>
                       </div>
@@ -239,9 +239,9 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
             <TabsContent value="questions" className="pt-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {candidate.discoveryQuestions.map((dq, i) => (
-                  <div key={i} className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-4">
+                  <div key={i} className="p-8 bg-slate-50 rounded-md border border-slate-100 space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 bg-white rounded-xl flex items-center justify-center font-black text-indigo-600 border border-slate-100 shadow-sm text-xs">
+                      <div className="h-8 w-8 bg-white rounded-md flex items-center justify-center font-black text-primary border border-slate-100 shadow-sm text-xs">
                         {i + 1}
                       </div>
                       <p className="text-[11px] font-black text-slate-900 leading-tight uppercase tracking-tight">{dq.question}</p>
@@ -250,7 +250,7 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
                       <p className="text-xs text-slate-600 leading-relaxed pl-11 italic">"{dq.answer}"</p>
                     ) : (
                       <div className="pl-11 pt-2">
-                        <button className="flex items-center gap-2 text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-800">
+                        <button className="flex items-center gap-2 text-[9px] font-black text-primary uppercase tracking-widest hover:text-primary/80">
                           <Plus className="h-3 w-3" /> Add Candidate Answer
                         </button>
                       </div>

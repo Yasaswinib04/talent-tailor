@@ -15,8 +15,8 @@ const steps = [
     icon: FileUp,
     title: "Drop & Extract",
     description: "Upload your resume; our agents extract deep STAR evidence automatically.",
-    color: "text-indigo-600",
-    bg: "bg-indigo-50"
+    color: "text-primary",
+    bg: "bg-primary/10"
   },
   {
     icon: Target,
@@ -55,13 +55,13 @@ export const WorkflowCarousel: React.FC = () => {
   const prevSlide = () => setIndex((prev) => (prev - 1 + steps.length) % steps.length);
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-10 shadow-sm overflow-hidden relative group">
+    <div className="w-full bg-white border border-slate-200 rounded-md p-6 lg:p-10 shadow-sm overflow-hidden relative group">
       <div className="flex items-center gap-6 lg:gap-16 px-4">
         
         {/* Left Nav Button */}
         <button 
           onClick={prevSlide}
-          className="h-10 w-10 shrink-0 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all z-10 hidden md:flex"
+          className="h-10 w-10 shrink-0 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-primary hover:border-indigo-200 transition-all z-10 hidden md:flex"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -75,7 +75,7 @@ export const WorkflowCarousel: React.FC = () => {
               exit={{ opacity: 0, x: -20 }}
               className="flex items-center gap-8"
             >
-              <div className={cn("p-6 rounded-3xl shrink-0", steps[index].bg)}>
+              <div className={cn("p-6 rounded-md shrink-0", steps[index].bg)}>
                 {React.createElement(steps[index].icon, { className: cn("h-10 w-10", steps[index].color) })}
               </div>
               <div className="space-y-3">
@@ -101,7 +101,7 @@ export const WorkflowCarousel: React.FC = () => {
                 onClick={() => setIndex(i)}
                 className={cn(
                   "h-2 transition-all duration-500 rounded-full",
-                  index === i ? "w-10 bg-indigo-600" : "w-2 bg-slate-200"
+                  index === i ? "w-10 bg-primary" : "w-2 bg-slate-200"
                 )}
               />
             ))}
@@ -109,7 +109,7 @@ export const WorkflowCarousel: React.FC = () => {
 
           <button 
             onClick={nextSlide}
-            className="h-10 w-10 shrink-0 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all z-10 hidden md:flex"
+            className="h-10 w-10 shrink-0 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-primary hover:border-indigo-200 transition-all z-10 hidden md:flex"
           >
             <ChevronRight className="h-5 w-5" />
           </button>

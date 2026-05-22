@@ -11,7 +11,7 @@ export function HRDashboard() {
           <h2 className="text-3xl font-headline font-bold tracking-tight text-on-surface mb-2">Active Hiring Pipelines</h2>
           <p className="text-on-surface-variant">Monitoring 3 active roles across departments.</p>
         </div>
-        <button className="bg-primary text-on-primary px-5 py-2.5 rounded-lg font-medium hover:bg-primary-fixed transition-colors flex items-center gap-2 text-sm shadow-[0_0_0_1px_rgba(167,139,250,0.1)]">
+        <button className="bg-primary text-on-primary px-5 py-2.5 rounded-md font-medium hover:bg-primary-fixed transition-colors flex items-center gap-2 text-sm shadow-[0_0_0_1px_rgba(167,139,250,0.1)]">
           <span className="material-symbols-outlined text-[20px]" data-icon="add">add</span>
           New Role
         </button>
@@ -21,7 +21,7 @@ export function HRDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Card 1: Senior Frontend Engineer */}
-        <div className="bg-surface-container border border-outline-variant rounded-xl p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 group-hover:bg-primary/10 transition-colors"></div>
           <div className="flex justify-between items-start">
             <div>
@@ -35,11 +35,11 @@ export function HRDashboard() {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">Total Screened</div>
               <div className="text-2xl font-display font-medium text-on-surface">142</div>
             </div>
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">High Match</div>
               <div className="text-2xl font-display font-medium text-primary">28</div>
             </div>
@@ -63,7 +63,7 @@ export function HRDashboard() {
         </div>
         
         {/* Card 2: Director of Product Marketing */}
-        <div className="bg-surface-container border border-outline-variant rounded-xl p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 group-hover:bg-primary/10 transition-colors"></div>
           <div className="flex justify-between items-start">
             <div>
@@ -77,11 +77,11 @@ export function HRDashboard() {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">Total Screened</div>
               <div className="text-2xl font-display font-medium text-on-surface">89</div>
             </div>
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">High Match</div>
               <div className="text-2xl font-display font-medium text-primary">12</div>
             </div>
@@ -105,7 +105,7 @@ export function HRDashboard() {
         </div>
         
         {/* Card 3: Lead UX Designer */}
-        <div className="bg-surface-container border border-outline-variant rounded-xl p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
+        <div className="bg-surface-container border border-outline-variant rounded-md p-6 flex flex-col gap-6 hover:border-outline transition-colors relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 group-hover:bg-primary/10 transition-colors"></div>
           <div className="flex justify-between items-start">
             <div>
@@ -119,11 +119,11 @@ export function HRDashboard() {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">Total Screened</div>
               <div className="text-2xl font-display font-medium text-on-surface">215</div>
             </div>
-            <div className="bg-surface-container-highest p-3 rounded-lg border border-outline-variant/50">
+            <div className="bg-surface-container-highest p-3 rounded-md border border-outline-variant/50">
               <div className="text-xs text-on-surface-variant mb-1">High Match</div>
               <div className="text-2xl font-display font-medium text-error">4</div>
             </div>

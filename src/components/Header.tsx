@@ -64,12 +64,12 @@ export const Header: React.FC<HeaderProps> = ({
 }) => (
   <header className="h-16 lg:h-20 border-b border-slate-200 bg-white px-4 lg:px-8 flex items-center justify-between shrink-0 z-50 sticky top-0">
     <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 text-indigo-600 font-black text-lg lg:text-xl tracking-tighter">
+      <div className="flex items-center gap-2 text-primary font-black text-lg lg:text-xl tracking-tighter">
         <ShieldCheck className="h-6 w-6 lg:h-7 lg:w-7 stroke-[2.5]" />
         <span className="hidden sm:inline italic">TALENT ENGINE PRO</span>
         <span className="sm:hidden italic">T.E.P</span>
       </div>
-      <Badge className="hidden md:flex bg-indigo-600 text-white border-none text-[8px] font-black rounded-lg px-2 py-0.5 uppercase tracking-tighter shrink-0">
+      <Badge className="hidden md:flex bg-primary text-white border-none text-[8px] font-black rounded-md px-2 py-0.5 uppercase tracking-tighter shrink-0">
         V2.6 • {persona}
       </Badge>
     </div>
@@ -77,10 +77,10 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="hidden lg:flex items-center gap-8">
       <Tabs value={persona} onValueChange={(v) => setPersona(v as Persona)} className="w-[300px]">
         <TabsList className="grid w-full grid-cols-2 rounded-full h-10 p-1 bg-slate-100">
-          <TabsTrigger value="candidate" className="rounded-full text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg transition-all duration-300">
+          <TabsTrigger value="candidate" className="rounded-full text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all duration-300">
             <User className="h-3.5 w-3.5 mr-2" /> Candidate
           </TabsTrigger>
-          <TabsTrigger value="hr" className="rounded-full text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg transition-all duration-300">
+          <TabsTrigger value="hr" className="rounded-full text-xs font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all duration-300">
             <Users className="h-3.5 w-3.5 mr-2" /> HR Expert
           </TabsTrigger>
         </TabsList>
@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
       {persona === 'hr' && (
         <button
           onClick={() => onTabChange('preferences')}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100"
+          className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all border border-primary/20"
         >
           <Sliders className="h-3.5 w-3.5" /> JD & Role Settings
         </button>
@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Role Selector */}
       <div className="hidden sm:block">
         <Select value={role} onValueChange={(v) => setRole(v as RoleType)}>
-          <SelectTrigger className="w-[140px] lg:w-[180px] h-9 text-xs font-bold bg-white border-slate-200 rounded-xl">
+          <SelectTrigger className="w-[140px] lg:w-[180px] h-9 text-xs font-bold bg-white border-slate-200 rounded-md">
             <SelectValue placeholder="Select Role" />
           </SelectTrigger>
           <SelectContent>
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Experience Tier Selector */}
       <div className="hidden sm:block">
         <Select value={tier} onValueChange={(v) => setTier(v as ExperienceTier)}>
-          <SelectTrigger className="w-[120px] lg:w-[150px] h-9 text-xs font-bold bg-indigo-50 border-indigo-100 text-indigo-700 rounded-xl">
+          <SelectTrigger className="w-[120px] lg:w-[150px] h-9 text-xs font-bold bg-primary/10 border-primary/20 text-primary rounded-md">
             <div className="flex items-center gap-2">
               <Target className="h-3 w-3" />
               <SelectValue placeholder="Experience" />
@@ -136,9 +136,9 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="hidden sm:flex items-center gap-4">
           <div className="flex flex-col items-end">
             <span className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{user.displayName?.split(' ')[0]}</span>
-            <button onClick={onLogout} className="text-[9px] font-bold text-indigo-500 hover:text-indigo-700 transition-all uppercase tracking-widest leading-none mt-1">Logout</button>
+            <button onClick={onLogout} className="text-[9px] font-bold text-primary/100 hover:text-primary transition-all uppercase tracking-widest leading-none mt-1">Logout</button>
           </div>
-          <div className="h-10 w-10 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-sm relative group">
+          <div className="h-10 w-10 rounded-md overflow-hidden border-2 border-slate-100 shadow-sm relative group">
             <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors" />
             <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} referrerPolicy="no-referrer" alt="Avatar" className="h-full w-full object-cover" />
           </div>
@@ -146,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
       ) : (
         <button
           onClick={onLogin}
-          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
+          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md text-xs font-bold hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
         >
           <Globe className="h-3.5 w-3.5" /> Login
         </button>
@@ -154,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="lg:hidden p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all relative"
+        className="lg:hidden p-2.5 bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-all relative"
       >
         {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         {!isMobileMenuOpen && historyCount > 0 && (

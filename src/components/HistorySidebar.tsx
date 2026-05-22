@@ -58,7 +58,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white pt-8 lg:pt-6">
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recent Analyses</span>
-            <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 border-none font-bold text-[9px]">{history.length}</Badge>
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold text-[9px]">{history.length}</Badge>
           </div>
           <button 
             onClick={() => setIsOpen(false)}
@@ -77,16 +77,16 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                   setIsOpen(false);
                 }}
                 className={cn(
-                  "w-full flex items-center justify-between p-4 bg-white border rounded-2xl transition-all group text-left",
+                  "w-full flex items-center justify-between p-4 bg-white border rounded-md transition-all group text-left",
                   activeAnalysisId === item.id 
-                    ? "border-indigo-600 shadow-lg shadow-indigo-100" 
+                    ? "border-primary shadow-lg shadow-primary/20" 
                     : "border-slate-100 hover:border-indigo-200"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "h-10 w-10 rounded-xl flex items-center justify-center font-bold text-[11px] shrink-0",
-                    activeAnalysisId === item.id ? "bg-indigo-600 text-white" : "bg-slate-50 text-indigo-600"
+                    "h-10 w-10 rounded-md flex items-center justify-center font-bold text-[11px] shrink-0",
+                    activeAnalysisId === item.id ? "bg-primary text-white" : "bg-slate-50 text-primary"
                   )}>
                     {(item.candidates[0]?.score || 0).toFixed(1)}
                   </div>
@@ -97,7 +97,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 </div>
                 <ChevronRight className={cn(
                   "h-4 w-4 transition-all shrink-0",
-                  activeAnalysisId === item.id ? "text-indigo-600 translate-x-1" : "text-slate-200 group-hover:text-indigo-400"
+                  activeAnalysisId === item.id ? "text-primary translate-x-1" : "text-slate-200 group-hover:text-indigo-400"
                 )} />
               </button>
             ))}

@@ -32,10 +32,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center space-y-8">
         <div className="relative">
-          <div className="h-32 w-32 bg-indigo-50 rounded-[3rem] rotate-6 flex items-center justify-center text-indigo-200">
+          <div className="h-32 w-32 bg-primary/10 rounded-md rotate-6 flex items-center justify-center text-indigo-200">
             <User className="h-16 w-16" />
           </div>
-          <div className="absolute -bottom-2 -right-2 h-12 w-12 bg-white rounded-2xl shadow-xl flex items-center justify-center text-indigo-600 border border-indigo-50">
+          <div className="absolute -bottom-2 -right-2 h-12 w-12 bg-white rounded-md shadow-xl flex items-center justify-center text-primary border border-primary/10">
             <Briefcase className="h-6 w-6" />
           </div>
         </div>
@@ -47,20 +47,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
           </p>
         </div>
 
-        <div className="w-full max-w-xl bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
+        <div className="w-full max-w-xl bg-white p-8 rounded-md border border-slate-200 shadow-sm">
           {isExtracting ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-4">
               <div className="relative">
-                <div className="h-16 w-16 bg-indigo-50 rounded-full animate-ping opacity-20" />
+                <div className="h-16 w-16 bg-primary/10 rounded-full animate-ping opacity-20" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               </div>
               <p className="text-xs font-black text-slate-900 uppercase tracking-widest animate-pulse">Extracting Intelligence...</p>
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group cursor-pointer" 
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-md p-12 hover:border-indigo-300 hover:bg-primary/10/30 transition-all group cursor-pointer" 
                    onClick={() => document.getElementById('portfolio-upload')?.click()}>
                 <input 
                   type="file" 
@@ -72,8 +72,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
                     if (file && onExtract) onExtract(file);
                   }}
                 />
-                <div className="h-16 w-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <ExternalLink className="h-8 w-8 text-slate-300 group-hover:text-indigo-500" />
+                <div className="h-16 w-16 bg-slate-50 rounded-md flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <ExternalLink className="h-8 w-8 text-slate-300 group-hover:text-primary/100" />
                 </div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Click or drag to upload resume</p>
               </div>
@@ -98,7 +98,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
   >
     {/* Profile Hero */}
     <div className="flex flex-col lg:flex-row gap-12 items-start">
-      <div className="h-48 w-48 bg-slate-900 rounded-[3rem] rotate-6 flex items-center justify-center text-white text-6xl font-black shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] shrink-0">
+      <div className="h-48 w-48 bg-slate-900 rounded-md rotate-6 flex items-center justify-center text-white text-6xl font-black shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] shrink-0">
         {profile.name.charAt(0)}
       </div>
       <div className="flex-1 space-y-6 pt-4">
@@ -121,8 +121,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
             { label: 'Current CTC', value: profile.currentCTC, icon: Wallet },
             { label: 'Expectation', value: profile.expectedCTC, icon: Target }
           ].map((item, i) => (
-            <div key={i} className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-              <div className="h-10 w-10 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-600">
+            <div key={i} className="p-4 bg-white rounded-md border border-slate-100 shadow-sm flex items-center gap-4">
+              <div className="h-10 w-10 bg-slate-50 rounded-md flex items-center justify-center text-primary">
                 <item.icon className="h-4 w-4" />
               </div>
               <div>
@@ -146,12 +146,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
           <div className="space-y-6 relative pl-8 border-l border-slate-100">
             {profile.workHistory.map((work, i) => (
               <div key={i} className="relative space-y-2 pb-6 last:pb-0">
-                <div className="absolute -left-[41px] h-4 w-4 rounded-full bg-white border-4 border-indigo-600 ring-4 ring-white" />
+                <div className="absolute -left-[41px] h-4 w-4 rounded-full bg-white border-4 border-primary ring-4 ring-white" />
                 <div className="flex items-center justify-between mb-1">
                   <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">{work.designation}</h4>
                   <Badge variant="secondary" className="bg-slate-100 text-slate-500 font-bold text-[9px] border-none">{work.period}</Badge>
                 </div>
-                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-3">{work.company}</p>
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">{work.company}</p>
                 <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">{work.description}</p>
               </div>
             ))}
@@ -165,16 +165,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {profile.education.map((edu, i) => (
-              <div key={i} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-3 relative group overflow-hidden">
+              <div key={i} className="p-6 bg-slate-50 rounded-md border border-slate-100 space-y-3 relative group overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                   <GraduationCap className="h-16 w-16" />
                 </div>
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight">{edu.degree}</h4>
-                  <Badge className="bg-white text-indigo-600 border-slate-100 font-bold text-[9px]">{edu.graduationYear}</Badge>
+                  <Badge className="bg-white text-primary border-slate-100 font-bold text-[9px]">{edu.graduationYear}</Badge>
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">{edu.college}</p>
-                {edu.specialization && <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter">{edu.specialization}</p>}
+                {edu.specialization && <p className="text-[9px] font-black text-primary/100 uppercase tracking-tighter">{edu.specialization}</p>}
                 <div className="flex items-center gap-2 pt-1">
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">GPA:</span>
                   <span className="text-[9px] font-black text-slate-900">{edu.gpa}</span>
@@ -188,7 +188,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
       <aside className="space-y-12">
         <section className="space-y-6">
           <div className="mono-label text-center">Talent DNA</div>
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-8 shadow-2xl shadow-indigo-100 relative overflow-hidden group">
+          <div className="bg-slate-900 rounded-md p-8 text-white space-y-8 shadow-2xl shadow-primary/20 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent opacity-50" />
             <div className="relative z-10 space-y-8">
               <div className="space-y-4">
@@ -207,7 +207,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
                 <div className="flex flex-wrap gap-2">
                   <Badge className="bg-white/10 text-white border-none text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">{profile.currentLocation}</Badge>
                   {profile.preferredLocation !== 'Not mentioned' && (
-                    <Badge className="bg-indigo-500/30 text-indigo-100 border-none text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">{profile.preferredLocation}</Badge>
+                    <Badge className="bg-primary/100/30 text-primary/20 border-none text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">{profile.preferredLocation}</Badge>
                   )}
                 </div>
               </div>
@@ -218,10 +218,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ profile, onExtract
         <section className="space-y-6">
           <div className="mono-label text-center">Quick Export</div>
           <div className="grid grid-cols-1 gap-2">
-            <button className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+            <button className="flex items-center justify-between p-4 bg-white rounded-md border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
               Download PDF Resume <ExternalLink className="h-3 w-3" />
             </button>
-            <button className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+            <button className="flex items-center justify-between p-4 bg-white rounded-md border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
               Copy Profile Link <ExternalLink className="h-3 w-3" />
             </button>
           </div>

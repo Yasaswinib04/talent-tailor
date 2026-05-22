@@ -14,7 +14,7 @@ export function HRPreferences() {
         </div>
 
         {/* Collapsible Job Description */}
-        <section className="bg-surface-container rounded-lg border border-outline-variant overflow-hidden group">
+        <section className="bg-surface-container rounded-md border border-outline-variant overflow-hidden group">
           <details className="w-full" open>
             <summary className="flex items-center justify-between p-5 cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
               <div className="flex items-center gap-3">
@@ -38,8 +38,8 @@ export function HRPreferences() {
           </div>
           <p className="text-sm text-on-surface-variant mb-4">Candidates failing these criteria will be automatically rejected.</p>
           
-          <div className="bg-surface-container border border-outline-variant rounded-lg p-5 flex flex-col gap-4">
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-highest transition-colors">
+          <div className="bg-surface-container border border-outline-variant rounded-md p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between p-3 rounded-md hover:bg-surface-container-highest transition-colors">
               <div>
                 <p className="text-on-surface font-medium text-sm">Minimum Experience (Years)</p>
                 <p className="text-on-surface-variant text-xs">Must have at least 5 years of professional experience.</p>
@@ -47,7 +47,7 @@ export function HRPreferences() {
               <input type="number" defaultValue={5} className="w-20 bg-surface-container-low border border-outline-variant rounded p-2 text-on-surface text-center focus:ring-1 focus:ring-primary outline-none" />
             </div>
             
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-highest transition-colors border-t border-outline-variant">
+            <div className="flex items-center justify-between p-3 rounded-md hover:bg-surface-container-highest transition-colors border-t border-outline-variant">
               <div>
                 <p className="text-on-surface font-medium text-sm">Tier 1 University Degree</p>
                 <p className="text-on-surface-variant text-xs">Strictly enforce Tier 1 university filtering.</p>
@@ -61,8 +61,8 @@ export function HRPreferences() {
         </section>
         
         <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-outline-variant">
-          <button className="px-5 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">Cancel</button>
-          <button className="bg-primary text-background px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-fixed transition-colors shadow-sm">Save Criteria</button>
+          <button className="px-5 py-2.5 rounded-md text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">Cancel</button>
+          <button className="bg-primary text-background px-5 py-2.5 rounded-md text-sm font-medium hover:bg-primary-fixed transition-colors shadow-sm">Save Criteria</button>
         </div>
       </div>
     </div>

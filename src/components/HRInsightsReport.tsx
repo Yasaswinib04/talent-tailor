@@ -27,14 +27,14 @@ export const HRInsightsReport: React.FC<HRInsightsReportProps> = ({ analysis }) 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-2">
-        <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg">
+        <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white shadow-lg">
           <TrendingUp className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest italic">Intelligence Insights</h3>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
+        <Card className="rounded-md border-slate-200 shadow-sm overflow-hidden">
           <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
             <CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
               <Users className="h-3 w-3" /> Pipeline Health
@@ -47,7 +47,7 @@ export const HRInsightsReport: React.FC<HRInsightsReportProps> = ({ analysis }) 
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Avg Match Delta</div>
               </div>
               <div className="text-right space-y-1">
-                <div className="text-xl font-black text-indigo-600 tracking-tighter">{candidates.length}</div>
+                <div className="text-xl font-black text-primary tracking-tighter">{candidates.length}</div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nodes Processed</div>
               </div>
             </div>
@@ -56,21 +56,21 @@ export const HRInsightsReport: React.FC<HRInsightsReportProps> = ({ analysis }) 
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${avgScore * 10}%` }}
-                className="h-full bg-indigo-600"
+                className="h-full bg-primary"
               />
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-2">
+          <div className="p-5 bg-emerald-50 rounded-md border border-emerald-100 space-y-2">
             <div className="text-emerald-700">
               <Target className="h-4 w-4" />
             </div>
             <div className="text-xl font-black text-emerald-900 leading-none">{highFitCount}</div>
             <div className="text-[8px] font-black text-emerald-600/60 uppercase tracking-widest">High-Fit Candidates</div>
           </div>
-          <div className="p-5 bg-rose-50 rounded-3xl border border-rose-100 space-y-2">
+          <div className="p-5 bg-rose-50 rounded-md border border-rose-100 space-y-2">
             <div className="text-rose-700">
               <AlertCircle className="h-4 w-4" />
             </div>
@@ -79,7 +79,7 @@ export const HRInsightsReport: React.FC<HRInsightsReportProps> = ({ analysis }) 
           </div>
         </div>
 
-        <Card className="rounded-3xl border-slate-200 shadow-sm">
+        <Card className="rounded-md border-slate-200 shadow-sm">
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <Briefcase className="h-3 w-3" /> Talent Track Distribution
@@ -108,7 +108,7 @@ export const HRInsightsReport: React.FC<HRInsightsReportProps> = ({ analysis }) 
           </CardContent>
         </Card>
 
-        <div className="p-6 bg-indigo-900 rounded-3xl text-white space-y-4 shadow-xl shadow-indigo-100 relative overflow-hidden">
+        <div className="p-6 bg-indigo-900 rounded-md text-white space-y-4 shadow-xl shadow-primary/20 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <Layers className="h-16 w-16" />
           </div>

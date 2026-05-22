@@ -29,26 +29,26 @@ export function HRLayout() {
         </div>
 
         <div className="flex flex-col gap-1 flex-1">
-          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
+          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
             <span className="material-symbols-outlined" data-icon="group">group</span>
             <span className="font-medium text-sm">Talent Pools</span>
           </Link>
-          <Link to="/hr" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
+          <Link to="/hr" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
             <span className="material-symbols-outlined" data-icon="work" data-weight="fill" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
             <span className="font-medium text-sm">Active Roles</span>
           </Link>
-          <Link to="/hr/analytics" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${isRouteActive('/hr/analytics') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
+          <Link to="/hr/analytics" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr/analytics') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
             <span className="material-symbols-outlined" data-icon="analytics">analytics</span>
             <span className="font-medium text-sm">Analytics</span>
           </Link>
-          <Link to="/hr/settings" className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group mt-auto ${isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
+          <Link to="/hr/settings" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group mt-auto ${isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
             <span className="material-symbols-outlined" data-icon="settings">settings</span>
             <span className="font-medium text-sm">Settings</span>
           </Link>
         </div>
 
         {/* User Profile */}
-        <div className="mt-4 pt-4 border-t border-outline-variant px-4 flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest p-2 rounded-lg transition-colors">
+        <div className="mt-4 pt-4 border-t border-outline-variant px-4 flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest p-2 rounded-md transition-colors">
           <img alt="Company Logo" className="w-8 h-8 rounded-full border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxPoLHFzLGjlRteLnPBczYw3pG-fjUf2nncz8zYeWiK1hlhXoiEOdkr1oonTYnk_UbdsKy6a8bCPN5dU_xv-3n9qR8rbjLuTK1pvUUqnRFC-NsGFqgCZeivBmgN7qWM0u_ROEWpdghFDqK5weGBdm1QsGa11xTw-TiAyZlNjBUKe4gWYQcppTWjAZa2lpIOOHvUT9y7zjNTSbX8xVY6N16DinuXLw-aiai8dvZpbxpM0Rq8tc6NO6Fa2t42FbYV308G9hoM9UAMcbb" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-on-surface truncate">Jane Doe</p>

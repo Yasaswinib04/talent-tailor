@@ -12,7 +12,7 @@ export const BuilderControls: React.FC = () => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-200 flex items-center justify-center hover:scale-105 transition-transform border-4 border-white"
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center hover:scale-105 transition-transform border-4 border-white"
         title="Builder Controls"
       >
         <Wrench className="h-6 w-6" />
@@ -37,7 +37,7 @@ export const BuilderControls: React.FC = () => {
             >
               <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                  <div className="h-10 w-10 bg-primary/20 text-primary rounded-md flex items-center justify-center">
                     <Wrench className="h-5 w-5" />
                   </div>
                   <div>
@@ -55,7 +55,7 @@ export const BuilderControls: React.FC = () => {
                   onClick={() => setActiveTab('bugs')}
                   className={cn(
                     "pb-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
-                    activeTab === 'bugs' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                    activeTab === 'bugs' ? "border-primary text-primary" : "border-transparent text-slate-400 hover:text-slate-600"
                   )}
                 >
                   <Bug className="h-4 w-4" /> Bug Reports
@@ -64,7 +64,7 @@ export const BuilderControls: React.FC = () => {
                   onClick={() => setActiveTab('roadmap')}
                   className={cn(
                     "pb-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
-                    activeTab === 'roadmap' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                    activeTab === 'roadmap' ? "border-primary text-primary" : "border-transparent text-slate-400 hover:text-slate-600"
                   )}
                 >
                   <Target className="h-4 w-4" /> Product Backlog
@@ -81,7 +81,7 @@ export const BuilderControls: React.FC = () => {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-6"
                     >
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="bg-white p-6 rounded-md border border-slate-200 shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Log a Bug</h3>
                           <span className="px-2 py-1 bg-rose-50 text-rose-600 rounded-md text-[9px] font-bold uppercase">Internal</span>
@@ -90,26 +90,26 @@ export const BuilderControls: React.FC = () => {
                           value={bugText}
                           onChange={(e) => setBugText(e.target.value)}
                           placeholder="Describe what's broken or needs fixing..."
-                          className="w-full h-32 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none placeholder:text-slate-400"
+                          className="w-full h-32 p-4 bg-slate-50 border border-slate-100 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none placeholder:text-slate-400"
                         />
                         <button 
                           onClick={() => { if(bugText) { setBugText(''); alert('Bug logged to local backlog!'); } }}
                           disabled={!bugText}
-                          className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
+                          className="w-full py-3 bg-slate-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
                         >
                           Save to Backlog
                         </button>
                       </div>
                       
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                        <div className="flex items-center gap-3 text-indigo-600">
+                      <div className="bg-white p-6 rounded-md border border-slate-200 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3 text-primary">
                           <MessageSquare className="h-5 w-5" />
                           <h3 className="text-[10px] font-black uppercase tracking-widest">Global Support Config</h3>
                         </div>
                         <p className="text-xs font-medium text-slate-500 leading-relaxed">
                           This is the contact number displayed to users when they need support.
                         </p>
-                        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 text-emerald-700 text-sm font-bold flex items-center justify-between">
+                        <div className="p-4 bg-emerald-50 rounded-md border border-emerald-100 text-emerald-700 text-sm font-bold flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className="text-xl">💬</span>
                             <span>+1 (555) 123-4567</span>
@@ -128,15 +128,15 @@ export const BuilderControls: React.FC = () => {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-6"
                     >
-                      <p className="text-xs font-medium text-slate-500 leading-relaxed bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <p className="text-xs font-medium text-slate-500 leading-relaxed bg-white p-4 rounded-md border border-slate-200 shadow-sm">
                         This backlog is strictly for builders. Manage your technical debt and upcoming features here.
                       </p>
                       {[
                         { status: 'Current Sprint', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', items: ['Global Market Expansion Profiles', 'Fix UI overflow on mobile', 'Implement Builder Mode FAB'] },
-                        { status: 'Next Up', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', items: ['Apply Autopilot Beta', 'Chrome Extension Integration', 'Direct Workday Push'] },
+                        { status: 'Next Up', color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20', items: ['Apply Autopilot Beta', 'Chrome Extension Integration', 'Direct Workday Push'] },
                         { status: 'Backlog', color: 'text-slate-600', bg: 'bg-white', border: 'border-slate-200', items: ['Interview Prep Agent', 'Compensation Negotiation AI', 'User Auth flows'] }
                       ].map((phase, i) => (
-                        <div key={i} className={`p-6 rounded-3xl border ${phase.bg} ${phase.border} space-y-4`}>
+                        <div key={i} className={`p-6 rounded-md border ${phase.bg} ${phase.border} space-y-4`}>
                           <div className={`text-[10px] font-black uppercase tracking-widest ${phase.color}`}>
                             {phase.status}
                           </div>

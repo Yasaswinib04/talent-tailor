@@ -324,10 +324,10 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
               >
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <Badge className="bg-indigo-600 text-white border-none text-[8px] font-black tracking-[0.25em] px-3 py-1">PROTOCOL ALPHA</Badge>
-                    <div className="h-px flex-1 bg-slate-200"></div>
+                    <Badge className="bg-primary text-primary-foreground border-none text-[8px] font-black tracking-[0.25em] px-3 py-1">PROTOCOL ALPHA</Badge>
+                    <div className="h-px flex-1 bg-slate-800"></div>
                   </div>
-                  <h1 className="text-5xl font-black tracking-tighter text-slate-900 leading-none">
+                  <h1 className="text-5xl font-black tracking-tighter text-slate-100 leading-none">
                     Bulk Screening <span className="display-serif font-normal">Intelligence</span>
                   </h1>
                   <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
@@ -336,20 +336,20 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
                 </div>
 
                 <div className="space-y-6">
-                   <div className="bg-indigo-600 p-10 rounded-[3rem] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-indigo-100">
+                   <div className="bg-primary p-10 rounded-[0.5rem] text-primary-foreground flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-primary/20">
                       <div className="space-y-2">
-                        <h3 className="text-3xl font-black tracking-tight uppercase italic">HR Command Center</h3>
-                        <p className="text-indigo-100 font-medium max-w-xl">Deep-vet candidates against the {activeProfile.name} rubric.</p>
+                        <h3 className="text-3xl font-black tracking-tight uppercase italic text-black">HR Command Center</h3>
+                        <p className="text-black/80 font-medium max-w-xl">Deep-vet candidates against the {activeProfile.name} rubric.</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge className="bg-white/20 text-white border-none text-[10px] font-black px-4 py-2 uppercase tracking-widest">Active Role: {activeProfile.name}</Badge>
+                        <Badge className="bg-black/20 text-black border-none text-[10px] font-black px-4 py-2 uppercase tracking-widest">Active Role: {activeProfile.name}</Badge>
                       </div>
                    </div>
                    
                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div className="space-y-4">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-2">Candidate Pool (PDF/Images)</Label>
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
+                        <div className="bg-white p-10 rounded-md border border-slate-200 shadow-sm">
                           <FileUploadZone
                             label="Drop multiple resumes here"
                             onFilesSelect={(files) => setResumeFiles(files)}
@@ -362,19 +362,19 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Job Description Profile</Label>
-                          <button onClick={() => setActiveTab('preferences')} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Change Role Settings</button>
+                          <button onClick={() => setActiveTab('preferences')} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Change Role Settings</button>
                         </div>
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-                          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                              <Target className="h-6 w-6 text-indigo-600" />
+                        <div className="bg-surface p-10 rounded-[0.5rem] border border-slate-800 shadow-sm space-y-6">
+                          <div className="flex items-center gap-4 p-4 bg-slate-900 rounded-md border border-slate-800">
+                            <div className="h-12 w-12 bg-slate-950 rounded-md flex items-center justify-center shadow-sm">
+                              <Target className="h-6 w-6 text-primary" />
                             </div>
                             <div>
                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Evaluating for</div>
                               <div className="text-sm font-black text-slate-900">{activeProfile.name}</div>
                             </div>
                           </div>
-                          <p className="text-[10px] text-indigo-700/70 font-medium leading-relaxed italic line-clamp-3">
+                          <p className="text-[10px] text-primary/70 font-medium leading-relaxed italic line-clamp-3">
                             "{activeProfile.jdContent || 'No Job Description content provided for this role profile.'}"
                           </p>
                         </div>
@@ -385,7 +385,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
                 <button
                   onClick={() => handleAnalyze()}
                   disabled={isAnalyzing || (resumeFiles.length === 0 || !activeProfile.jdContent)}
-                  className="w-full h-20 bg-indigo-600 text-white rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-2xl shadow-indigo-200 flex items-center justify-center gap-4 disabled:opacity-50"
+                  className="w-full h-20 bg-primary text-black rounded-[0.5rem] text-sm font-black uppercase tracking-[0.2em] hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-2xl shadow-primary/20 flex items-center justify-center gap-4 disabled:opacity-50"
                 >
                   {isAnalyzing ? (
                     <>
@@ -406,7 +406,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="max-w-5xl mx-auto p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 mt-6"
+                className="max-w-5xl mx-auto p-4 bg-rose-50 border border-rose-100 rounded-md flex items-start gap-3 mt-6"
               >
                 <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -431,15 +431,15 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
               >
                 {isAnalyzing ? (
                   <div className="py-20 flex flex-col items-center justify-center space-y-6">
-                    <RefreshCw className="h-10 w-10 text-indigo-600 animate-spin" />
-                    <p className="text-xs font-black text-slate-900 uppercase tracking-widest animate-pulse">Running Neural Vetting Protocol...</p>
+                    <RefreshCw className="h-10 w-10 text-primary animate-spin" />
+                    <p className="text-xs font-black text-slate-100 uppercase tracking-widest animate-pulse">Running Neural Vetting Protocol...</p>
                   </div>
                 ) : (
                   <div className="space-y-12">
                     {analysis && (
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         <div className="lg:col-span-8 space-y-8">
-                          <div className="bg-white border border-slate-200/60 rounded-[2.5rem] p-8 shadow-sm">
+                          <div className="bg-white border border-slate-200/60 rounded-md p-8 shadow-sm">
                             <CandidateLeaderboard
                               candidates={analysis.candidates}
                               onDeepDive={(c) => {
@@ -503,7 +503,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
               >
                 <div className="max-w-md text-center space-y-8">
                   <div className="relative inline-block">
-                    <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-10 animate-pulse" />
+                    <div className="absolute inset-0 bg-primary/100 blur-3xl opacity-10 animate-pulse" />
                     <Puzzle className="h-20 w-20 text-slate-300 mx-auto relative z-10" />
                   </div>
                   <div className="space-y-4">
@@ -516,7 +516,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
                     </p>
                   </div>
                   <div className="pt-4">
-                    <button className="px-10 py-4 bg-slate-100 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed transition-all">
+                    <button className="px-10 py-4 bg-slate-100 text-slate-400 rounded-md text-[10px] font-black uppercase tracking-widest cursor-not-allowed transition-all">
                       Coming Soon to Chrome Store
                     </button>
                   </div>
@@ -558,7 +558,7 @@ export function LegacyCandidateApp() {
   });
   const [history, setHistory] = useState<AnalysisResult[]>([]);
   const [persona, setPersona] = useState<Persona>(() => {
-    return (sessionStorage.getItem('persona') as Persona) || 'candidate';
+    return (sessionStorage.getItem('persona') as Persona) || 'hr';
   });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analysis' | 'extension' | 'portfolio' | 'preferences'>(() => {
     return (sessionStorage.getItem('activeTab') as any) || 'dashboard';
@@ -1071,7 +1071,7 @@ export function LegacyCandidateApp() {
   if (isAuthLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
-        <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin" />
+        <RefreshCw className="h-8 w-8 text-primary animate-spin" />
       </div>
     );
   }

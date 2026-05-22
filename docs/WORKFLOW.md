@@ -103,3 +103,11 @@ The pipeline relies on a mixture-of-experts architecture. Below are the precise 
   - `RoleType`, `ExperienceTier`
 - **Outputs:**
   - **Questions Array:** 6-8 dynamically generated discovery questions directly targeting the candidate's specific weaknesses for HR interview prep.
+
+# UAT Workflow
+- Trigger: user says “Run full UAT cycle”
+- Steps:
+  1. Read architecture_analysis.md.
+  2. Generate or update uat-test-plan.md.
+  3. Execute all tests using the uat-testing skill.
+  4. Save the report and notify the user.
