@@ -1,11 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { HRDashboard } from '../pages/hr/Dashboard.js';
 import { HRPreferences } from '../pages/hr/Preferences.js';
 import { HRRoleDashboard } from '../pages/hr/RoleDashboard.js';
+import { auth, signInWithGoogle } from '../lib/firebase.js';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { AuthOverlay } from '../components/AuthOverlay.js';
+import { AnimatePresence } from 'motion/react';
 
 export function HRLayout() {
   const location = useLocation();
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const isRouteActive = (path: string) => {
     if (path === '/hr' && location.pathname === '/hr') return true;
@@ -13,8 +27,21 @@ export function HRLayout() {
     return false;
   };
 
+  if (authLoading) return <div className="bg-background h-screen w-screen flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div></div>;
+
   return (
     <div className="bg-background text-on-surface font-body antialiased flex h-screen overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+      
+      <AnimatePresence>
+        {!user && (
+          <AuthOverlay
+            onLogin={async () => {
+              await signInWithGoogle();
+            }}
+            onSkip={() => {}} // Remove skip capability for HR
+          />
+        )}
+      </AnimatePresence>
       
       {/* SideNavBar */}
       <nav className="hidden md:flex bg-surface-container-low text-primary text-on-surface docked fixed left-0 top-0 h-screen w-64 border-r border-outline-variant flex-col py-6 px-4 gap-2 z-40">
