@@ -64,3 +64,42 @@ sequenceDiagram
     UI->>API: GET /api/hr/sessions/:id (Polling)
     API-->>UI: Render Dashboard Data
 ```
+
+## AI Agent Interfaces (I/O Definitions)
+
+The pipeline relies on a mixture-of-experts architecture. Below are the precise inputs and outputs for each AI block:
+
+### 1. Track Classifier (`classifyTrack`)
+- **Execution:** Runs once per bulk analysis session.
+- **Inputs:** 
+  - `Job Description (JD)` (String | Buffer)
+- **Outputs:** 
+  - `track` (Enum: `'IC'` or `'Manager'`) - Used to calibrate downstream scoring rubrics.
+
+### 2. Baseline Extraction (`extractProfile`)
+- **Execution:** Runs in parallel per candidate.
+- **Inputs:**
+  - `Resume` (String | Buffer)
+- **Outputs:**
+  - **JSON Profile:** `name`, `email`, `phone`, `currentLocation`, `totalWorkExperience`, `noticePeriod`, `currentCTC`, `expectedCTC`.
+  - **Arrays:** `strengths`, `weaknesses`, `education` (Degree, GPA, College), `workHistory` (Company, Designation, Duration, Description).
+
+### 3. Core Scorer (`scoreCandidate`)
+- **Execution:** Runs in parallel per candidate.
+- **Inputs:**
+  - `Resume` (String | Buffer)
+  - `Job Description (JD)` (String | Buffer)
+  - `Track` (from Track Classifier)
+  - `RoleType`, `ExperienceTier`, `HiringPreferences`, `TargetMarket`
+- **Outputs:**
+  - **Metrics:** `score` (0.0 - 10.0), `atsScore` (0-10), `meetsMandatoryCriteria` (Boolean).
+  - **Analysis:** `overallFeedback`, `professionalSummary`, `strengths`, `weaknesses`, `gaps`, `failedCriteria`.
+  - **Competencies Array:** Object containing `{ name, score, evidence }`. `evidence` is a strict, grounded quote extracted from the resume.
+
+### 4. Gap Interrogator (`generateQuestions`)
+- **Execution:** Runs sequentially *after* Core Scorer, and **only** if the candidate meets mandatory criteria and achieves a minimum score threshold (>= 5.0).
+- **Inputs:**
+  - `Gaps` (Array of Strings outputted by Core Scorer)
+  - `RoleType`, `ExperienceTier`
+- **Outputs:**
+  - **Questions Array:** 6-8 dynamically generated discovery questions directly targeting the candidate's specific weaknesses for HR interview prep.
