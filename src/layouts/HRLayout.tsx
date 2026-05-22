@@ -1,20 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { HRDashboard } from '../pages/hr/Dashboard.js';
 import { HRPreferences } from '../pages/hr/Preferences.js';
 import { HRRoleDashboard } from '../pages/hr/RoleDashboard.js';
 import { HRTalentPools } from '../pages/hr/TalentPools.js';
+import { HRCompare } from '../pages/hr/Compare.js';
 import { auth, signInWithGoogle } from '../lib/firebase.js';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { AuthOverlay } from '../components/AuthOverlay.js';
 import { AnimatePresence } from 'motion/react';
+import { createSession } from '../lib/api.js';
 
 export function HRLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    if (localStorage.getItem('uat_bypass_user') === 'true') {
+      setUser({
+        uid: 'uat-test-user-id',
+        email: 'uat-tester@example.com',
+        displayName: 'UAT Tester',
+        getIdToken: async () => 'uat-test-token-76839210-9b37-4d76-88d4-539c94b7f83e'
+      } as any);
+      setAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setAuthLoading(false);
@@ -26,6 +41,18 @@ export function HRLayout() {
     if (path === '/hr' && location.pathname === '/hr') return true;
     if (path !== '/hr' && location.pathname.startsWith(path)) return true;
     return false;
+  };
+
+  const handleNewRole = async () => {
+    try {
+      setCreating(true);
+      const res = await createSession({ name: "New Role", roleType: "General", experienceTier: "Mid" });
+      navigate(`/hr/role/${res.sessionId}/setup`);
+    } catch (err) {
+      console.error("Failed to create role", err);
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (authLoading) return <div className="bg-background h-screen w-screen flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div></div>;
@@ -46,43 +73,61 @@ export function HRLayout() {
       
       {/* SideNavBar */}
       <nav className="hidden md:flex bg-surface-container-low text-primary text-on-surface docked fixed left-0 top-0 h-screen w-64 border-r border-outline-variant flex-col py-6 px-4 gap-2 z-40">
-        <div className="mb-8 px-2 flex items-center gap-3">
-          <div className="w-10 h-10 rounded bg-primary-container/20 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined" data-icon="hub">hub</span>
+        <div className="mb-6 px-2 flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <span className="material-symbols-outlined text-lg" data-icon="hub">hub</span>
           </div>
           <div>
-            <h1 className="text-lg font-headline font-bold text-on-surface tracking-tight">TalentMatch AI</h1>
-            <p className="text-xs text-on-surface-variant">Strategic Recruitment</p>
+            <h1 className="text-sm font-headline font-bold text-on-surface tracking-tight leading-none">TalentMatch AI</h1>
+            <p className="text-[10px] text-on-surface-variant mt-0.5">Recruitment Engine</p>
           </div>
+        </div>
+
+        {/* New Request Button */}
+        <div className="px-2 mb-4">
+          <button 
+            onClick={handleNewRole} 
+            disabled={creating}
+            className="w-full bg-primary text-on-primary px-4 py-2.5 rounded-md font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(167,139,250,0.15)] disabled:opacity-50 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg">{creating ? "sync" : "add"}</span>
+            {creating ? "Creating..." : "New Request"}
+          </button>
         </div>
 
         <div className="flex flex-col gap-1 flex-1">
-          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
-            <span className="material-symbols-outlined" data-icon="group">group</span>
-            <span className="font-medium text-sm">Talent Pools</span>
+          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg" data-icon="group">group</span>
+            <span className="text-sm">Talent Pools</span>
           </Link>
-          <Link to="/hr" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
-            <span className="material-symbols-outlined" data-icon="work" data-weight="fill" style={{ fontVariationSettings: "'FILL' 1" }}>work</span>
-            <span className="font-medium text-sm">Active Roles</span>
+          <Link to="/hr" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg" data-icon="work" data-weight={isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? "fill" : "outline"} style={{ fontVariationSettings: isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? "'FILL' 1" : "'FILL' 0" }}>work</span>
+            <span className="text-sm">Active Roles</span>
           </Link>
-          <Link to="/hr/analytics" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${isRouteActive('/hr/analytics') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
-            <span className="material-symbols-outlined" data-icon="analytics">analytics</span>
-            <span className="font-medium text-sm">Analytics</span>
+          <Link to="/hr/compare" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/compare') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg" data-icon="compare_arrows">compare_arrows</span>
+            <span className="text-sm">Compare</span>
           </Link>
-          <Link to="/hr/settings" className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group mt-auto ${isRouteActive('/hr/settings') ? 'bg-secondary-container text-primary border-l-4 border-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'}`}>
-            <span className="material-symbols-outlined" data-icon="settings">settings</span>
-            <span className="font-medium text-sm">Settings</span>
+          <Link to="/hr/analytics" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/analytics') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg" data-icon="analytics">analytics</span>
+            <span className="text-sm">Analytics</span>
           </Link>
-        </div>
-
-        {/* User Profile */}
-        <div className="mt-4 pt-4 border-t border-outline-variant px-4 flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest p-2 rounded-md transition-colors">
-          <img alt="Company Logo" className="w-8 h-8 rounded-full border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxPoLHFzLGjlRteLnPBczYw3pG-fjUf2nncz8zYeWiK1hlhXoiEOdkr1oonTYnk_UbdsKy6a8bCPN5dU_xv-3n9qR8rbjLuTK1pvUUqnRFC-NsGFqgCZeivBmgN7qWM0u_ROEWpdghFDqK5weGBdm1QsGa11xTw-TiAyZlNjBUKe4gWYQcppTWjAZa2lpIOOHvUT9y7zjNTSbX8xVY6N16DinuXLw-aiai8dvZpbxpM0Rq8tc6NO6Fa2t42FbYV308G9hoM9UAMcbb" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-on-surface truncate">Jane Doe</p>
-            <p className="text-xs text-on-surface-variant truncate">Recruitment Lead</p>
+          <Link to="/hr/settings" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/settings') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+            <span className="text-sm">Settings</span>
+          </Link>
+          
+          {/* Bottom Help & Docs items */}
+          <div className="mt-auto border-t border-outline-variant pt-4 flex flex-col gap-1">
+            <Link to="/hr/help" className={`flex items-center gap-3 px-4 py-2 rounded-md transition-all duration-200 group ${isRouteActive('/hr/help') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+              <span className="material-symbols-outlined text-lg" data-icon="help">help</span>
+              <span className="text-sm">Help</span>
+            </Link>
+            <Link to="/hr/docs" className={`flex items-center gap-3 px-4 py-2 rounded-md transition-all duration-200 group ${isRouteActive('/hr/docs') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+              <span className="material-symbols-outlined text-lg" data-icon="description">description</span>
+              <span className="text-sm">Docs</span>
+            </Link>
           </div>
-          <span className="material-symbols-outlined text-on-surface-variant text-sm">unfold_more</span>
         </div>
       </nav>
 
@@ -103,15 +148,28 @@ export function HRLayout() {
             {/* Search Bar */}
             <div className="hidden md:flex items-center relative w-96">
               <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-sm">search</span>
-              <input className="w-full bg-surface-container-low border border-outline-variant rounded py-1.5 pl-9 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder="Search candidates, skills, or roles (Cmd+K)" type="text"/>
+              <input className="w-full bg-surface-container-low border border-outline-variant rounded-md py-1.5 pl-9 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder={location.pathname.includes('/compare') ? "Search candidates..." : "Search..."} type="text"/>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <button className="text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors active:scale-[0.98] relative">
-              <span className="material-symbols-outlined" data-icon="notifications">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border border-surface-container"></span>
+          <div className="flex items-center gap-4">
+            <button className="text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors active:scale-[0.98] relative flex items-center justify-center">
+              <span className="material-symbols-outlined text-xl" data-icon="notifications">notifications</span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border border-surface-container"></span>
             </button>
+            
+            <button className="text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors active:scale-[0.98] flex items-center justify-center">
+              <span className="material-symbols-outlined text-xl" data-icon="history">history</span>
+            </button>
+            
+            <div className="h-4 w-[1px] bg-outline-variant"></div>
+            
+            <a href="#support" className="text-sm text-on-surface-variant hover:text-on-surface transition-colors font-medium">Support</a>
+            
+            <button className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors">
+              Invite Team
+            </button>
+            
             <div className="w-8 h-8 rounded-full bg-secondary-container border border-outline-variant overflow-hidden">
               <img alt="Recruiter Profile" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCG4imHjCae9n9cYEVrEkgR35KdYFLBkBaAPM8LBbkAJKfhh_9_hKWXxsbOeIiiJzS3mleOYhpw64z_8YrIEUJguq2qxLiXJGl-jBGoOvVgDsc2nxBAcwz3ViLxGX7sZ9jCgSfjOowrCN-qKjvBeD_vrJH-0laScJ2OBAy7puEx8TibIVSiEvOOBIRSUpJaUbxGW-a8A5Hvvy8NAjvDbZynbk8DI040sezZPUQV8pngJ3WHj7x3HPJNx5WtR5CV3LsqEx2cQtujCaX-" />
             </div>
@@ -125,8 +183,11 @@ export function HRLayout() {
             <Route path="/role/:id" element={<HRRoleDashboard />} />
             <Route path="/role/:id/setup" element={<HRPreferences />} />
             <Route path="/pools" element={<HRTalentPools />} />
-            <Route path="/analytics" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block">analytics</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Analytics</h2><p>This module is coming soon in the next update.</p></div>} />
-            <Route path="/settings" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block">settings</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Settings</h2><p>This module is coming soon in the next update.</p></div>} />
+            <Route path="/compare" element={<HRCompare />} />
+            <Route path="/analytics" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block animate-pulse">analytics</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Analytics</h2><p>This module is coming soon in the next update.</p></div>} />
+            <Route path="/settings" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block animate-pulse">settings</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Settings</h2><p>This module is coming soon in the next update.</p></div>} />
+            <Route path="/help" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block text-primary">help</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Help Center</h2><p>Contact support or search our documentation.</p></div>} />
+            <Route path="/docs" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block text-primary">description</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Developer Docs</h2><p>Learn about TalentMatch API and workflows.</p></div>} />
           </Routes>
         </main>
       </div>

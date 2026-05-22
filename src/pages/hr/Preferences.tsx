@@ -1,8 +1,40 @@
-import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { updateSessionPreferences } from '../../lib/api.js';
 
 export function HRPreferences() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [minExp, setMinExp] = useState(5);
+  const [tier1, setTier1] = useState(false);
+
+  const handleSave = async () => {
+    if (!id) return;
+    try {
+      setSaving(true);
+      await updateSessionPreferences(id, {
+        name: "Senior Frontend Engineer",
+        roleType: "Developer",
+        experienceTier: "Senior",
+        department: "Engineering Dept",
+        location: "Remote (US)",
+        preferences: {
+          minExperienceYears: minExp,
+          isTierIMandatory: tier1,
+          isMBAMandatory: false,
+          preferredCompanies: [],
+          mandatorySkills: ["React", "Node.js", "System Design"],
+          topN: 10
+        }
+      });
+      navigate(`/hr/role/${id}`);
+    } catch (err) {
+      console.error("Failed to save criteria", err);
+    } finally {
+      setSaving(false);
+    }
+  };
   
   return (
     <div className="p-6 md:p-10 lg:p-12 h-full overflow-y-auto custom-scrollbar flex justify-center pb-32">
@@ -44,7 +76,12 @@ export function HRPreferences() {
                 <p className="text-on-surface font-medium text-sm">Minimum Experience (Years)</p>
                 <p className="text-on-surface-variant text-xs">Must have at least 5 years of professional experience.</p>
               </div>
-              <input type="number" defaultValue={5} className="w-20 bg-surface-container-low border border-outline-variant rounded p-2 text-on-surface text-center focus:ring-1 focus:ring-primary outline-none" />
+              <input 
+                type="number" 
+                value={minExp} 
+                onChange={(e) => setMinExp(Number(e.target.value))}
+                className="w-20 bg-surface-container-low border border-outline-variant rounded p-2 text-on-surface text-center focus:ring-1 focus:ring-primary outline-none" 
+              />
             </div>
             
             <div className="flex items-center justify-between p-3 rounded-md hover:bg-surface-container-highest transition-colors border-t border-outline-variant">
@@ -53,7 +90,12 @@ export function HRPreferences() {
                 <p className="text-on-surface-variant text-xs">Strictly enforce Tier 1 university filtering.</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" />
+                <input 
+                  type="checkbox" 
+                  checked={tier1}
+                  onChange={(e) => setTier1(e.target.checked)}
+                  className="sr-only peer" 
+                />
                 <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
               </label>
             </div>
@@ -61,8 +103,19 @@ export function HRPreferences() {
         </section>
         
         <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-outline-variant">
-          <button className="px-5 py-2.5 rounded-md text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">Cancel</button>
-          <button className="bg-primary text-background px-5 py-2.5 rounded-md text-sm font-medium hover:bg-primary-fixed transition-colors shadow-sm">Save Criteria</button>
+          <button 
+            onClick={() => navigate('/hr')}
+            className="px-5 py-2.5 rounded-md text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-primary text-background px-5 py-2.5 rounded-md text-sm font-medium hover:bg-primary-fixed transition-colors shadow-sm disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Criteria"}
+          </button>
         </div>
       </div>
     </div>
