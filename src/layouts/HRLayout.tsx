@@ -123,6 +123,9 @@ export function HRLayout() {
             <Route path="/" element={<HRDashboard />} />
             <Route path="/role/:id" element={<HRRoleDashboard />} />
             <Route path="/role/:id/setup" element={<HRPreferences />} />
+            <Route path="/pools" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block">group</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Talent Pools</h2><p>This module is coming soon in the next update.</p></div>} />
+            <Route path="/analytics" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block">analytics</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Analytics</h2><p>This module is coming soon in the next update.</p></div>} />
+            <Route path="/settings" element={<div className="p-12 text-center text-on-surface-variant"><span className="material-symbols-outlined text-4xl mb-4 block">settings</span><h2 className="text-xl font-headline font-bold text-on-surface mb-2">Settings</h2><p>This module is coming soon in the next update.</p></div>} />
           </Routes>
         </main>
       </div>

@@ -16,7 +16,7 @@ export const createSession = async (jobProfile: any) => {
       ...(await getAuthHeaders()),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ job_profile: jobProfile })
+    body: JSON.stringify({ jobProfile })
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
