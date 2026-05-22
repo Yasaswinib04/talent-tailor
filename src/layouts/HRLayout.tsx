@@ -6,7 +6,7 @@ import { HRRoleDashboard } from '../pages/hr/RoleDashboard.js';
 import { HRTalentPools } from '../pages/hr/TalentPools.js';
 import { HRCompare } from '../pages/hr/Compare.js';
 import { auth, signInWithGoogle } from '../lib/firebase.js';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { AuthOverlay } from '../components/AuthOverlay.js';
 import { AnimatePresence } from 'motion/react';
 import { createSession } from '../lib/api.js';
@@ -17,6 +17,27 @@ export function HRLayout() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  const handleSandboxSignIn = () => {
+    localStorage.setItem('uat_bypass_user', 'true');
+    setUser({
+      uid: 'uat-test-user-id',
+      email: 'uat-tester@example.com',
+      displayName: 'UAT Tester',
+      photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop',
+      getIdToken: async () => 'uat-test-token-76839210-9b37-4d76-88d4-539c94b7f83e'
+    } as any);
+  };
+
+  const handleSignOut = async () => {
+    localStorage.removeItem('uat_bypass_user');
+    setUser(null);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+  };
 
   useEffect(() => {
     if (localStorage.getItem('uat_bypass_user') === 'true') {
@@ -64,9 +85,16 @@ export function HRLayout() {
         {!user && (
           <AuthOverlay
             onLogin={async () => {
-              await signInWithGoogle();
+              try {
+                await signInWithGoogle();
+              } catch (err) {
+                console.error("Google sign in failed, falling back to sandbox", err);
+                alert("Google Sign-In failed (unauthorized domain, popup blocked, or disabled provider in Firebase). Automatically logging into Sandbox/Demo Workspace instead.");
+                handleSandboxSignIn();
+              }
             }}
             onSkip={() => {}} // Remove skip capability for HR
+            onSandboxLogin={handleSandboxSignIn}
           />
         )}
       </AnimatePresence>
@@ -168,6 +196,13 @@ export function HRLayout() {
             
             <button className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors">
               Invite Team
+            </button>
+
+            <button 
+              onClick={handleSignOut}
+              className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Sign Out
             </button>
             
             <div className="w-8 h-8 rounded-full bg-secondary-container border border-outline-variant overflow-hidden">

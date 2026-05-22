@@ -1,7 +1,7 @@
 # UAT Test Plan: Talent Tailor HR Modules (Obsidian Edition)
 
 **System Under Test:** Talent Tailor HR Dashboard & Pipelines
-**Base URL:** `http://localhost:5173`
+**Base URL:** `https://talent-tailor-production.up.railway.app`
 **Verification Mode:** Automated E2E via Puppeteer with Network Mocking
 
 This test plan defines the end-to-end User Acceptance Testing (UAT) verification for the updated HR user flows, layout adjustments, and premium Obsidian-themed empty states.
@@ -10,12 +10,24 @@ This test plan defines the end-to-end User Acceptance Testing (UAT) verification
 
 ## Test Cases
 
+### TC-00: Sandbox Authentication
+- **Description:** Verify that the user can sign in using the "Sign In with Sandbox" button when google sign-in fails or as a bypass.
+- **Preconditions:** Clean browser state (no local storage `uat_bypass_user` set).
+- **Steps:**
+  1. Navigate to `/hr`.
+  2. Verify that the AuthOverlay is displayed with "Sign In with Sandbox" button.
+  3. Click "Sign In with Sandbox".
+- **Expected Result:**
+  - Displays the login screen with choices.
+  - Clicking Sandbox button logs the user in successfully and removes the AuthOverlay.
+- **Acceptance Criteria:** AuthOverlay disappears and redirects to the dashboard.
+- **Screenshot:** [00_login_overlay.png](file:///Users/sundaridevulapalli/Downloads/talent-engine-pro/specs/screenshots/00_login_overlay.png)
+
 ### TC-01: Dashboard Empty State ("No Active Roles Open")
 - **Description:** Verify the dashboard when there are no active roles open in the pipeline.
-- **Preconditions:** Active sessions are empty.
+- **Preconditions:** TC-00 completed (User is logged in via Sandbox mode).
 - **Steps:**
-  1. Set local storage `uat_bypass_user = true` and navigate to `/hr`.
-  2. Confirm the page loads and matches the dark Obsidian styling theme.
+  1. Confirm the page loads and matches the dark Obsidian styling theme.
 - **Expected Result:**
   - Displays centered "No Active Roles Open" illustration with floating animated profile and funnel cards.
   - Buttons: "+ Create New Role" (violet) and "View Archived Roles" are rendered.
