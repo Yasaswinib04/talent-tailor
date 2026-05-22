@@ -160,6 +160,8 @@ export interface DashboardShellProps {
   hasSkippedSignIn: boolean;
   handleSignIn: () => void;
   handleSkipSignIn: () => void;
+  handleSandboxSignIn: () => void;
+  handleSignOut: () => void;
   persona: Persona;
   setPersona: (p: Persona) => void;
   role: RoleType;
@@ -220,7 +222,7 @@ export interface DashboardShellProps {
 
 const DashboardShell: React.FC<DashboardShellProps> = (props) => {
   const {
-    user, hasSkippedSignIn, handleSignIn, handleSkipSignIn, persona, setPersona,
+    user, hasSkippedSignIn, handleSignIn, handleSkipSignIn, handleSandboxSignIn, handleSignOut, persona, setPersona,
     role, setRole, history, activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen,
     selectedTier, setSelectedTier, selectedFeatures, setSelectedFeatures, analysis, setAnalysis,
     resumeInputMode, setResumeInputMode, resumeFiles, setResumeFiles, resume, setResume,
@@ -241,6 +243,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
           <AuthOverlay
             onLogin={handleSignIn}
             onSkip={handleSkipSignIn}
+            onSandboxLogin={handleSandboxSignIn}
           />
         )}
       </AnimatePresence>
@@ -252,7 +255,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
         setRole={setRole}
         user={user}
         onLogin={handleSignIn}
-        onLogout={() => signOut(auth)}
+        onLogout={handleSignOut}
         onTabChange={(tab) => {
           setActiveTab(tab as any);
           setIsMobileMenuOpen(false);
@@ -285,7 +288,7 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
         }}
         user={user}
         onLogin={handleSignIn}
-        onLogout={() => signOut(auth)}
+        onLogout={handleSignOut}
         selectedFeatures={selectedFeatures}
         setSelectedFeatures={setSelectedFeatures}
       />
@@ -683,6 +686,20 @@ export function LegacyCandidateApp() {
   }, [hrAnalysis]);
 
   useEffect(() => {
+    if (localStorage.getItem('uat_bypass_user') === 'true') {
+      const mockUser = {
+        uid: 'uat-test-user-id',
+        email: 'uat-tester@example.com',
+        displayName: 'Demo HR Recruiter',
+        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop',
+        getIdToken: async () => 'uat-test-token-76839210-9b37-4d76-88d4-539c94b7f83e'
+      };
+      setUser(mockUser as any);
+      setIsAuthLoading(false);
+      loadHistory(mockUser.uid);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setIsAuthLoading(false);
@@ -1059,12 +1076,39 @@ export function LegacyCandidateApp() {
     sessionStorage.setItem('hasSkippedSignIn', 'true');
   };
 
+  const handleSandboxSignIn = () => {
+    localStorage.setItem('uat_bypass_user', 'true');
+    const mockUser = {
+      uid: 'uat-test-user-id',
+      email: 'uat-tester@example.com',
+      displayName: 'Demo HR Recruiter',
+      photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop',
+      getIdToken: async () => 'uat-test-token-76839210-9b37-4d76-88d4-539c94b7f83e'
+    };
+    setUser(mockUser as any);
+    handleSkipSignIn();
+  };
+
+  const handleSignOut = async () => {
+    localStorage.removeItem('uat_bypass_user');
+    sessionStorage.removeItem('hasSkippedSignIn');
+    setHasSkippedSignIn(false);
+    setUser(null);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+  };
+
   const handleSignIn = async () => {
     try {
       await signInWithGoogle();
       handleSkipSignIn(); // Also mark as skipped so overlay doesn't reappear
     } catch (error) {
       console.error("Sign in failed", error);
+      alert("Google Sign-In failed (unauthorized domain, popup blocked, or disabled provider in Firebase). Automatically logging into Sandbox/Demo Workspace instead.");
+      handleSandboxSignIn();
     }
   };
 
@@ -1077,7 +1121,7 @@ export function LegacyCandidateApp() {
   }
 
   const dashboardProps: DashboardShellProps = {
-    user, hasSkippedSignIn, handleSignIn, handleSkipSignIn, persona, setPersona,
+    user, hasSkippedSignIn, handleSignIn, handleSkipSignIn, handleSandboxSignIn, handleSignOut, persona, setPersona,
     role, setRole, history, activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen,
     selectedTier, setSelectedTier, selectedFeatures, setSelectedFeatures, analysis, setAnalysis,
     resumeInputMode, setResumeInputMode, resumeFiles, setResumeFiles, resume, setResume,

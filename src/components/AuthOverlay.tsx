@@ -1,13 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Globe } from 'lucide-react';
+import { ShieldCheck, Globe, KeyRound } from 'lucide-react';
 
 interface AuthOverlayProps {
   onLogin: () => void;
   onSkip: () => void;
+  onSandboxLogin: () => void;
 }
 
-export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip }) => (
+export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip, onSandboxLogin }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6">
     <motion.div
       initial={{ opacity: 0, y: 40, scale: 0.95 }}
@@ -29,13 +30,19 @@ export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip }) => 
       <div className="w-full space-y-4 max-w-sm">
         <button
           onClick={onLogin}
-          className="w-full h-16 bg-slate-900 text-white font-black uppercase tracking-[0.2em] rounded-md flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl text-xs"
+          className="w-full h-16 bg-slate-900 text-white font-black uppercase tracking-[0.2em] rounded-md flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl text-xs cursor-pointer"
         >
           <Globe className="h-5 w-5 opacity-40" /> Sign In with Google
         </button>
         <button
+          onClick={onSandboxLogin}
+          className="w-full h-16 bg-violet-600 text-white font-black uppercase tracking-[0.2em] rounded-md flex items-center justify-center gap-3 hover:bg-violet-700 transition-all shadow-xl text-xs cursor-pointer border border-violet-500/30"
+        >
+          <KeyRound className="h-5 w-5 opacity-70" /> Sign In with Sandbox
+        </button>
+        <button
           onClick={onSkip}
-          className="w-full h-16 bg-white border-2 border-slate-100 text-slate-400 font-black uppercase tracking-[0.2em] rounded-md hover:bg-slate-50 hover:border-slate-200 transition-all text-[10px]"
+          className="w-full h-16 bg-white border-2 border-slate-100 text-slate-400 font-black uppercase tracking-[0.2em] rounded-md hover:bg-slate-50 hover:border-slate-200 transition-all text-[10px] cursor-pointer"
         >
           Continue as Guest
         </button>
