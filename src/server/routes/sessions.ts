@@ -107,7 +107,7 @@ router.delete('/:id', async (req: AuthRequest, res): Promise<void> => {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    if (session.status === 'analyzing') {
+    if ((session as any).status === 'analyzing') {
       res.status(400).json({ error: 'Cannot delete session while analyzing' });
       return;
     }

@@ -18,6 +18,7 @@ import {
   ThumbsUp, 
   Download, 
   Globe,
+  CheckCircle2,
   Trash2,
   ExternalLink,
   Target,

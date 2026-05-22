@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "cross-env NODE_ENV=production tsx server.ts",
     "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
@@ -31,7 +32,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
-    "node-cache": "^5.1.2",
+    "p-queue": "^9.3.0",
     "postgres": "^3.4.9",
     "posthog-js": "^1.372.5",
     "react": "^19.0.0",
@@ -57,7 +58,7 @@
     "jest": "^30.4.1",
     "tailwindcss": "^4.1.14",
     "ts-jest": "^29.4.9",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

@@ -10,7 +10,7 @@ import {
   Trophy,
   GraduationCap
 } from 'lucide-react';
-import { RoleType, ExperienceTier, HiringPreferences } from '../types';
+import { RoleType, ExperienceTier, HiringPreferences, JobProfile } from '../types';
 import { ROLE_WEIGHTS, TIER_CONFIG, getEffectiveWeights } from '../constants/roles';
 import { cn } from '../lib/utils';
 import { Badge } from "@/components/ui/badge";

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { HRDashboard } from '../pages/hr/Dashboard';
-import { HRPreferences } from '../pages/hr/Preferences';
-import { HRRoleDashboard } from '../pages/hr/RoleDashboard';
+import { HRDashboard } from '../pages/hr/Dashboard.js';
+import { HRPreferences } from '../pages/hr/Preferences.js';
+import { HRRoleDashboard } from '../pages/hr/RoleDashboard.js';
 
 export function HRLayout() {
   const location = useLocation();
@@ -92,7 +92,7 @@ export function HRLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-background">
-          <Routes location={location} key={location.pathname}>
+          <Routes location={location}>
             <Route path="/" element={<HRDashboard />} />
             <Route path="/role/:id" element={<HRRoleDashboard />} />
             <Route path="/role/:id/setup" element={<HRPreferences />} />

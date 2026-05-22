@@ -39,6 +39,18 @@ export async function initDb() {
         updated_at TIMESTAMPTZ DEFAULT now()
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS pipeline_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id UUID REFERENCES screening_sessions(id) ON DELETE CASCADE,
+        candidate_id TEXT,
+        agent_name TEXT NOT NULL,
+        duration_ms INTEGER,
+        status TEXT,
+        error TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
     console.log("PostgreSQL schema validated successfully.");
   } catch (error) {
     console.error("Failed to initialize PostgreSQL schema:", error);
@@ -123,6 +135,27 @@ export async function deleteSession(sessionId: string, hrUserId: string) {
     DELETE FROM screening_sessions
     WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
   `;
+}
+
+/**
+ * Logs an AI agent execution event to the pipeline_logs table.
+ */
+export async function logPipelineEvent(
+  sessionId: string, 
+  candidateId: string, 
+  agentName: string, 
+  durationMs: number, 
+  status: 'success' | 'failed', 
+  errorText?: string
+) {
+  try {
+    await sql`
+      INSERT INTO pipeline_logs (session_id, candidate_id, agent_name, duration_ms, status, error)
+      VALUES (${sessionId}, ${candidateId}, ${agentName}, ${durationMs}, ${status}, ${errorText || null})
+    `;
+  } catch (e) {
+    console.error("Failed to log pipeline event:", e);
+  }
 }
 
 export default sql;
