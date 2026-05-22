@@ -1111,8 +1111,10 @@ export function LegacyCandidateApp() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/hr/dashboard" replace />} />
       <Route path="/hr/*" element={<HRLayout />} />
-      <Route path="/*" element={<LegacyCandidateApp />} />
+      <Route path="/legacy/*" element={<LegacyCandidateApp />} />
+      <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
     </Routes>
   );
 }
