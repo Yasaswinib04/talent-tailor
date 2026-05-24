@@ -51,6 +51,21 @@ export async function initDb() {
         created_at TIMESTAMPTZ DEFAULT now()
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS uat_bugs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reporter_email TEXT NOT NULL,
+        screen_path TEXT NOT NULL,
+        category TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        description TEXT NOT NULL,
+        steps_to_reproduce TEXT,
+        browser_info JSONB NOT NULL DEFAULT '{}'::jsonb,
+        state_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+        status TEXT NOT NULL DEFAULT 'open',
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
     console.log("PostgreSQL schema validated successfully.");
   } catch (error) {
     console.error("Failed to initialize PostgreSQL schema:", error);
@@ -156,6 +171,54 @@ export async function logPipelineEvent(
   } catch (e) {
     console.error("Failed to log pipeline event:", e);
   }
+}
+
+/**
+ * Logs a UAT bug report securely in the database.
+ */
+export async function createBugReport(
+  reporterEmail: string,
+  screenPath: string,
+  category: string,
+  severity: string,
+  description: string,
+  stepsToReproduce: string,
+  browserInfo: any,
+  stateSnapshot: any
+): Promise<string> {
+  const [row] = await sql`
+    INSERT INTO uat_bugs (
+      reporter_email,
+      screen_path,
+      category,
+      severity,
+      description,
+      steps_to_reproduce,
+      browser_info,
+      state_snapshot
+    ) VALUES (
+      ${reporterEmail},
+      ${screenPath},
+      ${category},
+      ${severity},
+      ${description},
+      ${stepsToReproduce || null},
+      ${sql.json(browserInfo)},
+      ${sql.json(stateSnapshot)}
+    )
+    RETURNING id
+  `;
+  return row.id;
+}
+
+/**
+ * Retrieves all reported UAT bug logs.
+ */
+export async function listBugReports() {
+  return await sql`
+    SELECT * FROM uat_bugs
+    ORDER BY created_at DESC
+  `;
 }
 
 export default sql;

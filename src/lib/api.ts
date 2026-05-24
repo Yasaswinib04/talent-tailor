@@ -91,3 +91,24 @@ export const getSessions = async () => {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
+
+export const reportBug = async (bugData: any) => {
+  const res = await fetch('/api/hr/bugs', {
+    method: 'POST',
+    headers: {
+      ...(await getAuthHeaders()),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(bugData)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const getBugs = async () => {
+  const res = await fetch('/api/hr/bugs', {
+    headers: await getAuthHeaders()
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};

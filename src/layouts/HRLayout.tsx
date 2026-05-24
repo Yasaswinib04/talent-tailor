@@ -10,6 +10,7 @@ import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth
 import { AuthOverlay } from '../components/AuthOverlay.js';
 import { AnimatePresence } from 'motion/react';
 import { createSession } from '../lib/api.js';
+import { DevBugReporter } from '../components/DevBugReporter.js';
 
 export function HRLayout() {
   const location = useLocation();
@@ -17,6 +18,30 @@ export function HRLayout() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  
+  const [isDevMode, setIsDevMode] = useState(() => localStorage.getItem('developer_mode') === 'true');
+  const [logoClicks, setLogoClicks] = useState(0);
+
+  const handleLogoClick = () => {
+    setLogoClicks(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        const nextMode = !isDevMode;
+        localStorage.setItem('developer_mode', nextMode ? 'true' : 'false');
+        setIsDevMode(nextMode);
+        alert(nextMode ? 'Developer Mode Enabled!' : 'Developer Mode Disabled.');
+        return 0;
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (logoClicks > 0) {
+      const timer = setTimeout(() => setLogoClicks(0), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [logoClicks]);
 
   const handleSandboxSignIn = () => {
     localStorage.setItem('uat_bypass_user', 'true');
@@ -101,14 +126,26 @@ export function HRLayout() {
       
       {/* SideNavBar */}
       <nav className="hidden md:flex bg-surface-container-low text-primary text-on-surface docked fixed left-0 top-0 h-screen w-64 border-r border-outline-variant flex-col py-6 px-4 gap-2 z-40">
-        <div className="mb-6 px-2 flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-            <span className="material-symbols-outlined text-lg" data-icon="hub">hub</span>
+        <div 
+          onClick={handleLogoClick}
+          className="mb-6 px-2 flex flex-col gap-2 cursor-pointer select-none group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:scale-105 transition-transform animate-float-1">
+              <span className="material-symbols-outlined text-lg" data-icon="hub">hub</span>
+            </div>
+            <div>
+              <h1 className="text-sm font-headline font-bold text-on-surface tracking-tight leading-none">TalentMatch AI</h1>
+              <p className="text-[10px] text-on-surface-variant mt-0.5">Recruitment Engine</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-sm font-headline font-bold text-on-surface tracking-tight leading-none">TalentMatch AI</h1>
-            <p className="text-[10px] text-on-surface-variant mt-0.5">Recruitment Engine</p>
-          </div>
+          
+          {isDevMode && (
+            <div className="mt-1 px-2.5 py-1 rounded bg-primary-container text-primary text-[10px] font-mono border border-primary/20 flex items-center gap-1.5 w-fit animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              DEV MODE ACTIVE
+            </div>
+          )}
         </div>
 
         {/* New Request Button */}
@@ -226,6 +263,8 @@ export function HRLayout() {
           </Routes>
         </main>
       </div>
+
+      <DevBugReporter isDevMode={isDevMode} setIsDevMode={setIsDevMode} />
     </div>
   );
 }

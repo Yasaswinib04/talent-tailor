@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
+import bugsRouter from "./src/server/routes/bugs.js";
 import { initDb } from "./src/server/db.js";
 import axios from "axios";
 import path from "path";
@@ -18,6 +19,7 @@ async function startServer() {
 
   app.use("/api/hr/sessions", sessionsRouter);
   app.use("/api/hr/upload", uploadRouter);
+  app.use("/api/hr/bugs", bugsRouter);
 
   // API Route to fetch URL content
   app.get("/api/proxy", async (req, res) => {
