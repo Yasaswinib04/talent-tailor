@@ -6,14 +6,15 @@ interface AuthOverlayProps {
   onLogin: () => void;
   onSkip: () => void;
   onSandboxLogin: () => void;
+  error?: string | null;
 }
 
-export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip, onSandboxLogin }) => (
+export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip, onSandboxLogin, error }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6">
     <motion.div
       initial={{ opacity: 0, y: 40, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="bg-white max-w-lg w-full rounded-md shadow-[0_32px_128px_-32px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col items-center p-12 text-center space-y-10 border border-white"
+      className="bg-white max-w-lg w-full rounded-md shadow-[0_32px_128px_-32px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col items-center p-12 text-center space-y-8 border border-white"
     >
       <div className="h-24 w-24 bg-slate-900 rounded-md flex items-center justify-center rotate-6 shadow-2xl shadow-primary/20 relative group">
         <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-transparent opacity-20 group-hover:opacity-40 transition-opacity" />
@@ -26,6 +27,17 @@ export const AuthOverlay: React.FC<AuthOverlayProps> = ({ onLogin, onSkip, onSan
           Access specialized role intelligence and precision matchmaking in your private workspace.
         </p>
       </div>
+
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs px-4 py-3 rounded-md flex items-center gap-2.5 text-left leading-relaxed"
+        >
+          <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+          <span>{error}</span>
+        </motion.div>
+      )}
 
       <div className="w-full space-y-4 max-w-sm">
         <button

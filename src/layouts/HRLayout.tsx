@@ -18,6 +18,7 @@ export function HRLayout() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const [isDevMode, setIsDevMode] = useState(() => localStorage.getItem('developer_mode') === 'true');
   const [logoClicks, setLogoClicks] = useState(0);
@@ -111,15 +112,20 @@ export function HRLayout() {
           <AuthOverlay
             onLogin={async () => {
               try {
+                setAuthError(null);
                 await signInWithGoogle();
               } catch (err) {
                 console.error("Google sign in failed, falling back to sandbox", err);
-                alert("Google Sign-In failed (unauthorized domain, popup blocked, or disabled provider in Firebase). Automatically logging into Sandbox/Demo Workspace instead.");
-                handleSandboxSignIn();
+                setAuthError("Google Sign-In failed (unauthorized domain or popup blocked). Automatically logging into Sandbox/Demo Workspace instead...");
+                setTimeout(() => {
+                  handleSandboxSignIn();
+                  setAuthError(null);
+                }, 2500);
               }
             }}
             onSkip={() => {}} // Remove skip capability for HR
             onSandboxLogin={handleSandboxSignIn}
+            error={authError}
           />
         )}
       </AnimatePresence>
