@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Props {
   onAddTalent: () => void;
 }
 
 export function TalentPoolList({ onAddTalent }: Props) {
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+
+  // Close menus on clicking anywhere outside
+  useEffect(() => {
+    const closeMenu = () => setActiveMenuId(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
+
   // Mock Data mimicking the screenshot
   const [candidates] = useState([
     { id: 1, name: 'Alex Johnson', role: 'Senior Software Engineer', skills: [{name: 'Java', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'React', color: 'bg-secondary/20 text-secondary border-secondary/30'}, {name: 'Node.js', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'LinkedIn', date: 'Oct 26, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
@@ -122,7 +131,7 @@ export function TalentPoolList({ onAddTalent }: Props) {
               <thead>
                 <tr className="border-b border-outline-variant bg-surface-container-low">
                   <th className="p-4 pl-5 w-12"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary" /></th>
-                  <th className="py-4 pr-4 font-semibold text-on-surface-variant text-sm tracking-wide">Name</th>
+                  <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Name</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Role</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Skills</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Source</th>
@@ -135,7 +144,7 @@ export function TalentPoolList({ onAddTalent }: Props) {
                 {candidates.map((c, i) => (
                   <tr key={c.id} className="hover:bg-surface-container-highest/50 transition-colors group">
                     <td className="p-4 pl-5"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary opacity-0 group-hover:opacity-100 transition-opacity" /></td>
-                    <td className="py-3 pr-4">
+                    <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-xs shrink-0 overflow-hidden border border-outline-variant">
                           {/* Placeholder Avatar */}
@@ -161,11 +170,53 @@ export function TalentPoolList({ onAddTalent }: Props) {
                         {c.status}
                       </span>
                     </td>
-                    <td className="p-4 pr-5 text-right">
+                    <td className="p-4 pr-5 text-right relative" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2 text-on-surface-variant">
-                        <button className="hover:text-primary transition-colors p-1"><span className="material-symbols-outlined text-lg">visibility</span></button>
-                        <button className="hover:text-on-surface transition-colors p-1"><span className="material-symbols-outlined text-lg">more_horiz</span></button>
+                        <button className="hover:text-primary transition-colors p-1" title="View Profile">
+                          <span className="material-symbols-outlined text-lg">visibility</span>
+                        </button>
+                        <button 
+                          onClick={() => setActiveMenuId(activeMenuId === c.id ? null : c.id)}
+                          className="hover:text-on-surface transition-colors p-1 cursor-pointer"
+                          title="More Actions"
+                        >
+                          <span className="material-symbols-outlined text-lg">more_horiz</span>
+                        </button>
                       </div>
+
+                      {/* Interactive Dropdown Menu */}
+                      {activeMenuId === c.id && (
+                        <div className="absolute right-5 top-11 z-30 bg-surface-container-high border border-outline-variant rounded-md shadow-xl py-1 w-44 text-left animate-in fade-in slide-in-from-top-1 duration-150">
+                          <button 
+                            onClick={() => { alert(`Viewing full profile: ${c.name}`); setActiveMenuId(null); }}
+                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">account_box</span>
+                            View Profile
+                          </button>
+                          <button 
+                            onClick={() => { alert(`Adding ${c.name} to Active Screening Pipeline`); setActiveMenuId(null); }}
+                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
+                          >
+                            <span className="material-symbols-outlined text-sm">assignment_ind</span>
+                            Add to Pipeline
+                          </button>
+                          <button 
+                            onClick={() => { alert(`Exporting profile of ${c.name} as PDF summary`); setActiveMenuId(null); }}
+                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                            Export PDF Summary
+                          </button>
+                          <button 
+                            onClick={() => { alert(`Removing ${c.name} from UAT talent pool`); setActiveMenuId(null); }}
+                            className="w-full px-4 py-2.5 text-xs font-semibold text-error hover:bg-error-container/20 transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
+                          >
+                            <span className="material-symbols-outlined text-sm text-error">delete</span>
+                            Delete Candidate
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

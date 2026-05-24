@@ -1,135 +1,448 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getSessions } from '../../lib/api.js';
+import { Check, X, ArrowLeft, Sliders, AlertTriangle, Layers, Award, ShieldAlert, Download, Sparkles } from 'lucide-react';
+
+interface Candidate {
+  id: string;
+  name: string;
+  location: string;
+  score: number;
+  meetsMandatoryCriteria: boolean;
+  strengths: string[];
+  weaknesses: string[];
+  overallFeedback: string;
+  discoveryQuestions: Array<{ question: string; answer: string }>;
+}
+
+interface RolePipeline {
+  id: string;
+  name: string;
+  department: string;
+  candidates: Candidate[];
+}
 
 export function HRCompare() {
   const navigate = useNavigate();
+  const [pipelines, setPipelines] = useState<RolePipeline[]>([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Mock Demo Pipeline fallback for UAT review
+  const demoPipeline: RolePipeline = {
+    id: 'demo-role-123',
+    name: 'Senior Frontend Architect (Demo)',
+    department: 'Engineering',
+    candidates: [
+      {
+        id: 'demo-c1',
+        name: 'Marcus Chen',
+        location: 'San Francisco, CA',
+        score: 8.8,
+        meetsMandatoryCriteria: true,
+        strengths: ['React & TypeScript', 'LCP Optimization', 'Vite & State Management'],
+        weaknesses: ['Limited backend database experience'],
+        overallFeedback: 'Marcus is an outstanding frontend developer who demonstrated excellent problem solving. He is highly proficient with React, state management, and modern Web APIs.',
+        discoveryQuestions: [
+          {
+            question: 'Explain how you optimized Largest Contentful Paint (LCP) in React.',
+            answer: 'I lazy-loaded non-critical components, optimized hero images, and minimized render-blocking assets.'
+          }
+        ]
+      },
+      {
+        id: 'demo-c2',
+        name: 'Sophia Rodriguez',
+        location: 'Austin, TX',
+        score: 8.2,
+        meetsMandatoryCriteria: true,
+        strengths: ['UI Architecture', 'A11y/Accessibility standards', 'TailwindCSS'],
+        weaknesses: ['Limited Node.js server knowledge'],
+        overallFeedback: 'Sophia has a strong eye for visual design aesthetics, detail, and layout consistency. She builds clean component structures and maintains high accessibility standards.',
+        discoveryQuestions: [
+          {
+            question: 'How do you handle responsive design and container queries?',
+            answer: 'I use CSS container queries and flexbox layouts to ensure visual elements scale gracefully across viewport sizes.'
+          }
+        ]
+      },
+      {
+        id: 'demo-c3',
+        name: 'Liam Davis',
+        location: 'New York, NY',
+        score: 6.9,
+        meetsMandatoryCriteria: false,
+        strengths: ['Vanilla Javascript', 'Webpack configuration'],
+        weaknesses: ['No React experience', 'Lacks TypeScript knowledge'],
+        overallFeedback: 'Liam has solid experience in traditional frontend engineering but lacks hands-on experience with modern React/TypeScript frameworks required for this role.',
+        discoveryQuestions: [
+          {
+            question: 'What are the benefits of migrating from Webpack to Vite?',
+            answer: 'Vite uses ES modules in dev mode which makes hot module replacement (HMR) significantly faster.'
+          }
+        ]
+      }
+    ]
+  };
+
+  useEffect(() => {
+    const fetchPipelines = async () => {
+      try {
+        const sessionsData = await getSessions();
+        const formatted: RolePipeline[] = (sessionsData || []).map((session: any) => {
+          const jp = session.job_profile || {};
+          const rawCandidates = session.analysis_results || [];
+          return {
+            id: session.id,
+            name: jp.name || 'Untitled Role',
+            department: jp.department || 'General',
+            candidates: rawCandidates.map((c: any) => ({
+              id: c.id || Math.random().toString(),
+              name: c.profile?.name || 'Unknown Candidate',
+              location: c.profile?.currentLocation || 'Remote',
+              score: c.score || 0,
+              meetsMandatoryCriteria: c.meetsMandatoryCriteria !== false,
+              strengths: c.strengths || [],
+              weaknesses: c.weaknesses || [],
+              overallFeedback: c.overallFeedback || 'No feedback available.',
+              discoveryQuestions: c.discoveryQuestions || []
+            }))
+          };
+        });
+
+        // Always prepend our demo pipeline for comprehensive UAT testing fallback
+        const allPipelines = [demoPipeline, ...formatted];
+        setPipelines(allPipelines);
+        
+        // Auto-select demo role on load
+        setSelectedPipelineId(demoPipeline.id);
+      } catch (err) {
+        console.error("Failed to load pipelines, using UAT demo data:", err);
+        setPipelines([demoPipeline]);
+        setSelectedPipelineId(demoPipeline.id);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPipelines();
+  }, []);
+
+  const activePipeline = pipelines.find(p => p.id === selectedPipelineId);
+  const activeCandidates = activePipeline ? activePipeline.candidates : [];
+
+  const handleToggleCandidate = (id: string) => {
+    setSelectedCandidateIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(cId => cId !== id);
+      }
+      if (prev.length >= 3) {
+        alert("You can compare a maximum of 3 candidates side-by-side.");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const handlePipelineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedPipelineId(e.target.value);
+    setSelectedCandidateIds([]); // Clear selection when switching pipelines
+  };
+
+  const selectedCandidates = activeCandidates.filter(c => selectedCandidateIds.includes(c.id));
+
+  const handleExportComparison = () => {
+    if (selectedCandidates.length === 0) return;
+    try {
+      const exportData = {
+        role: activePipeline?.name,
+        comparedAt: new Date().toISOString(),
+        candidates: selectedCandidates
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `candidate-comparison-${activePipeline?.name.replace(/\s+/g, '-').toLowerCase()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 min-h-[calc(100vh-4rem)] flex items-center justify-center bg-background text-on-surface-variant">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 min-h-[calc(100vh-4rem)] flex items-center justify-center bg-background">
-      {/* Purple Glow Background */}
-      <div className="absolute w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0"></div>
+    <div className="p-6 min-h-[calc(100vh-4rem)] flex flex-col bg-background relative overflow-hidden">
+      {/* Glow Backdrop */}
+      <div className="absolute w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none top-1/4 right-0 z-0"></div>
 
-      {/* Main Compare Container Card */}
-      <div className="relative z-10 w-full max-w-2xl bg-surface-container/60 backdrop-blur-sm border border-outline-variant rounded-2xl p-10 flex flex-col items-center shadow-2xl">
-        
-        {/* Glow Behind Graphic */}
-        <div className="absolute top-12 w-64 h-64 bg-primary/5 rounded-full blur-[70px] pointer-events-none"></div>
-
-        {/* Dynamic Graphic Area */}
-        <div className="w-full max-w-md h-56 relative flex items-center justify-center z-10 mb-6">
-          {/* Connector SVGs */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 200" fill="none">
-            <defs>
-              <linearGradient id="glow-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#34d399" stopOpacity="0.1" />
-              </linearGradient>
-              <linearGradient id="green-grad" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#27272a" stopOpacity="0.1" />
-              </linearGradient>
-            </defs>
-
-            {/* Left to Center path */}
-            <path d="M 90,80 C 130,80 160,80 200,80" stroke="url(#glow-grad)" strokeWidth="1.5" strokeDasharray="4 4">
-              <animate attributeName="stroke-dashoffset" values="20;0" dur="3s" repeatCount="indefinite" />
-            </path>
-
-            {/* Right to Center path */}
-            <path d="M 310,80 C 270,80 240,80 200,80" stroke="url(#glow-grad)" strokeWidth="1.5" strokeDasharray="4 4">
-              <animate attributeName="stroke-dashoffset" values="0;20" dur="3s" repeatCount="indefinite" />
-            </path>
-
-            {/* Center to Bottom Node path */}
-            <path d="M 200,120 L 200,150" stroke="url(#green-grad)" strokeWidth="1.5" strokeDasharray="3 3">
-              <animate attributeName="stroke-dashoffset" values="15;0" dur="2s" repeatCount="indefinite" />
-            </path>
-
-            {/* Cross-connection paths */}
-            <path d="M 90,80 C 150,110 180,120 200,150" stroke="url(#glow-grad)" strokeWidth="1" opacity="0.3" />
-            <path d="M 310,80 C 250,110 220,120 200,150" stroke="url(#glow-grad)" strokeWidth="1" opacity="0.3" />
-          </svg>
-
-          {/* Left Candidate Card */}
-          <div className="absolute left-6 top-6 bg-surface-container-low/85 backdrop-blur border border-outline-variant rounded-xl p-3 w-28 flex flex-col items-center gap-1.5 shadow-lg animate-float-1">
-            <div className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center bg-surface-container-highest">
-              <span className="material-symbols-outlined text-[16px] text-on-surface-variant">person</span>
-            </div>
-            <div className="w-14 h-1.5 bg-on-surface-variant/40 rounded mt-1"></div>
-            <div className="w-10 h-1 bg-outline-variant rounded"></div>
-            <div className="flex gap-0.5 mt-1">
-              <div className="w-3 h-1 bg-outline-variant/60 rounded-full"></div>
-              <div className="w-3 h-1 bg-outline-variant/60 rounded-full"></div>
-              <div className="w-3 h-1 bg-outline-variant/30 rounded-full"></div>
-            </div>
-          </div>
-
-          {/* Center Main Candidate Card */}
-          <div className="absolute bg-surface-container-low/95 border border-primary/40 rounded-xl p-4 w-36 flex flex-col items-center gap-2 shadow-[0_0_25px_rgba(167,139,250,0.2)] z-10 animate-float-2">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full border border-primary/50 flex items-center justify-center bg-primary/10">
-                <span className="material-symbols-outlined text-[20px] text-primary">person</span>
-              </div>
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-tertiary flex items-center justify-center border border-surface-container-low">
-                <span className="material-symbols-outlined text-[10px] text-background font-bold">check</span>
-              </span>
-            </div>
-            <div className="w-20 h-2 bg-on-surface rounded mt-1"></div>
-            <div className="w-14 h-1 bg-primary/60 rounded"></div>
-            <div className="flex gap-0.5 mt-1">
-              <div className="w-4 h-1 bg-primary/70 rounded-full"></div>
-              <div className="w-4 h-1 bg-primary/70 rounded-full"></div>
-              <div className="w-4 h-1 bg-primary/70 rounded-full"></div>
-            </div>
-          </div>
-
-          {/* Right Candidate Card */}
-          <div className="absolute right-6 top-6 bg-surface-container-low/85 backdrop-blur border border-outline-variant rounded-xl p-3 w-28 flex flex-col items-center gap-1.5 shadow-lg animate-float-3">
-            <div className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center bg-surface-container-highest">
-              <span className="material-symbols-outlined text-[16px] text-on-surface-variant">person</span>
-            </div>
-            <div className="w-14 h-1.5 bg-on-surface-variant/40 rounded mt-1"></div>
-            <div className="w-10 h-1 bg-outline-variant rounded"></div>
-            <div className="flex gap-0.5 mt-1">
-              <div className="w-3 h-1 bg-outline-variant/60 rounded-full"></div>
-              <div className="w-3 h-1 bg-outline-variant/30 rounded-full"></div>
-              <div className="w-3 h-1 bg-outline-variant/30 rounded-full"></div>
-            </div>
-          </div>
-
-          {/* Bottom Security verification badge node */}
-          <div className="absolute bottom-1 bg-surface-container border border-tertiary/40 px-3 py-1.5 rounded-full flex items-center gap-1.5 z-20 shadow-[0_0_15px_rgba(52,211,153,0.15)]">
-            <span className="material-symbols-outlined text-[14px] text-tertiary">verified_user</span>
-            <span className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Metrics</span>
-          </div>
-        </div>
-
-        {/* Text Content */}
-        <h2 className="text-2xl font-headline font-bold text-on-surface mb-3 tracking-tight">
-          Compare Top Talent
-        </h2>
-        <p className="text-on-surface-variant text-sm max-w-md mb-8 leading-relaxed">
-          Select 2-3 candidates from your ranking list to compare their skills, experience, and intelligence verification data side-by-side.
-        </p>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4">
-          <button
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6 shrink-0 relative z-10">
+        <div>
+          <button 
             onClick={() => navigate('/hr')}
-            className="bg-primary text-on-primary px-6 py-2.5 rounded-md font-semibold hover:opacity-95 active:scale-[0.98] transition-all flex items-center gap-2 text-sm shadow-[0_0_20px_rgba(167,139,250,0.15)] cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-primary transition-colors mb-2 cursor-pointer font-semibold"
           >
-            <span className="material-symbols-outlined text-lg">checklist</span>
-            Go to Candidate Ranking
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Dashboard
           </button>
-          <button
-            onClick={() => alert("Comparison metric documentation coming soon!")}
-            className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-6 py-2.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-lg">info</span>
-            Learn about Comparison Metrics
-          </button>
+          <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
+            Compare Top Talent
+            <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
+          </h2>
+          <p className="text-xs text-on-surface-variant mt-1">Select candidates side-by-side to review technical capabilities, strengths, and AI discovery checks.</p>
         </div>
 
+        {selectedCandidates.length > 1 && (
+          <button
+            onClick={handleExportComparison}
+            className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-4 py-2 rounded-md font-bold text-xs tracking-wider uppercase transition-colors flex items-center gap-2 cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export Comparison
+          </button>
+        )}
+      </div>
+
+      {/* Selectors Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6 relative z-10 shrink-0">
+        {/* Role Select Dropdown */}
+        <div className="bg-surface-container border border-outline-variant rounded-xl p-5 flex flex-col gap-3">
+          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Hiring Pipeline</label>
+          <div className="relative">
+            <select
+              value={selectedPipelineId}
+              onChange={handlePipelineChange}
+              className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer appearance-none"
+            >
+              {pipelines.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.department})</option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+          </div>
+        </div>
+
+        {/* Candidate Checklist */}
+        <div className="lg:col-span-3 bg-surface-container border border-outline-variant rounded-xl p-5 flex flex-col justify-center">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-3">Select Candidates to Compare (Max 3)</span>
+          {activeCandidates.length === 0 ? (
+            <div className="flex items-center gap-2 text-xs text-on-surface-variant italic py-1 bg-surface-container-low/50 px-3 rounded-md border border-outline-variant">
+              <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+              No candidates have been analyzed in this pipeline yet. Go back to upload resumes first.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {activeCandidates.map(c => {
+                const isSelected = selectedCandidateIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleToggleCandidate(c.id)}
+                    className={`px-4 py-2.5 rounded-lg border text-xs font-semibold flex items-center gap-3 transition-all cursor-pointer ${isSelected ? 'bg-primary-container border-primary text-primary shadow-[0_0_15px_rgba(167,139,250,0.1)]' : 'bg-surface-container-low border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-on-primary' : 'border-outline-variant'}`}>
+                      {isSelected && <Check className="h-3 w-3" />}
+                    </div>
+                    <div>
+                      <p className="text-left font-medium leading-none mb-0.5">{c.name}</p>
+                      <p className={`text-[10px] text-left font-mono font-bold leading-none ${c.score >= 8.0 ? 'text-primary' : c.score >= 6.0 ? 'text-tertiary' : 'text-error'}`}>Score: {Math.round(c.score * 10)}%</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Comparison Matrix Area */}
+      <div className="flex-1 min-h-[400px] relative z-10 flex flex-col">
+        {selectedCandidates.length < 2 ? (
+          /* Empty Selector State */
+          <div className="flex-1 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center p-12 text-center bg-surface-container/20">
+            <div className="w-16 h-16 rounded-full bg-primary-container text-primary flex items-center justify-center border border-primary/20 mb-4 shadow-[0_0_20px_rgba(167,139,250,0.1)]">
+              <Sliders className="h-7 w-7" />
+            </div>
+            <h3 className="text-lg font-headline font-bold text-on-surface mb-2">Side-by-Side Comparison Workspace</h3>
+            <p className="text-xs text-on-surface-variant max-w-sm leading-relaxed">
+              Please check checkboxes for 2 or 3 candidates above. The comparison board will immediately generate structured competency ratings, strengths, and interview check logs.
+            </p>
+          </div>
+        ) : (
+          /* Matrix Table Card */
+          <div className="flex-1 bg-surface-container border border-outline-variant rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="overflow-x-auto custom-scrollbar flex-1">
+              <table className="w-full text-left border-collapse min-w-[700px] table-fixed">
+                <thead>
+                  <tr className="bg-surface-container-low border-b border-outline-variant/60">
+                    {/* Header: Left Label */}
+                    <th className="p-5 text-xs font-bold text-on-surface-variant uppercase tracking-wider w-1/4 align-top">Candidate Profile</th>
+                    
+                    {/* Header: Candidate Columns */}
+                    {selectedCandidates.map(c => (
+                      <th key={c.id} className="p-5 border-l border-outline-variant/40 w-1/4 align-top">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-secondary-container border border-outline-variant flex items-center justify-center text-on-surface font-headline font-bold text-xs uppercase shrink-0">
+                              {c.name.substring(0, 2)}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-bold text-on-surface truncate">{c.name}</h4>
+                              <p className="text-[10px] text-on-surface-variant truncate">{c.location}</p>
+                            </div>
+                          </div>
+
+                          {/* Gauge and Score */}
+                          <div className="flex items-center gap-4 bg-surface-container-lowest/50 p-2.5 rounded-lg border border-outline-variant/40 w-fit pr-4">
+                            <div className="relative w-9 h-9 shrink-0">
+                              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="#27272a" strokeWidth="3" />
+                                <circle 
+                                  cx="18" 
+                                  cy="18" 
+                                  r="16" 
+                                  fill="none" 
+                                  stroke="#a78bfa" 
+                                  strokeWidth="3.2" 
+                                  strokeDasharray={`${Math.round(c.score * 10)} 100`}
+                                  strokeLinecap="round" 
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-on-surface font-mono">
+                                {Math.round(c.score * 10)}
+                              </div>
+                            </div>
+                            <div className="leading-tight">
+                              <span className="text-[10px] font-bold text-primary uppercase tracking-wider block">Match Score</span>
+                              <span className="text-[9px] text-on-surface-variant">AI Evaluation</span>
+                            </div>
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/40 text-xs">
+                  {/* Row 1: Mandatory Checks */}
+                  <tr>
+                    <td className="p-5 font-bold text-on-surface-variant flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-primary shrink-0" />
+                      Mandatory Criteria
+                    </td>
+                    {selectedCandidates.map(c => (
+                      <td key={c.id} className="p-5 border-l border-outline-variant/40 font-medium align-middle">
+                        {c.meetsMandatoryCriteria ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary-container text-primary font-bold border border-primary/20 text-[10px] tracking-wide uppercase">
+                            <Check className="h-3.5 w-3.5" /> Meets Standard
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error-container text-error font-bold border border-error/20 text-[10px] tracking-wide uppercase">
+                            <X className="h-3.5 w-3.5" /> Fails Criteria
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Row 2: Strengths */}
+                  <tr>
+                    <td className="p-5 font-bold text-on-surface-variant flex items-center gap-2">
+                      <Award className="h-4 w-4 text-primary shrink-0" />
+                      Key Strengths
+                    </td>
+                    {selectedCandidates.map(c => (
+                      <td key={c.id} className="p-5 border-l border-outline-variant/40 align-top">
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.strengths.map((str, idx) => (
+                            <span 
+                              key={idx} 
+                              className="px-2 py-0.5 rounded border border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant font-medium hover:border-primary/30 transition-colors"
+                            >
+                              {str}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Row 3: Weaknesses */}
+                  <tr>
+                    <td className="p-5 font-bold text-on-surface-variant flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-primary shrink-0" />
+                      Skill Gaps & Risks
+                    </td>
+                    {selectedCandidates.map(c => (
+                      <td key={c.id} className="p-5 border-l border-outline-variant/40 align-top">
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.weaknesses.map((weak, idx) => (
+                            <span 
+                              key={idx} 
+                              className="px-2 py-0.5 rounded border border-error/25 bg-error-container/10 text-[10px] text-error font-medium"
+                            >
+                              {weak}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Row 4: Fit summary */}
+                  <tr>
+                    <td className="p-5 font-bold text-on-surface-variant flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary shrink-0" />
+                      Fit Summary
+                    </td>
+                    {selectedCandidates.map(c => (
+                      <td key={c.id} className="p-5 border-l border-outline-variant/40 align-top">
+                        <p className="text-on-surface-variant text-xs leading-relaxed max-w-sm font-sans">{c.overallFeedback}</p>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Row 5: AI Questions */}
+                  <tr>
+                    <td className="p-5 font-bold text-on-surface-variant flex items-center gap-2 align-top">
+                      <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                      AI Discovery Check
+                    </td>
+                    {selectedCandidates.map(c => (
+                      <td key={c.id} className="p-5 border-l border-outline-variant/40 align-top">
+                        {c.discoveryQuestions && c.discoveryQuestions.length > 0 ? (
+                          <div className="space-y-4 max-w-sm">
+                            {c.discoveryQuestions.map((q, idx) => (
+                              <div key={idx} className="space-y-1.5 bg-surface-container-low/40 p-3 rounded border border-outline-variant/30">
+                                <div className="flex gap-2">
+                                  <span className="font-bold text-primary">Q:</span>
+                                  <span className="font-bold text-on-surface leading-tight text-[11px]">{q.question}</span>
+                                </div>
+                                <div className="flex gap-2 text-on-surface-variant pl-4 text-[10px] leading-relaxed border-l border-outline-variant/50">
+                                  <span className="italic">Candidate Answer: "{q.answer}"</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-on-surface-variant italic text-[11px]">No interview questions generated yet.</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
