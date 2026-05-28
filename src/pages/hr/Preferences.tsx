@@ -51,6 +51,8 @@ export function HRPreferences() {
     { key: 'softSkills', label: 'Soft Skills', weight: 15 },
   ]);
   const [extractingSkills, setExtractingSkills] = useState(false);
+  const [rubricModified, setRubricModified] = useState(false);
+  const [rubricRecalculatedAt, setRubricRecalculatedAt] = useState<number>(0);
 
   const roleTypeOptions: RoleType[] = [
     'Product Manager', 'Consumer Product Manager', 'Product Designer', 'Designer',
@@ -131,6 +133,8 @@ export function HRPreferences() {
       { key: 'education', label: 'Education', weight: w.education },
       { key: 'softSkills', label: 'Soft Skills', weight: w.softSkills },
     ]);
+    setRubricModified(false);
+    setRubricRecalculatedAt(Date.now());
   };
 
   const normalizeWeights = (dims: ScoreDimension[], idx: number): ScoreDimension[] => {
@@ -183,6 +187,9 @@ export function HRPreferences() {
             ];
             if (cw) for (const [k, v] of Object.entries(cw as Record<string, number>)) base.push({ key: k, label: k, weight: v, custom: true });
             setDimensions(base);
+            setRubricModified(true);
+          } else {
+            applyRecommendedWeights();
           }
         }
       } catch (err) { console.error('Failed to load session preferences:', err); }
@@ -225,15 +232,36 @@ export function HRPreferences() {
     try {
       const result = await extractJDSkills(jdContent, roleType, experienceTier);
       if (result.mandatory?.length || result.preferred?.length) {
-        const merged = [
-          ...(result.mandatory || []).filter((s: string) => !skills.mandatory.includes(s)),
-          ...skills.mandatory,
-        ];
-        const mergedPref = [
-          ...(result.preferred || []).filter((s: string) => !skills.preferred.includes(s) && !merged.includes(s)),
-          ...skills.preferred,
-        ];
-        setSkills({ mandatory: merged, preferred: mergedPref });
+        const allGeneric = allRoleSkills.map(s => s.name.toLowerCase());
+        const newMandatory: string[] = [...skills.mandatory];
+        const newPreferred: string[] = [...skills.preferred];
+
+        for (const skill of (result.mandatory || [])) {
+          const sl = skill.trim();
+          const match = allRoleSkills.find(gs => gs.name.toLowerCase() === sl.toLowerCase());
+          if (match) {
+            if (!newMandatory.includes(match.name) && !newPreferred.includes(match.name)) {
+              newMandatory.push(match.name);
+            }
+          } else if (!newMandatory.includes(sl)) {
+            newMandatory.push(sl);
+          }
+        }
+
+        for (const skill of (result.preferred || [])) {
+          const sl = skill.trim();
+          if (newMandatory.some(m => m.toLowerCase() === sl.toLowerCase())) continue;
+          const match = allRoleSkills.find(gs => gs.name.toLowerCase() === sl.toLowerCase());
+          if (match) {
+            if (!newPreferred.includes(match.name) && !newMandatory.includes(match.name)) {
+              newPreferred.push(match.name);
+            }
+          } else if (!newPreferred.includes(sl)) {
+            newPreferred.push(sl);
+          }
+        }
+
+        setSkills({ mandatory: newMandatory, preferred: newPreferred });
       }
     } catch (err: any) {
       console.error('Skill extraction failed:', err);
@@ -264,8 +292,9 @@ export function HRPreferences() {
             <h2 className="text-2xl font-headline font-bold text-on-surface tracking-tight">JD & Criteria Setup</h2>
             <p className="text-on-surface-variant text-sm mt-0.5">Configure the job description and AI vetting parameters.</p>
           </div>
-          <button onClick={applyRecommendedWeights} className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">auto_fix_high</span> Reset to AI recommended weights
+          <button onClick={applyRecommendedWeights} className={`text-xs hover:underline cursor-pointer flex items-center gap-1 ${rubricModified ? 'text-amber-400' : 'text-primary'}`}>
+            <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+            {rubricModified ? 'Reset to AI recommended weights' : 'AI recommended weights'}
           </button>
         </div>
 
@@ -377,7 +406,14 @@ export function HRPreferences() {
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Scoring Rubric</h3>
-            <span className={`text-xs font-mono font-bold ${totalWeight === 100 ? 'text-emerald-400' : 'text-red-400'}`}>Total: {totalWeight}%</span>
+            <div className="flex items-center gap-3">
+              {rubricModified ? (
+                <span className="text-[10px] text-amber-400 font-medium">Custom weights saved</span>
+              ) : rubricRecalculatedAt > 0 ? (
+                <span className="text-[10px] text-emerald-400 font-medium animate-pulse">AI recalculated</span>
+              ) : null}
+              <span className={`text-xs font-mono font-bold ${totalWeight === 100 ? 'text-emerald-400' : 'text-red-400'}`}>Total: {totalWeight}%</span>
+            </div>
           </div>
           <p className="text-[10px] text-on-surface-variant mb-4">AI weights based on {roleType} · {experienceTier} · {industry}. Adjust sliders; must sum to 100%.</p>
           <div className="space-y-3">
@@ -385,20 +421,20 @@ export function HRPreferences() {
               <div key={dim.key} className="flex items-center gap-3">
                 <span className="w-28 text-xs font-medium text-on-surface shrink-0 truncate">{dim.label}{dim.custom && <span className="text-[9px] text-primary ml-1">custom</span>}</span>
                 <input type="range" min={0} max={100} value={dim.weight}
-                  onChange={(e) => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Number(e.target.value) }; return normalizeWeights(next, i); })}
+                  onChange={(e) => { setRubricModified(true); setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Number(e.target.value) }; return normalizeWeights(next, i); }); }}
                   className="flex-1 h-1.5 accent-primary cursor-pointer" />
                 <span className="w-10 text-right text-xs font-mono font-bold text-on-surface">{dim.weight}%</span>
                 <div className="flex gap-0.5 shrink-0">
-                  <button onClick={() => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.max(0, next[i].weight - 1) }; return normalizeWeights(next, i); })}
+                  <button onClick={() => { setRubricModified(true); setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.max(0, next[i].weight - 1) }; return normalizeWeights(next, i); }); }}
                     className="w-5 h-5 rounded text-[10px] bg-surface-container-low border border-outline-variant hover:bg-surface-container-highest flex items-center justify-center cursor-pointer">−</button>
-                  <button onClick={() => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.min(100, next[i].weight + 1) }; return normalizeWeights(next, i); })}
+                  <button onClick={() => { setRubricModified(true); setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.min(100, next[i].weight + 1) }; return normalizeWeights(next, i); }); }}
                     className="w-5 h-5 rounded text-[10px] bg-surface-container-low border border-outline-variant hover:bg-surface-container-highest flex items-center justify-center cursor-pointer">+</button>
-                  {dim.custom && <button onClick={() => setDimensions(prev => prev.filter((_, j) => j !== i))} className="w-5 h-5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 flex items-center justify-center cursor-pointer ml-1">&times;</button>}
+                  {dim.custom && <button onClick={() => { setRubricModified(true); setDimensions(prev => prev.filter((_, j) => j !== i)); }} className="w-5 h-5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 flex items-center justify-center cursor-pointer ml-1">&times;</button>}
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={() => { const name = prompt('Custom criterion name:'); if (name?.trim()) setDimensions(prev => [...prev, { key: name.trim(), label: name.trim(), weight: 5, custom: true }]); }}
+          <button onClick={() => { const name = prompt('Custom criterion name:'); if (name?.trim()) { setRubricModified(true); setDimensions(prev => [...prev, { key: name.trim(), label: name.trim(), weight: 5, custom: true }]); } }}
             className="mt-3 text-[11px] text-primary hover:underline cursor-pointer flex items-center gap-1">
             <span className="material-symbols-outlined text-sm">add</span> Add custom scoring criterion
           </button>
