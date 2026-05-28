@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { RoleType, HiringPreferences, ExperienceTier } from "../../../types.js";
+import { RoleType, HiringPreferences, ExperienceTier, IndustryType } from "../../../types.js";
 import { getEffectiveWeights } from "../../../constants/roles.js";
 import { getAI, safeJsonParse, normalizeScore, SYSTEM_PROMPT } from "./config.js";
 
@@ -11,7 +11,8 @@ export async function scoreCandidate(
   tier: ExperienceTier = 'Senior',
   preferences?: HiringPreferences,
   targetMarket: string = 'India',
-  discoveryAnswers?: { question: string, answer: string }[]
+  discoveryAnswers?: { question: string, answer: string }[],
+  industry?: IndustryType
 ): Promise<any> {
   const jdPart = typeof jd === 'string' ? { text: jd } : { inlineData: jd };
   const resumePart = typeof resume === 'string' ? { text: resume } : { inlineData: resume };
@@ -74,13 +75,13 @@ export async function scoreCandidate(
       },
       required: ["present", "missing"]
     },
-    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Developer', etc." },
+    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Frontend Developer', etc." },
     experienceTier: { type: Type.STRING, description: "Seniority level e.g. 'Junior', 'Senior', 'Executive'." }
   };
 
   const requiredFields = ["name", "score", "professionalSummary", "bulletedAchievements", "overallFeedback", "strengths", "weaknesses", "competencies", "gaps", "meetsMandatoryCriteria", "experienceYears", "atsScore", "keywords", "roleType", "experienceTier"];
 
-  const effectiveWeights = getEffectiveWeights(role as RoleType, tier as ExperienceTier);
+  const effectiveWeights = getEffectiveWeights(role as RoleType, tier as ExperienceTier, industry);
   const weightInfo = `Role Analysis Context (${role} - ${tier} - Track: ${track}):
 - Seniority Focus: ${effectiveWeights.focus}
 - Top Priority: ${effectiveWeights.topPriority}

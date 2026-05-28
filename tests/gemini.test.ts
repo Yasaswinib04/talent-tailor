@@ -83,7 +83,7 @@ describe('Gemini AI Services', () => {
 
     it('should infer implicit skills based on new grounding rules', async () => {
       const resume = getFixture('implicit_skills_resume.txt');
-      const result = await scoreCandidate(resume, jd, 'IC', 'Developer', 'Senior');
+      const result = await scoreCandidate(resume, jd, 'IC', 'Full Stack Developer', 'Senior');
       
       // Should find "Performance Optimization" or similar skill inferred from "reduced latency"
       const skills = [

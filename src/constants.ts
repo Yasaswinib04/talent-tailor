@@ -42,7 +42,7 @@ export const MOCK_ANALYSIS: AnalysisResult = {
 
 export const DEVELOPER_MOCK: AnalysisResult = {
   id: 'mock-2',
-  role: 'Developer',
+  role: 'Full Stack Developer',
   jdContent: 'Seeking a Senior Full-stack Developer with expertise in React, Node.js, and System Design.',
   createdAt: new Date().toISOString(),
   candidates: [
@@ -74,7 +74,7 @@ export const DEVELOPER_MOCK: AnalysisResult = {
         present: ['React', 'Node.js', 'System Design', 'Kubernetes'],
         missing: ['Python', 'Django']
       },
-      roleType: 'Developer',
+      roleType: 'Full Stack Developer',
       experienceTier: 'Lead'
     }
   ]

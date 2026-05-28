@@ -179,7 +179,7 @@ export async function scoreCandidate(
       },
       required: ["present", "missing"]
     },
-    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Developer', etc." },
+    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Frontend Developer', etc." },
     experienceTier: { type: Type.STRING, description: "Seniority level e.g. 'Junior', 'Senior', 'Executive'." }
   };
 

@@ -22,6 +22,6 @@
     "present": ["developer", "industry"],
     "missing": ["React", "TypeScript", "PostgreSQL"]
   },
-  "roleType": "Developer",
+  "roleType": "Full Stack Developer",
   "experienceTier": "Senior"
 }

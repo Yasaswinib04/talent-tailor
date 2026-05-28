@@ -120,6 +120,10 @@ export function preFilterResume(
     }
   }
 
+  if (preferences.preferredSkills && preferences.preferredSkills.length > 0) {
+    // preferredSkills are bonus-only — never trigger rejection, just tracked for scoring
+  }
+
   if (preferences.isMBAMandatory) {
     const hasMBA = degrees.some(d =>
       d.includes('mba') || d.includes('master of business')

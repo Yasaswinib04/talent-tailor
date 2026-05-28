@@ -11,14 +11,36 @@ export type RoleType =
   | 'Sales' 
   | "Founder's Office" 
   | 'Chief of Staff' 
-  | 'Developer' 
+  | 'Frontend Developer'
+  | 'Backend Developer'
+  | 'Full Stack Developer'
   | 'QA' 
   | 'Analytics' 
+  | 'Data Scientist'
+  | 'AI / ML Engineer'
   | 'Data Engineer' 
   | 'Finance' 
   | 'Other';
 
 export type ExperienceTier = 'Junior' | 'Mid-Level' | 'Senior' | 'Lead' | 'Director' | 'Executive';
+
+export type IndustryType =
+  | 'Technology / SaaS'
+  | 'FinTech'
+  | 'Healthcare'
+  | 'E-Commerce'
+  | 'EdTech'
+  | 'Enterprise'
+  | 'Consulting'
+  | 'Other';
+
+export type SkillCategory = 'technical' | 'analytics' | 'softSkills' | 'tools';
+
+export interface RoleSkill {
+  name: string;
+  category: SkillCategory;
+  isPreferred?: boolean;
+}
 
 export type InputMode = 'file' | 'text' | 'url';
 
@@ -78,6 +100,7 @@ export interface HiringPreferences {
   minExperienceYears: number;
   preferredCompanies: string[];
   mandatorySkills: string[];
+  preferredSkills?: string[];
   maxFailedCriteria?: number;
   topN: number;
   scoringWeights?: { technical: number; experience: number; domain: number; education: number; softSkills: number; custom?: Record<string, number> };
@@ -113,6 +136,7 @@ export interface JobProfile {
   id: string;
   name: string;
   role: RoleType;
+  industry?: IndustryType;
   jdContent: string;
   preferences: HiringPreferences;
 }

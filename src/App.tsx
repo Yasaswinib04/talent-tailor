@@ -598,8 +598,8 @@ export function LegacyCandidateApp() {
     },
     {
       id: 'dev-role',
-      name: 'Developer',
-      role: 'Developer',
+      name: 'Full Stack Developer',
+      role: 'Full Stack Developer',
       jdContent: 'Full-stack developer with React/Node expertise...',
       preferences: { isTierIMandatory: true, isMBAMandatory: false, minExperienceYears: 4, preferredCompanies: [], mandatorySkills: ['React', 'Node.js', 'PostgreSQL'], topN: 20 }
     },

@@ -1,4 +1,4 @@
-import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier } from "../../../types.js";
+import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier, IndustryType } from "../../../types.js";
 import { getSessionById, updateSession, supabase, logPipelineEvent, getResumeText, setResumeText } from "../../db.js";
 import PQueue from 'p-queue';
 import { classifyTrack } from "./classifier.js";
@@ -23,7 +23,8 @@ export async function analyzeResumes(
   features: string[] = ['score', 'competencies'],
   discoveryAnswers?: { question: string, answer: string }[],
   preferences?: HiringPreferences,
-  targetMarket: string = 'India'
+  targetMarket: string = 'India',
+  industry?: IndustryType
 ): Promise<AnalysisResult> {
   const includeQuestions = features.includes('questions');
 
@@ -79,7 +80,8 @@ export async function analyzeResumes(
           tier,
           preferences,
           targetMarket,
-          discoveryAnswers
+          discoveryAnswers,
+          industry
         );
         await logPipelineEvent(sessionId, candidateId, 'CoreScorer', Date.now() - startScore, 'success');
 
@@ -207,10 +209,11 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
 
     console.log(`[Pipeline] ${resumeInputs.length} resumes: ${extractedCount} cached text, ${preFilteredCount} pre-filtered out`);
 
-    const role = jobProfile.role || "Developer";
+    const role = jobProfile.role || "Full Stack Developer";
     const tier = jobProfile.experienceTier || "Senior";
     const jd = jobProfile.jd || "General Job Description";
     const targetMarket = jobProfile.targetMarket || "India";
+    const industry = jobProfile.industry as IndustryType | undefined;
 
     const results = await analyzeResumes(
       sessionId,
@@ -221,7 +224,8 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
       ['score', 'competencies'],
       undefined,
       preferences,
-      targetMarket
+      targetMarket,
+      industry
     );
 
     await updateSession(sessionId, hrUserId, {

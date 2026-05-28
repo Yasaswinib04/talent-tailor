@@ -1,15 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { updateSessionPreferences, getSession } from '../../lib/api.js';
 import { ROLE_WEIGHTS, getEffectiveWeights } from '../../constants/roles.js';
-import type { RoleType, ExperienceTier } from '../../types.js';
+import type { RoleType, ExperienceTier, IndustryType, SkillCategory, RoleSkill } from '../../types.js';
 
-interface ScoreDimension {
-  key: string;
-  label: string;
-  weight: number;
-  custom?: boolean;
-}
+const CATEGORY_LABELS: Record<SkillCategory, string> = {
+  technical: 'Technical',
+  analytics: 'Analytics',
+  softSkills: 'Soft Skills',
+  tools: 'Tools & Platforms',
+};
+
+const CATEGORY_COLORS: Record<SkillCategory, string> = {
+  technical: 'bg-primary/10 text-primary border-primary/20',
+  analytics: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  softSkills: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  tools: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+};
+
+interface SkillState { mandatory: string[]; preferred: string[]; }
+
+interface ScoreDimension { key: string; label: string; weight: number; custom?: boolean; }
 
 export function HRPreferences() {
   const { id } = useParams();
@@ -17,8 +28,9 @@ export function HRPreferences() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [roleName, setRoleName] = useState('');
-  const [roleType, setRoleType] = useState<RoleType>('Developer');
+  const [roleType, setRoleType] = useState<RoleType>('Frontend Developer');
   const [experienceTier, setExperienceTier] = useState<ExperienceTier>('Senior');
+  const [industry, setIndustry] = useState<IndustryType>('Technology / SaaS');
   const [department, setDepartment] = useState('');
   const [location, setLocation] = useState('');
   const [jdContent, setJdContent] = useState('');
@@ -27,8 +39,7 @@ export function HRPreferences() {
   const [isMba, setIsMba] = useState(false);
   const [topN, setTopN] = useState(10);
   const [maxFailedCriteria, setMaxFailedCriteria] = useState(0);
-
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [skills, setSkills] = useState<SkillState>({ mandatory: [], preferred: [] });
   const [skillInput, setSkillInput] = useState('');
   const [companyChips, setCompanyChips] = useState<string[]>([]);
   const [companyInput, setCompanyInput] = useState('');
@@ -43,25 +54,96 @@ export function HRPreferences() {
   const roleTypeOptions: RoleType[] = [
     'Product Manager', 'Consumer Product Manager', 'Product Designer', 'Designer',
     'Marketing', 'Growth Marketing', 'Brand Marketing', 'Sales', "Founder's Office",
-    'Chief of Staff', 'Developer', 'QA', 'Analytics', 'Data Engineer', 'Finance', 'Other'
+    'Chief of Staff', 'Frontend Developer', 'Backend Developer', 'Full Stack Developer',
+    'QA', 'Analytics', 'Data Scientist', 'AI / ML Engineer', 'Data Engineer', 'Finance', 'Other',
   ];
 
-  const experienceTierOptions: ExperienceTier[] = [
-    'Junior', 'Mid-Level', 'Senior', 'Lead', 'Director', 'Executive'
+  const experienceTierOptions: ExperienceTier[] = ['Junior', 'Mid-Level', 'Senior', 'Lead', 'Director', 'Executive'];
+
+  const industryOptions: IndustryType[] = [
+    'Technology / SaaS', 'FinTech', 'Healthcare', 'E-Commerce', 'EdTech', 'Enterprise', 'Consulting', 'Other',
   ];
 
-  const recommendedSkills = ROLE_WEIGHTS[roleType]?.competencies || [];
-  const recommendedWeights = getEffectiveWeights(roleType, experienceTier);
+  const weightData = useMemo(
+    () => getEffectiveWeights(roleType, experienceTier, industry),
+    [roleType, experienceTier, industry]
+  );
+
+  const allRoleSkills = useMemo(() => {
+    const base = weightData.roleSkills || ROLE_WEIGHTS[roleType]?.roleSkills || [];
+    const industrySkills = weightData.industrySkills || [];
+    const seen = new Set(base.map(s => s.name));
+    const uniqueIndustry = industrySkills.filter(s => !seen.has(s.name));
+    return [...base, ...uniqueIndustry];
+  }, [weightData, roleType]);
+
+  const skillsByCategory = useMemo(() => {
+    const map: Record<SkillCategory, RoleSkill[]> = { technical: [], analytics: [], softSkills: [], tools: [] };
+    for (const s of allRoleSkills) {
+      map[s.category].push(s);
+    }
+    return map;
+  }, [allRoleSkills]);
+
+  const toggleSkill = (skillName: string) => {
+    setSkills(prev => {
+      const inMandatory = prev.mandatory.includes(skillName);
+      const inPreferred = prev.preferred.includes(skillName);
+      if (inMandatory) {
+        return { mandatory: prev.mandatory.filter(s => s !== skillName), preferred: [...prev.preferred, skillName] };
+      }
+      if (inPreferred) {
+        return { mandatory: prev.mandatory, preferred: prev.preferred.filter(s => s !== skillName) };
+      }
+      return { mandatory: [...prev.mandatory, skillName], preferred: prev.preferred };
+    });
+  };
+
+  const addCustomSkill = () => {
+    const s = skillInput.trim();
+    if (!s) return;
+    setSkills(prev => ({
+      ...prev,
+      mandatory: prev.mandatory.includes(s) ? prev.mandatory : [...prev.mandatory, s],
+    }));
+    setSkillInput('');
+  };
+
+  const handleSkillKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); addCustomSkill(); }
+  };
+
+  const addCompanyChip = () => {
+    const c = companyInput.trim();
+    if (c && !companyChips.includes(c)) setCompanyChips(prev => [...prev, c]);
+    setCompanyInput('');
+  };
+
+  const removeCompanyChip = (c: string) => setCompanyChips(prev => prev.filter(x => x !== c));
 
   const applyRecommendedWeights = () => {
+    const w = getEffectiveWeights(roleType, experienceTier, industry);
     setDimensions([
-      { key: 'technical', label: 'Technical Skills', weight: recommendedWeights.technical },
-      { key: 'experience', label: 'Experience', weight: recommendedWeights.experience },
-      { key: 'domain', label: 'Domain Knowledge', weight: recommendedWeights.domain },
-      { key: 'education', label: 'Education', weight: recommendedWeights.education },
-      { key: 'softSkills', label: 'Soft Skills', weight: recommendedWeights.softSkills },
+      { key: 'technical', label: 'Technical Skills', weight: w.technical },
+      { key: 'experience', label: 'Experience', weight: w.experience },
+      { key: 'domain', label: 'Domain Knowledge', weight: w.domain },
+      { key: 'education', label: 'Education', weight: w.education },
+      { key: 'softSkills', label: 'Soft Skills', weight: w.softSkills },
     ]);
   };
+
+  const normalizeWeights = (dims: ScoreDimension[], idx: number): ScoreDimension[] => {
+    const others = dims.reduce((s, d, i) => i === idx ? s : s + d.weight, 0);
+    if (others === 0) return dims;
+    const target = 100 - dims[idx].weight;
+    return dims.map((d, i) => i === idx ? d : { ...d, weight: Math.round((d.weight / others) * target) });
+  };
+
+  const totalWeight = dimensions.reduce((s, d) => s + d.weight, 0);
+
+  useEffect(() => {
+    applyRecommendedWeights();
+  }, [roleType, experienceTier, industry]);
 
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -73,8 +155,9 @@ export function HRPreferences() {
           const jp = session.job_profile || session.jobProfile || {};
           const pref = jp.preferences || {};
           setRoleName(jp.name || '');
-          setRoleType(jp.roleType || jp.role || 'Developer');
+          setRoleType(jp.roleType || jp.role || 'Frontend Developer');
           setExperienceTier(jp.experienceTier || 'Senior');
+          setIndustry(jp.industry || pref.industry || 'Technology / SaaS');
           setDepartment(jp.department || '');
           setLocation(jp.location || '');
           setJdContent(session.jdContent || jp.jdContent || session.jd_content || '');
@@ -83,10 +166,13 @@ export function HRPreferences() {
           setIsMba(pref.isMBAMandatory ?? false);
           setTopN(pref.topN ?? 10);
           setMaxFailedCriteria(pref.maxFailedCriteria ?? 0);
-          setSelectedSkills(pref.mandatorySkills || []);
+          setSkills({
+            mandatory: pref.mandatorySkills || [],
+            preferred: pref.preferredSkills || [],
+          });
           setCompanyChips(pref.preferredCompanies || []);
           if (pref.scoringWeights) {
-            const { technical, experience, domain, education, softSkills, custom } = pref.scoringWeights;
+            const { technical, experience, domain, education, softSkills, custom: cw } = pref.scoringWeights;
             const base: ScoreDimension[] = [
               { key: 'technical', label: 'Technical Skills', weight: technical },
               { key: 'experience', label: 'Experience', weight: experience },
@@ -94,143 +180,54 @@ export function HRPreferences() {
               { key: 'education', label: 'Education', weight: education },
               { key: 'softSkills', label: 'Soft Skills', weight: softSkills },
             ];
-            if (custom) {
-              for (const [k, v] of Object.entries(custom as Record<string, number>)) {
-                base.push({ key: k, label: k, weight: v, custom: true });
-              }
-            }
+            if (cw) for (const [k, v] of Object.entries(cw as Record<string, number>)) base.push({ key: k, label: k, weight: v, custom: true });
             setDimensions(base);
-          } else {
-            applyRecommendedWeights();
           }
         }
-      } catch (err) {
-        console.error('Failed to load session preferences:', err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error('Failed to load session preferences:', err); }
+      finally { setLoading(false); }
     };
     fetchSessionData();
   }, [id]);
-
-  const adjustWeight = (index: number, delta: number) => {
-    setDimensions(prev => {
-      const next = [...prev];
-      const newWeight = Math.max(0, Math.min(100, next[index].weight + delta));
-      next[index] = { ...next[index], weight: newWeight };
-      return normalizeWeights(next, index);
-    });
-  };
-
-  const normalizeWeights = (dims: ScoreDimension[], changedIndex: number): ScoreDimension[] => {
-    const totalOthers = dims.reduce((sum, d, i) => i === changedIndex ? sum : sum + d.weight, 0);
-    const targetTotal = 100 - dims[changedIndex].weight;
-    if (totalOthers === 0) return dims;
-    return dims.map((d, i) => {
-      if (i === changedIndex) return d;
-      return { ...d, weight: Math.round((d.weight / totalOthers) * targetTotal) };
-    });
-  };
-
-  const totalWeight = dimensions.reduce((s, d) => s + d.weight, 0);
-
-  const addCustomDimension = () => {
-    const name = prompt('Name for the new scoring criterion:');
-    if (!name?.trim()) return;
-    setDimensions(prev => [
-      ...prev,
-      { key: name.trim(), label: name.trim(), weight: 5, custom: true },
-    ]);
-  };
-
-  const removeCustomDimension = (index: number) => {
-    setDimensions(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const toggleSkill = (skill: string) => {
-    setSelectedSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
-    );
-  };
-
-  const addCustomSkill = () => {
-    const s = skillInput.trim();
-    if (s && !selectedSkills.includes(s)) {
-      setSelectedSkills(prev => [...prev, s]);
-    }
-    setSkillInput('');
-  };
-
-  const handleSkillKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addCustomSkill();
-    }
-  };
-
-  const addCompanyChip = () => {
-    const c = companyInput.trim();
-    if (c && !companyChips.includes(c)) {
-      setCompanyChips(prev => [...prev, c]);
-    }
-    setCompanyInput('');
-  };
-
-  const removeCompanyChip = (company: string) => {
-    setCompanyChips(prev => prev.filter(c => c !== company));
-  };
 
   const handleSave = async () => {
     if (!id) return;
     try {
       setSaving(true);
-      const weightEntries = dimensions.filter(d => !d.custom).reduce((acc, d) => {
-        (acc as any)[d.key] = d.weight;
-        return acc;
-      }, {} as Record<string, number>);
-      const customWeights: Record<string, number> = {};
-      for (const d of dimensions) {
-        if (d.custom) customWeights[d.key] = d.weight;
-      }
-
+      const w = dimensions.filter(d => !d.custom).reduce((acc, d) => { (acc as any)[d.key] = d.weight; return acc; }, {} as Record<string, number>);
+      const cw: Record<string, number> = {};
+      for (const d of dimensions) if (d.custom) cw[d.key] = d.weight;
       await updateSessionPreferences(id, {
-        name: roleName,
-        role: roleType,
-        roleType: roleType,
-        experienceTier,
-        department,
-        location,
-        jdContent,
+        name: roleName, role: roleType, roleType, experienceTier, industry,
+        department, location, jdContent,
         preferences: {
-          minExperienceYears: minExp,
-          isTierIMandatory: tier1,
-          isMBAMandatory: isMba,
+          minExperienceYears: minExp, isTierIMandatory: tier1, isMBAMandatory: isMba,
           preferredCompanies: companyChips,
-          mandatorySkills: selectedSkills,
-          maxFailedCriteria,
-          topN: Number(topN),
-          scoringWeights: {
-            ...weightEntries,
-            ...(Object.keys(customWeights).length > 0 ? { custom: customWeights } : {}),
-          },
+          mandatorySkills: skills.mandatory,
+          preferredSkills: skills.preferred,
+          maxFailedCriteria, topN: Number(topN),
+          scoringWeights: { ...w, ...(Object.keys(cw).length ? { custom: cw } : {}) },
         },
       });
       navigate(`/hr/role/${id}`);
     } catch (err: any) {
-      console.error('Failed to save criteria', err);
-      alert(`Failed to save criteria: ${err.message || 'Database offline fallback error'}`);
-    } finally {
-      setSaving(false);
-    }
+      alert(`Failed to save: ${err.message || 'Database error'}`);
+    } finally { setSaving(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-background h-screen w-screen">
-        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex-1 flex items-center justify-center bg-background h-screen w-screen"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div></div>;
+
+  const skillStateIcon = (name: string) => {
+    if (skills.mandatory.includes(name)) return '✓';
+    if (skills.preferred.includes(name)) return '◉';
+    return null;
+  };
+
+  const skillStateClass = (name: string) => {
+    if (skills.mandatory.includes(name)) return 'bg-primary/15 text-primary border-primary/40';
+    if (skills.preferred.includes(name)) return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+    return 'bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/30';
+  };
 
   return (
     <div className="p-6 md:p-8 lg:p-10 h-full overflow-y-auto custom-scrollbar pb-32 bg-background text-on-surface">
@@ -240,95 +237,99 @@ export function HRPreferences() {
             <h2 className="text-2xl font-headline font-bold text-on-surface tracking-tight">JD & Criteria Setup</h2>
             <p className="text-on-surface-variant text-sm mt-0.5">Configure the job description and AI vetting parameters.</p>
           </div>
-          <button
-            onClick={applyRecommendedWeights}
-            className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-            Reset to AI recommended weights
+          <button onClick={applyRecommendedWeights} className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">auto_fix_high</span> Reset to AI recommended weights
           </button>
         </div>
 
-        {/* Role Details — Compact 4-column */}
+        {/* Role Details */}
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-4">Role Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <InputField label="Role Title" value={roleName} onChange={setRoleName} placeholder="e.g. Senior Engineer" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+            <InputField label="Role Title" value={roleName} onChange={setRoleName} placeholder="e.g. Senior Frontend Engineer" />
             <InputField label="Department" value={department} onChange={setDepartment} placeholder="e.g. Engineering" />
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Role Type</label>
-              <select value={roleType} onChange={(e) => setRoleType(e.target.value as RoleType)}
-                className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
-                {roleTypeOptions.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Experience Tier</label>
-              <select value={experienceTier} onChange={(e) => setExperienceTier(e.target.value as ExperienceTier)}
-                className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
-                {experienceTierOptions.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="mt-3">
             <InputField label="Location" value={location} onChange={setLocation} placeholder="e.g. Remote (US)" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <select value={roleType} onChange={(e) => setRoleType(e.target.value as RoleType)}
+              className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
+              {roleTypeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <select value={experienceTier} onChange={(e) => setExperienceTier(e.target.value as ExperienceTier)}
+              className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
+              {experienceTierOptions.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <select value={industry} onChange={(e) => setIndustry(e.target.value as IndustryType)}
+              className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
+              {industryOptions.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mt-1">
+            <span className="text-[9px] text-on-surface-variant">Role Type</span>
+            <span className="text-[9px] text-on-surface-variant">Experience Tier</span>
+            <span className="text-[9px] text-on-surface-variant">Industry</span>
           </div>
         </section>
 
-        {/* Job Description */}
+        {/* JD */}
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Job Description</h3>
             <span className="text-[10px] text-on-surface-variant">{jdContent.length} chars</span>
           </div>
-          <textarea
-            value={jdContent}
-            onChange={(e) => setJdContent(e.target.value)}
-            rows={6}
+          <textarea value={jdContent} onChange={(e) => setJdContent(e.target.value)} rows={6}
             placeholder="Paste the full job description here..."
-            className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none resize-y transition-all font-sans leading-relaxed"
-          />
+            className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none resize-y transition-all font-sans leading-relaxed" />
         </section>
 
-        {/* Mandatory Skills — Chip recommendations */}
+        {/* Skills — Categorized */}
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
-          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Mandatory Skills</h3>
-          <p className="text-[10px] text-on-surface-variant mb-3">
-            Recommended for {roleType} · {experienceTier}. Click to select. Type your own below.
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Skills</h3>
+          <p className="text-[10px] text-on-surface-variant mb-4">
+            Click once for <span className="text-primary font-semibold">Mandatory</span> (required), twice for <span className="text-blue-400 font-semibold">Preferred</span> (bonus), again to clear. Based on {roleType} · {experienceTier} · {industry}.
           </p>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {recommendedSkills.map(skill => {
-              const selected = selectedSkills.includes(skill);
-              return (
-                <button key={skill} type="button" onClick={() => toggleSkill(skill)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
-                    selected
-                      ? 'bg-primary/15 text-primary border-primary/40'
-                      : 'bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary/30'
-                  }`}>
-                  {selected && <span className="mr-1">✓</span>}{skill}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)}
-              onKeyDown={handleSkillKeyDown}
-              placeholder="Type custom skill + Enter"
+          {(Object.keys(skillsByCategory) as SkillCategory[]).map(cat => {
+            const entries = skillsByCategory[cat];
+            if (entries.length === 0) return null;
+            return (
+              <div key={cat} className="mb-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${CATEGORY_COLORS[cat]}`}>{CATEGORY_LABELS[cat]}</span>
+                  <span className="text-[10px] text-on-surface-variant">{entries.length} skills</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {entries.map(skill => {
+                    const icon = skillStateIcon(skill.name);
+                    const cls = skillStateClass(skill.name);
+                    return (
+                      <button key={skill.name} type="button" onClick={() => toggleSkill(skill.name)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all cursor-pointer flex items-center gap-1 ${cls}`}>
+                        {icon && <span className="text-[10px] font-bold">{icon}</span>}
+                        {skill.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-2 mt-2 pt-3 border-t border-outline-variant/50">
+            <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyDown}
+              placeholder="Add custom skill + Enter"
               className="flex-1 bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
-            <button onClick={addCustomSkill}
-              className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-3 py-2 rounded text-xs font-semibold transition-colors cursor-pointer">
-              + Add
-            </button>
+            <button onClick={addCustomSkill} className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-3 py-2 rounded text-xs font-semibold transition-colors cursor-pointer">+ Add</button>
           </div>
-          {selectedSkills.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-outline-variant/50">
-              <span className="text-[10px] font-semibold text-on-surface-variant self-center mr-1">Selected ({selectedSkills.length}):</span>
-              {selectedSkills.map(skill => (
-                <span key={skill}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary/10 text-primary border border-primary/20">
-                  {skill}
-                  <button onClick={() => toggleSkill(skill)} className="hover:text-error cursor-pointer ml-0.5">&times;</button>
+          {(skills.mandatory.length > 0 || skills.preferred.length > 0) && (
+            <div className="mt-3 pt-3 border-t border-outline-variant/50 flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] font-semibold text-on-surface-variant">Selected:</span>
+              {skills.mandatory.map(s => (
+                <span key={s} className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                  <span className="material-symbols-outlined text-[12px]">check_circle</span> {s}
+                </span>
+              ))}
+              {skills.preferred.map(s => (
+                <span key={s} className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <span className="material-symbols-outlined text-[12px]">star</span> {s}
                 </span>
               ))}
             </div>
@@ -339,138 +340,69 @@ export function HRPreferences() {
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Scoring Rubric</h3>
-            <span className={`text-xs font-mono font-bold ${totalWeight === 100 ? 'text-emerald-400' : 'text-red-400'}`}>
-              Total: {totalWeight}%
-            </span>
+            <span className={`text-xs font-mono font-bold ${totalWeight === 100 ? 'text-emerald-400' : 'text-red-400'}`}>Total: {totalWeight}%</span>
           </div>
-          <p className="text-[10px] text-on-surface-variant mb-4">
-            AI default weights based on {roleType} · {experienceTier}. Adjust sliders; total must sum to 100%.
-          </p>
+          <p className="text-[10px] text-on-surface-variant mb-4">AI weights based on {roleType} · {experienceTier} · {industry}. Adjust sliders; must sum to 100%.</p>
           <div className="space-y-3">
             {dimensions.map((dim, i) => (
               <div key={dim.key} className="flex items-center gap-3">
-                <span className="w-28 text-xs font-medium text-on-surface shrink-0 truncate">
-                  {dim.label}
-                  {dim.custom && <span className="text-[9px] text-primary ml-1">custom</span>}
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={dim.weight}
-                  onChange={(e) => {
-                    setDimensions(prev => {
-                      const next = [...prev];
-                      next[i] = { ...next[i], weight: Number(e.target.value) };
-                      return normalizeWeights(next, i);
-                    });
-                  }}
-                  className="flex-1 h-1.5 accent-primary cursor-pointer"
-                />
+                <span className="w-28 text-xs font-medium text-on-surface shrink-0 truncate">{dim.label}{dim.custom && <span className="text-[9px] text-primary ml-1">custom</span>}</span>
+                <input type="range" min={0} max={100} value={dim.weight}
+                  onChange={(e) => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Number(e.target.value) }; return normalizeWeights(next, i); })}
+                  className="flex-1 h-1.5 accent-primary cursor-pointer" />
                 <span className="w-10 text-right text-xs font-mono font-bold text-on-surface">{dim.weight}%</span>
                 <div className="flex gap-0.5 shrink-0">
-                  <button onClick={() => adjustWeight(i, -1)}
+                  <button onClick={() => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.max(0, next[i].weight - 1) }; return normalizeWeights(next, i); })}
                     className="w-5 h-5 rounded text-[10px] bg-surface-container-low border border-outline-variant hover:bg-surface-container-highest flex items-center justify-center cursor-pointer">−</button>
-                  <button onClick={() => adjustWeight(i, 1)}
+                  <button onClick={() => setDimensions(prev => { const next = [...prev]; next[i] = { ...next[i], weight: Math.min(100, next[i].weight + 1) }; return normalizeWeights(next, i); })}
                     className="w-5 h-5 rounded text-[10px] bg-surface-container-low border border-outline-variant hover:bg-surface-container-highest flex items-center justify-center cursor-pointer">+</button>
-                  {dim.custom && (
-                    <button onClick={() => removeCustomDimension(i)}
-                      className="w-5 h-5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 flex items-center justify-center cursor-pointer ml-1">&times;</button>
-                  )}
+                  {dim.custom && <button onClick={() => setDimensions(prev => prev.filter((_, j) => j !== i))} className="w-5 h-5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 flex items-center justify-center cursor-pointer ml-1">&times;</button>}
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={addCustomDimension}
+          <button onClick={() => { const name = prompt('Custom criterion name:'); if (name?.trim()) setDimensions(prev => [...prev, { key: name.trim(), label: name.trim(), weight: 5, custom: true }]); }}
             className="mt-3 text-[11px] text-primary hover:underline cursor-pointer flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">add</span>
-            Add custom scoring criterion
+            <span className="material-symbols-outlined text-sm">add</span> Add custom scoring criterion
           </button>
         </section>
 
-        {/* Vetting Filters — Compact */}
+        {/* Vetting Filters */}
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-4">Vetting Filters</h3>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-on-surface-variant">Min Experience</label>
-              <input type="number" value={minExp} min={0} onChange={(e) => setMinExp(Number(e.target.value))}
-                className="w-16 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
-              <span className="text-xs text-on-surface-variant">yrs</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                <input type="checkbox" checked={tier1} onChange={(e) => setTier1(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" />
-                <span className="text-xs text-on-surface-variant">Tier-1 University</span>
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                <input type="checkbox" checked={isMba} onChange={(e) => setIsMba(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" />
-                <span className="text-xs text-on-surface-variant">MBA Required</span>
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-on-surface-variant">Top N</label>
-              <input type="number" value={topN} min={1} max={100} onChange={(e) => setTopN(Number(e.target.value))}
-                className="w-16 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-on-surface-variant">Max Failed Criteria</label>
-              <input type="number" value={maxFailedCriteria} min={0} max={10} onChange={(e) => setMaxFailedCriteria(Number(e.target.value))}
-                className="w-16 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
-            </div>
+            <div className="flex items-center gap-2"><label className="text-xs font-medium text-on-surface-variant">Min Exp</label><input type="number" value={minExp} min={0} onChange={(e) => setMinExp(Number(e.target.value))} className="w-14 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" /><span className="text-xs text-on-surface-variant">yrs</span></div>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none"><input type="checkbox" checked={tier1} onChange={(e) => setTier1(e.target.checked)} className="w-3.5 h-3.5 rounded border-outline-variant text-primary cursor-pointer" /><span className="text-xs text-on-surface-variant">Tier-1 Uni</span></label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none"><input type="checkbox" checked={isMba} onChange={(e) => setIsMba(e.target.checked)} className="w-3.5 h-3.5 rounded border-outline-variant text-primary cursor-pointer" /><span className="text-xs text-on-surface-variant">MBA Required</span></label>
+            <div className="flex items-center gap-2"><label className="text-xs font-medium text-on-surface-variant">Top N</label><input type="number" value={topN} min={1} max={100} onChange={(e) => setTopN(Number(e.target.value))} className="w-16 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" /></div>
+            <div className="flex items-center gap-2"><label className="text-xs font-medium text-on-surface-variant">Max Failed</label><input type="number" value={maxFailedCriteria} min={0} max={10} onChange={(e) => setMaxFailedCriteria(Number(e.target.value))} className="w-16 bg-surface-container-low border border-outline-variant rounded p-1.5 text-center text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" /></div>
           </div>
-
-          {/* Preferred Companies — Chip input */}
           <div className="mt-4 pt-4 border-t border-outline-variant/50">
             <label className="text-xs font-medium text-on-surface-variant mb-2 block">Preferred Past Companies</label>
             <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
-              {companyChips.map(c => (
-                <span key={c} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  {c}
-                  <button onClick={() => removeCompanyChip(c)} className="hover:text-red-400 cursor-pointer ml-0.5">&times;</button>
-                </span>
-              ))}
+              {companyChips.map(c => <span key={c} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">{c}<button onClick={() => removeCompanyChip(c)} className="hover:text-red-400 cursor-pointer ml-0.5">&times;</button></span>)}
             </div>
             <div className="flex items-center gap-2">
-              <input type="text" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompanyChip(); } }}
-                placeholder="Type company name + Enter to add"
-                className="flex-1 bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
-              <button onClick={addCompanyChip}
-                className="text-xs text-primary hover:underline cursor-pointer">Add</button>
+              <input type="text" value={companyInput} onChange={(e) => setCompanyInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCompanyChip(); } }} placeholder="Company + Enter" className="flex-1 bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none" />
+              <button onClick={addCompanyChip} className="text-xs text-primary hover:underline cursor-pointer">Add</button>
             </div>
           </div>
         </section>
 
-        {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">
-          <button onClick={() => navigate('/hr')}
-            className="px-5 py-2.5 rounded-md text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer">
-            Cancel
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            className="bg-primary text-on-primary px-6 py-2.5 rounded-md text-sm font-semibold hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-[0_0_15px_rgba(167,139,250,0.1)]">
-            {saving ? 'Saving...' : 'Save Criteria'}
-          </button>
+          <button onClick={() => navigate('/hr')} className="px-5 py-2.5 rounded-md text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container cursor-pointer">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="bg-primary text-on-primary px-6 py-2.5 rounded-md text-sm font-semibold hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer shadow-[0_0_15px_rgba(167,139,250,0.1)]">{saving ? 'Saving...' : 'Save Criteria'}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function InputField({ label, value, onChange, placeholder, type = 'text' }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string;
-}) {
+function InputField({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; type?: string }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-bold text-on-surface-variant uppercase">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none transition-all" />
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="bg-surface-container-low border border-outline-variant rounded p-2 text-sm text-on-surface focus:ring-1 focus:ring-primary outline-none transition-all" />
     </div>
   );
 }
