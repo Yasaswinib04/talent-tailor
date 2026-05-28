@@ -123,37 +123,60 @@ export function HRCompare() {
     const fetchPipelines = async () => {
       try {
         const sessionsData = await getSessions();
-        const formatted: RolePipeline[] = (sessionsData || []).map((session: any) => {
+        const formatted: RolePipeline[] = [];
+        for (const session of (sessionsData || [])) {
           const jp = session.job_profile || {};
-          const rawCandidates = session.analysis_results || [];
-          return {
+          const candidates = Array.isArray(session.analysis_results?.candidates)
+            ? session.analysis_results.candidates
+            : Array.isArray(session.analysisResults?.candidates)
+              ? session.analysisResults.candidates
+              : Array.isArray(session.analysis_results)
+                ? session.analysis_results
+                : [];
+          const mapped: Candidate[] = candidates
+            .filter((c: any) => !c.preFiltered)
+            .map((c: any) => ({
+              id: c.id || Math.random().toString(),
+              name: c.name || 'Unknown Candidate',
+              location: c.location || '—',
+              score: c.score || 0,
+              meetsMandatoryCriteria: c.meetsMandatoryCriteria !== false,
+              strengths: (c.strengths || []).map((s: any) => typeof s === 'string' ? s : s.text || s),
+              weaknesses: (c.weaknesses || []).map((w: any) => typeof w === 'string' ? w : w.text || w),
+              overallFeedback: c.overallFeedback || 'No feedback available.',
+              discoveryQuestions: c.discoveryQuestions || []
+            }));
+          formatted.push({
             id: session.id,
             name: jp.name || 'Untitled Role',
             department: jp.department || 'General',
-            candidates: rawCandidates.map((c: any) => ({
-              id: c.id || Math.random().toString(),
-              name: c.profile?.name || 'Unknown Candidate',
-              location: c.profile?.currentLocation || 'Remote',
-              score: c.score || 0,
-              meetsMandatoryCriteria: c.meetsMandatoryCriteria !== false,
-              strengths: c.strengths || [],
-              weaknesses: c.weaknesses || [],
-              overallFeedback: c.overallFeedback || 'No feedback available.',
-              discoveryQuestions: c.discoveryQuestions || []
-            }))
-          };
-        });
+            candidates: mapped,
+          });
+        }
 
-        // Always prepend our demo pipeline for comprehensive UAT testing fallback
-        const allPipelines = [demoPipeline, ...formatted];
-        setPipelines(allPipelines);
-        
-        // Auto-select demo role on load
-        setSelectedPipelineId(demoPipeline.id);
+        const isDevMode = localStorage.getItem('developer_mode') === 'true';
+        const hasRealData = formatted.some(p => p.candidates.length > 0);
+
+        if (hasRealData) {
+          setPipelines(formatted);
+          setSelectedPipelineId(formatted[0].id);
+        } else if (isDevMode) {
+          setPipelines([demoPipeline]);
+          setSelectedPipelineId(demoPipeline.id);
+        } else {
+          setPipelines(formatted.length > 0 ? formatted : []);
+          setSelectedPipelineId(formatted.length > 0 ? formatted[0].id : '');
+        }
       } catch (err) {
-        console.error("Failed to load pipelines, using UAT demo data:", err);
-        setPipelines([demoPipeline]);
-        setSelectedPipelineId(demoPipeline.id);
+        console.error("Failed to load pipelines:", err);
+        const isDevMode = localStorage.getItem('developer_mode') === 'true';
+        if (isDevMode) {
+          setPipelines([demoPipeline]);
+          setSelectedPipelineId(demoPipeline.id);
+        } else {
+          setPipelines([]);
+          setSelectedPipelineId('');
+        }
       } finally {
         setLoading(false);
       }
