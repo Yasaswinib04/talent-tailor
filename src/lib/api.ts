@@ -219,18 +219,23 @@ export const startAnalysis = async (sessionId: string) => {
       sessions[idx].status = 'analyzing';
       saveLocalSessions(sessions);
       
-      // Simulate background processing on the client
+      // The server cannot start analysis because it is unreachable or DB is down.
+      // Set the session to error state so the UI shows a clear message.
       setTimeout(() => {
         const currentSessions = getLocalSessions();
         const sIdx = currentSessions.findIndex(s => s.id === sessionId);
         if (sIdx !== -1) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          const isDBError = errorMsg.includes('Database connection failed') || errorMsg.includes('503');
+          const msg = isDBError
+            ? 'Database is not available. Analysis requires PostgreSQL + Supabase. Please configure DATABASE_URL, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY in your Railway environment variables.'
+            : 'Server unreachable. Check that the app is running and your network connection is active.';
           currentSessions[sIdx].status = 'error';
-          currentSessions[sIdx].analysisResults = { error: 'Server unreachable. Analysis could not be started. Please check your connection and try again.' };
+          currentSessions[sIdx].analysisResults = { error: msg };
           currentSessions[sIdx].analysis_results = currentSessions[sIdx].analysisResults;
           currentSessions[sIdx].updatedAt = new Date().toISOString();
           currentSessions[sIdx].updated_at = new Date().toISOString();
           saveLocalSessions(currentSessions);
-          console.warn(`[LocalStorage Fallback] Analysis failed for session: ${sessionId} — server unreachable`);
         }
       }, 2000);
 

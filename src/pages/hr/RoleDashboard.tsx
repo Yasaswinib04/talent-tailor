@@ -174,17 +174,22 @@ export function HRRoleDashboard() {
       </div>
 
       {session.status === 'error' && analysisError && (
-        <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-          <span className="material-symbols-outlined text-red-500 shrink-0 mt-0.5">error</span>
-          <div>
-            <p className="text-sm font-semibold text-red-400">Analysis Failed</p>
-            <p className="text-xs text-red-300/80 mt-1">{analysisError}</p>
+        <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-xl p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-red-500 shrink-0 mt-0.5">error</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-red-400">Analysis Could Not Start</p>
+              <p className="text-xs text-red-300/80 mt-1 leading-relaxed">{analysisError}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pt-2 border-t border-red-500/15">
             <button
               onClick={() => startAnalysis(id!)}
-              className="mt-2 text-xs font-semibold text-red-400 hover:text-red-300 underline cursor-pointer"
+              className="px-4 py-1.5 rounded-md text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-colors cursor-pointer"
             >
               Retry Analysis
             </button>
+            <span className="text-[10px] text-red-400/60">This usually means the database (PostgreSQL) is not configured. Check Railway environment variables: DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.</span>
           </div>
         </div>
       )}
