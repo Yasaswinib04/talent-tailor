@@ -1,9 +1,4 @@
-import React, { useState, useEffect } from 'react';
-
-interface Props {
-  onAddTalent: () => void;
-  candidates?: Candidate[];
-}
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface Candidate {
   id: string;
@@ -14,6 +9,22 @@ interface Candidate {
   date: string;
   status: string;
   statusColor: string;
+  sessionId?: string;
+}
+
+interface Filters {
+  location: string[];
+  experienceMin: number;
+  experienceMax: number;
+  salaryMin: string;
+  salaryMax: string;
+  skillSearch: string;
+}
+
+interface Props {
+  onAddTalent: () => void;
+  candidates?: Candidate[];
+  onRefresh?: () => void;
 }
 
 const DEMO_CANDIDATES: Candidate[] = [
@@ -28,9 +39,18 @@ function useIsDevMode(): boolean {
   return localStorage.getItem('developer_mode') === 'true';
 }
 
-export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: Props) {
+export function TalentPoolList({ onAddTalent, candidates: externalCandidates, onRefresh }: Props) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const isDevMode = useIsDevMode();
+
+  const [filters, setFilters] = useState<Filters>({
+    location: [],
+    experienceMin: 0,
+    experienceMax: 10,
+    salaryMin: '',
+    salaryMax: '',
+    skillSearch: '',
+  });
 
   useEffect(() => {
     const closeMenu = () => setActiveMenuId(null);
@@ -38,42 +58,69 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: 
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  const candidates: Candidate[] = externalCandidates && externalCandidates.length > 0
-    ? externalCandidates
-    : isDevMode
-      ? DEMO_CANDIDATES
-      : [];
+  const toggleLocationFilter = (loc: string) => {
+    setFilters(prev => ({
+      ...prev,
+      location: prev.location.includes(loc)
+        ? prev.location.filter(l => l !== loc)
+        : [...prev.location, loc],
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      location: [],
+      experienceMin: 0,
+      experienceMax: 10,
+      salaryMin: '',
+      salaryMax: '',
+      skillSearch: '',
+    });
+  };
+
+  const filteredCandidates = useMemo(() => {
+    const raw = externalCandidates && externalCandidates.length > 0
+      ? externalCandidates
+      : isDevMode
+        ? DEMO_CANDIDATES
+        : [];
+
+    return raw.filter(c => {
+      if (filters.skillSearch.trim()) {
+        const search = filters.skillSearch.toLowerCase();
+        const hasSkill = c.skills.some(s => s.name.toLowerCase().includes(search))
+          || c.name.toLowerCase().includes(search)
+          || c.role.toLowerCase().includes(search);
+        if (!hasSkill) return false;
+      }
+      return true;
+    });
+  }, [externalCandidates, isDevMode, filters]);
+
+  const hasActiveFilters = filters.location.length > 0 || filters.skillSearch.trim().length > 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      {/* Left Sidebar - Filters */}
       <aside className="w-64 border-r border-outline-variant bg-surface-container-low shrink-0 h-full overflow-y-auto custom-scrollbar p-5 flex flex-col gap-6">
         <div>
           <h2 className="text-lg font-headline font-bold text-on-surface mb-4">Filters</h2>
         </div>
 
-        {/* Location Filter */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-on-surface">Location</h3>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <input type="checkbox" className="w-4 h-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
-            <span className="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">Remote</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <input type="checkbox" className="w-4 h-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
-            <span className="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">New York</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <input type="checkbox" className="w-4 h-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
-            <span className="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">London</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <input type="checkbox" className="w-4 h-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
-            <span className="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">San Francisco</span>
-          </label>
+          {['Remote', 'New York', 'London', 'San Francisco'].map(loc => (
+            <label key={loc} className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={filters.location.includes(loc)}
+                onChange={() => toggleLocationFilter(loc)}
+                className="w-4 h-4 rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary focus:ring-offset-0 transition-colors cursor-pointer"
+              />
+              <span className="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">{loc}</span>
+            </label>
+          ))}
         </div>
 
-        {/* Experience Filter */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-on-surface">Experience</h3>
           <div className="flex items-center justify-between text-xs text-on-surface-variant mb-1">
@@ -81,75 +128,119 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: 
             <span>5-10</span>
             <span>10+ years</span>
           </div>
-          {/* Simple mock range slider */}
           <div className="relative w-full h-1 bg-surface-container-highest rounded-full">
-            <div className="absolute left-1/4 right-1/4 h-full bg-primary rounded-full"></div>
-            <div className="absolute left-1/4 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-primary ring-2 ring-background cursor-pointer"></div>
-            <div className="absolute right-1/4 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 rounded-full bg-primary ring-2 ring-background cursor-pointer"></div>
+            <div className="absolute h-full bg-primary rounded-full"
+              style={{
+                left: `${(filters.experienceMin / 12) * 100}%`,
+                right: `${100 - (filters.experienceMax / 12) * 100}%`,
+              }}
+            ></div>
+            <input
+              type="range"
+              min={0}
+              max={12}
+              value={filters.experienceMin}
+              onChange={(e) => setFilters(prev => ({ ...prev, experienceMin: Math.min(Number(e.target.value), prev.experienceMax - 1) }))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <input
+              type="range"
+              min={0}
+              max={12}
+              value={filters.experienceMax}
+              onChange={(e) => setFilters(prev => ({ ...prev, experienceMax: Math.max(Number(e.target.value), prev.experienceMin + 1) }))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-on-surface-variant font-mono">
+            <span>{filters.experienceMin}y</span>
+            <span>{filters.experienceMax}y</span>
           </div>
         </div>
 
-        {/* Salary Range */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-on-surface">Salary Range</h3>
           <div className="flex items-center gap-2">
-            <input type="text" placeholder="Min" className="w-full bg-surface-container-highest border border-outline-variant rounded p-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all" />
-            <input type="text" placeholder="Max" className="w-full bg-surface-container-highest border border-outline-variant rounded p-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all" />
+            <input
+              type="text"
+              placeholder="Min"
+              value={filters.salaryMin}
+              onChange={(e) => setFilters(prev => ({ ...prev, salaryMin: e.target.value }))}
+              className="w-full bg-surface-container-highest border border-outline-variant rounded p-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
+            <input
+              type="text"
+              placeholder="Max"
+              value={filters.salaryMax}
+              onChange={(e) => setFilters(prev => ({ ...prev, salaryMax: e.target.value }))}
+              className="w-full bg-surface-container-highest border border-outline-variant rounded p-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all"
+            />
           </div>
         </div>
 
-        {/* Skills Filter */}
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold text-on-surface">Skills</h3>
-          <div className="relative">
-            <select className="w-full bg-surface-container-highest border border-outline-variant rounded p-2.5 text-sm text-on-surface-variant appearance-none focus:ring-1 focus:ring-primary outline-none transition-all">
-              <option>Multi-select...</option>
-            </select>
-            <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
-          </div>
+          <h3 className="text-sm font-semibold text-on-surface">Skills / Search</h3>
+          <input
+            type="text"
+            placeholder="Python, React, SQL..."
+            value={filters.skillSearch}
+            onChange={(e) => setFilters(prev => ({ ...prev, skillSearch: e.target.value }))}
+            className="w-full bg-surface-container-highest border border-outline-variant rounded p-2.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all"
+          />
         </div>
 
         <div className="mt-auto pt-6 border-t border-outline-variant/50">
-          <button className="w-full py-2 border border-outline-variant text-on-surface hover:bg-surface-container-highest rounded-md text-sm font-medium transition-colors">
+          <button
+            onClick={clearAllFilters}
+            className="w-full py-2 border border-outline-variant text-on-surface hover:bg-surface-container-highest rounded-md text-sm font-medium transition-colors cursor-pointer"
+          >
             Clear All
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
-        {/* Top Header Actions */}
         <header className="p-6 pb-4 flex justify-between items-center gap-4 shrink-0">
           <div className="relative flex-1 max-w-2xl">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
-            <input 
-              type="text" 
-              placeholder="Search candidates, roles, or skills..." 
+            <input
+              type="text"
+              placeholder="Search candidates, roles, or skills..."
+              value={filters.skillSearch}
+              onChange={(e) => setFilters(prev => ({ ...prev, skillSearch: e.target.value }))}
               className="w-full bg-surface-container-low border border-outline-variant rounded-md py-2 pl-9 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary outline-none transition-all"
             />
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button 
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                className="border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-2 rounded-md transition-colors cursor-pointer"
+                title="Refresh"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+              </button>
+            )}
+            <button
               onClick={onAddTalent}
-              className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2"
+              className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               Add Talent
             </button>
-            <button className="border border-outline-variant text-on-surface hover:bg-surface-container-highest px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2">
+            <button className="border border-outline-variant text-on-surface hover:bg-surface-container-highest px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer">
               <span className="material-symbols-outlined text-[18px]">download</span>
               Export
             </button>
           </div>
         </header>
 
-        {/* Data Table Container */}
         <div className="flex-1 overflow-auto custom-scrollbar px-6 pb-6">
           <div className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden shadow-lg shadow-black/20 flex flex-col min-h-full">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-outline-variant bg-surface-container-low">
-                  <th className="p-4 pl-5 w-12"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary" /></th>
+                  <th className="p-4 pl-5 w-12"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary cursor-pointer" /></th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Name</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Role</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Skills</th>
@@ -160,95 +251,117 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: 
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/50 text-sm">
-                {candidates.map((c, i) => (
-                  <tr key={c.id} className="hover:bg-surface-container-highest/50 transition-colors group">
-                    <td className="p-4 pl-5"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary opacity-0 group-hover:opacity-100 transition-opacity" /></td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-xs shrink-0 overflow-hidden border border-outline-variant">
-                          {/* Placeholder Avatar */}
-                          <img src={`https://i.pravatar.cc/150?u=${c.id}`} alt={c.name} className="w-full h-full object-cover" />
-                        </div>
-                        <span className="font-medium text-on-surface">{c.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-on-surface-variant">{c.role}</td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {c.skills.map(s => (
-                          <span key={s.name} className={`px-2 py-0.5 rounded text-[11px] font-medium border ${s.color}`}>
-                            {s.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-4 text-on-surface-variant">{c.source}</td>
-                    <td className="p-4 text-on-surface-variant">{c.date}</td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${c.statusColor}`}>
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="p-4 pr-5 text-right relative" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2 text-on-surface-variant">
-                        <button className="hover:text-primary transition-colors p-1" title="View Profile">
-                          <span className="material-symbols-outlined text-lg">visibility</span>
+                {filteredCandidates.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-12 text-center text-on-surface-variant">
+                      <span className="material-symbols-outlined text-3xl mb-2 block opacity-30">person_off</span>
+                      <p className="text-sm font-medium">
+                        {hasActiveFilters ? 'No candidates match your filters' : 'No candidates yet'}
+                      </p>
+                      {!hasActiveFilters && (
+                        <button onClick={onAddTalent} className="mt-2 text-xs text-primary hover:underline cursor-pointer">
+                          Add your first talent
                         </button>
-                        <button 
-                          onClick={() => setActiveMenuId(activeMenuId === c.id ? null : c.id)}
-                          className="hover:text-on-surface transition-colors p-1 cursor-pointer"
-                          title="More Actions"
-                        >
-                          <span className="material-symbols-outlined text-lg">more_horiz</span>
-                        </button>
-                      </div>
-
-                      {/* Interactive Dropdown Menu */}
-                      {activeMenuId === c.id && (
-                        <div className="absolute right-5 top-11 z-30 bg-surface-container-high border border-outline-variant rounded-md shadow-xl py-1 w-44 text-left animate-in fade-in slide-in-from-top-1 duration-150">
-                          <button 
-                            onClick={() => { alert(`Viewing full profile: ${c.name}`); setActiveMenuId(null); }}
-                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-sm">account_box</span>
-                            View Profile
-                          </button>
-                          <button 
-                            onClick={() => { alert(`Adding ${c.name} to Active Screening Pipeline`); setActiveMenuId(null); }}
-                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
-                          >
-                            <span className="material-symbols-outlined text-sm">assignment_ind</span>
-                            Add to Pipeline
-                          </button>
-                          <button 
-                            onClick={() => { alert(`Exporting profile of ${c.name} as PDF summary`); setActiveMenuId(null); }}
-                            className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
-                            Export PDF Summary
-                          </button>
-                          <button 
-                            onClick={() => { alert(`Removing ${c.name} from UAT talent pool`); setActiveMenuId(null); }}
-                            className="w-full px-4 py-2.5 text-xs font-semibold text-error hover:bg-error-container/20 transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
-                          >
-                            <span className="material-symbols-outlined text-sm text-error">delete</span>
-                            Delete Candidate
-                          </button>
-                        </div>
                       )}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredCandidates.map((c) => (
+                    <tr key={c.id} className="hover:bg-surface-container-highest/50 transition-colors group">
+                      <td className="p-4 pl-5"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" /></td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-xs shrink-0 overflow-hidden border border-outline-variant">
+                            <img src={`https://i.pravatar.cc/150?u=${c.id}`} alt={c.name} className="w-full h-full object-cover" />
+                          </div>
+                          <span className="font-medium text-on-surface">{c.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-on-surface-variant">{c.role}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.skills.length === 0 ? (
+                            <span className="text-xs text-on-surface-variant italic">—</span>
+                          ) : (
+                            c.skills.map(s => (
+                              <span key={s.name} className={`px-2 py-0.5 rounded text-[11px] font-medium border ${s.color}`}>
+                                {s.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-on-surface-variant">{c.source}</td>
+                      <td className="p-4 text-on-surface-variant">{c.date}</td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${c.statusColor}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-4 pr-5 text-right relative" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2 text-on-surface-variant">
+                          <button className="hover:text-primary transition-colors p-1 cursor-pointer" title="View Profile">
+                            <span className="material-symbols-outlined text-lg">visibility</span>
+                          </button>
+                          <button
+                            onClick={() => setActiveMenuId(activeMenuId === c.id ? null : c.id)}
+                            className="hover:text-on-surface transition-colors p-1 cursor-pointer"
+                            title="More Actions"
+                          >
+                            <span className="material-symbols-outlined text-lg">more_horiz</span>
+                          </button>
+                        </div>
+
+                        {activeMenuId === c.id && (
+                          <div className="absolute right-5 top-11 z-30 bg-surface-container-high border border-outline-variant rounded-md shadow-xl py-1 w-44 text-left animate-in fade-in slide-in-from-top-1 duration-150">
+                            <button
+                              onClick={() => { alert(`Viewing full profile: ${c.name}`); setActiveMenuId(null); }}
+                              className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-sm">account_box</span>
+                              View Profile
+                            </button>
+                            <button
+                              onClick={() => { alert(`Adding ${c.name} to Active Screening Pipeline`); setActiveMenuId(null); }}
+                              className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
+                            >
+                              <span className="material-symbols-outlined text-sm">assignment_ind</span>
+                              Add to Pipeline
+                            </button>
+                            <button
+                              onClick={() => { alert(`Exporting profile of ${c.name} as PDF summary`); setActiveMenuId(null); }}
+                              className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                              Export PDF Summary
+                            </button>
+                            <button
+                              onClick={() => { alert(`Removing ${c.name} from talent pool`); setActiveMenuId(null); }}
+                              className="w-full px-4 py-2.5 text-xs font-semibold text-error hover:bg-error-container/20 transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
+                            >
+                              <span className="material-symbols-outlined text-sm text-error">delete</span>
+                              Delete Candidate
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
 
-            {/* Pagination Footer */}
             <div className="mt-auto p-4 border-t border-outline-variant bg-surface-container-low flex justify-between items-center text-sm text-on-surface-variant">
-              <div>Showing {candidates.length} candidate{candidates.length !== 1 ? 's' : ''}</div>
+              <div>
+                Showing {filteredCandidates.length} candidate{filteredCandidates.length !== 1 ? 's' : ''}
+                {hasActiveFilters && ` (filtered from ${(externalCandidates || []).length})`}
+              </div>
               <div className="flex items-center gap-1">
-                {candidates.length > 0 && (
+                {filteredCandidates.length > 0 && (
                   <>
-                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button>
+                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors cursor-pointer">
+                      <span className="material-symbols-outlined text-sm">chevron_left</span>
+                    </button>
                     <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary font-medium">1</button>
                   </>
                 )}

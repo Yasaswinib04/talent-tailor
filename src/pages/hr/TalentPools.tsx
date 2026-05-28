@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TalentPoolEmptyState } from '../../components/hr/TalentPoolEmptyState';
 import { TalentPoolList } from '../../components/hr/TalentPoolList';
 import { AddTalentModal } from '../../components/hr/AddTalentModal';
 import { getSessions } from '../../lib/api.js';
 
-interface PoolCandidate {
+export interface PoolCandidate {
   id: string;
   name: string;
   role: string;
@@ -13,6 +13,7 @@ interface PoolCandidate {
   date: string;
   status: string;
   statusColor: string;
+  sessionId?: string;
 }
 
 const SKILL_COLORS = [
@@ -26,6 +27,8 @@ const SKILL_COLORS = [
 function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
   const pool: PoolCandidate[] = [];
   for (const session of sessions) {
+    const jp = session.job_profile || {};
+
     const candidates = Array.isArray(session.analysis_results?.candidates)
       ? session.analysis_results.candidates
       : Array.isArray(session.analysis_results)
@@ -33,6 +36,7 @@ function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
         : Array.isArray(session.analysisResults?.candidates)
           ? session.analysisResults.candidates
           : [];
+
     for (const c of candidates) {
       if (c.preFiltered) continue;
       const competencies = (c.competencies || []).slice(0, 3);
@@ -50,6 +54,28 @@ function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
         statusColor: (c.score || 0) >= 7
           ? 'bg-tertiary/10 text-tertiary border-tertiary/20'
           : 'bg-error/10 text-error border-error/20',
+        sessionId: session.id,
+      });
+    }
+
+    const uploadedFiles = session.uploadedFiles || session.uploaded_files || [];
+    for (const file of uploadedFiles) {
+      if (!file.fileName && !file.name) continue;
+      const fname = file.fileName || file.name || '';
+      const alreadyAnalyzed = candidates.some((c: any) =>
+        c.resumeContent && c.resumeContent.includes(fname)
+      );
+      if (alreadyAnalyzed) continue;
+      pool.push({
+        id: `pending-${file.path || fname}`,
+        name: fname.replace(/^[\w-]+-/, '').replace(/\.(pdf|docx?)$/i, ''),
+        role: jp.name || 'Pending Role',
+        skills: [],
+        source: 'Upload',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        status: 'Pending Analysis',
+        statusColor: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+        sessionId: session.id,
       });
     }
   }
@@ -62,27 +88,27 @@ export function HRTalentPools() {
   const [candidates, setCandidates] = useState<PoolCandidate[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadCandidates = async () => {
-      try {
-        const sessions = await getSessions();
-        const pool = extractCandidatesFromSessions(sessions);
-        setCandidates(pool);
-        const isDevMode = localStorage.getItem('developer_mode') === 'true';
-        if (pool.length > 0 || isDevMode) setHasTalent(true);
-      } catch (err) {
-        console.error('Failed to load candidates for talent pool:', err);
-        const isDevMode = localStorage.getItem('developer_mode') === 'true';
-        if (isDevMode) setHasTalent(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadCandidates();
+  const loadCandidates = useCallback(async () => {
+    try {
+      const sessions = await getSessions();
+      const pool = extractCandidatesFromSessions(sessions);
+      setCandidates(pool);
+      const isDevMode = localStorage.getItem('developer_mode') === 'true';
+      if (pool.length > 0 || isDevMode) setHasTalent(true);
+    } catch (err) {
+      console.error('Failed to load candidates for talent pool:', err);
+      const isDevMode = localStorage.getItem('developer_mode') === 'true';
+      if (isDevMode) setHasTalent(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadCandidates(); }, [loadCandidates]);
 
   const handleAddTalentSuccess = () => {
     setHasTalent(true);
+    loadCandidates();
   };
 
   if (loading) {
@@ -98,12 +124,16 @@ export function HRTalentPools() {
       {!hasTalent ? (
         <TalentPoolEmptyState onAddTalent={() => setIsModalOpen(true)} />
       ) : (
-        <TalentPoolList onAddTalent={() => setIsModalOpen(true)} candidates={candidates} />
+        <TalentPoolList
+          onAddTalent={() => setIsModalOpen(true)}
+          candidates={candidates}
+          onRefresh={loadCandidates}
+        />
       )}
 
-      <AddTalentModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <AddTalentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onAddSuccess={handleAddTalentSuccess}
       />
     </div>
