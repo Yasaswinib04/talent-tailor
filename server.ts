@@ -4,6 +4,7 @@ import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
 import bugsRouter from "./src/server/routes/bugs.js";
 import { initDb, isDbConnected } from "./src/server/db.js";
+import { extractSkillsFromJD } from "./src/server/services/ai/jdSkillExtractor.js";
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -18,8 +19,23 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+  // Routes that don't need PostgreSQL
+  app.post("/api/hr/sessions/extract-skills", async (req, res) => {
+    try {
+      const { jdText, roleType, experienceTier } = req.body;
+      if (!jdText || jdText.trim().length < 50) {
+        res.status(400).json({ error: 'JD text is too short to extract skills.' });
+        return;
+      }
+      const skills = await extractSkillsFromJD(jdText, roleType || 'Other', experienceTier || 'Senior');
+      res.json(skills);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Skill extraction failed' });
+    }
+  });
+
   // Middleware to check database connection status for database-dependent API endpoints
-  app.use(["/api/hr/sessions", "/api/hr/upload"], (req, res, next) => {
+  app.use(["/api/hr/sessions", "/api/hr/bugs"], (req, res, next) => {
     if (!isDbConnected) {
       return res.status(503).json({
         error: "Database connection failed. Please check that DATABASE_URL is configured correctly in your environment variables."
