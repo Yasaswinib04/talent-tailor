@@ -140,6 +140,11 @@ export const CandidateCard = ({
             </Badge>
           )}
           <Badge className="bg-slate-100 text-slate-500 border-none text-[8px] font-black uppercase px-2 rounded-md">{c.experienceTier}</Badge>
+          {c.overqualified && (
+            <Badge className="bg-amber-50 text-amber-600 border-amber-100 rounded-md text-[8px] font-black uppercase px-2 shadow-none gap-1.5">
+              <TriangleAlert className="h-2.5 w-2.5" /> Overqualified
+            </Badge>
+          )}
         </div>
         <div className="p-2 rounded-md border border-slate-100 text-slate-300 group-hover:text-primary group-hover:bg-primary/10 transition-all">
           <ChevronRight className="h-4 w-4" />

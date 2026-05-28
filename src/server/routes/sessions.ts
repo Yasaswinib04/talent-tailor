@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { createSession, getSessionById, updateSession, listSessionsByUser, deleteSession } from '../db.js';
 import { runScreeningAnalysis, generateQuestions } from '../services/ai.js';
+import { extractSkillsFromJD } from '../services/ai/jdSkillExtractor.js';
 
 const router = Router();
 
@@ -141,6 +142,20 @@ router.post('/:id/candidates/:candidateId/questions', async (req: AuthRequest, r
     res.json({ success: true, discoveryQuestions: questions });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/extract-skills', async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const { jdText, roleType, experienceTier } = req.body;
+    if (!jdText || jdText.trim().length < 50) {
+      res.status(400).json({ error: 'JD text is too short to extract skills. Please paste the full job description.' });
+      return;
+    }
+    const skills = await extractSkillsFromJD(jdText, roleType || 'Other', experienceTier || 'Senior');
+    res.json(skills);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Skill extraction failed' });
   }
 });
 

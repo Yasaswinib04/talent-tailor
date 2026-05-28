@@ -7,6 +7,13 @@ import { generateQuestions } from "./questions.js";
 import { preFilterResume, PreFilterResult } from "../preFilter.js";
 import { extractResumeText } from "../extract.js";
 
+function checkOverqualified(experienceYears: string | undefined, minRequired: number | undefined): boolean {
+  if (!experienceYears || !minRequired || minRequired <= 0) return false;
+  const years = parseFloat(experienceYears);
+  if (isNaN(years)) return false;
+  return years >= minRequired + 5;
+}
+
 interface ResumeInput {
   text: string;
   inlineData?: { data: string; mimeType: string };
@@ -95,6 +102,7 @@ export async function analyzeResumes(
         processedCandidates.push({
           ...data,
           track,
+          overqualified: checkOverqualified(data.experienceYears, preferences?.minExperienceYears),
           discoveryQuestions: questions,
           strengths: (data.strengths || []).map((s: string) => ({ text: s })),
           weaknesses: (data.weaknesses || []).map((w: string) => ({ text: w })),

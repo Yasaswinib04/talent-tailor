@@ -128,6 +128,7 @@ export interface CandidateAnalysis {
     missing: string[];
   };
   confirmedSkills?: string[];
+  overqualified?: boolean;
   roleType: RoleType;
   experienceTier: ExperienceTier;
 }

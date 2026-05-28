@@ -318,6 +318,24 @@ export const getBugs = async () => {
   }
 };
 
+export const extractJDSkills = async (jdText: string, roleType: string, experienceTier: string) => {
+  try {
+    const res = await fetchWithTimeout('/api/hr/sessions/extract-skills', {
+      method: 'POST',
+      headers: {
+        ...(await getAuthHeaders()),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ jdText, roleType, experienceTier })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (error) {
+    console.warn("API extractJDSkills failed:", error);
+    return { mandatory: [], preferred: [] };
+  }
+};
+
 export const generateScreeningQuestions = async (sessionId: string, candidateId: string) => {
   try {
     if (sessionId === 'demo-role-123') {

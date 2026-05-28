@@ -66,6 +66,11 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
               <Badge className="bg-primary text-white border-none font-black text-[9px] px-2 py-0.5 rounded-md">
                 {candidate.score.toFixed(1)} MATCH
               </Badge>
+              {candidate.overqualified && (
+                <Badge className="bg-amber-500/15 text-amber-600 border border-amber-500/30 font-black text-[9px] px-2 py-0.5 rounded-md">
+                  OVERQUALIFIED
+                </Badge>
+              )}
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">System_REF: {candidate.id.toUpperCase().substring(0, 12)}</p>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { updateSessionPreferences, getSession } from '../../lib/api.js';
+import { updateSessionPreferences, getSession, extractJDSkills } from '../../lib/api.js';
 import { ROLE_WEIGHTS, getEffectiveWeights } from '../../constants/roles.js';
 import type { RoleType, ExperienceTier, IndustryType, SkillCategory, RoleSkill } from '../../types.js';
 
@@ -50,6 +50,7 @@ export function HRPreferences() {
     { key: 'education', label: 'Education', weight: 5 },
     { key: 'softSkills', label: 'Soft Skills', weight: 15 },
   ]);
+  const [extractingSkills, setExtractingSkills] = useState(false);
 
   const roleTypeOptions: RoleType[] = [
     'Product Manager', 'Consumer Product Manager', 'Product Designer', 'Designer',
@@ -215,6 +216,32 @@ export function HRPreferences() {
     } finally { setSaving(false); }
   };
 
+  const handleExtractSkills = async () => {
+    if (!jdContent || jdContent.trim().length < 50) {
+      alert('Please paste a full job description first.');
+      return;
+    }
+    setExtractingSkills(true);
+    try {
+      const result = await extractJDSkills(jdContent, roleType, experienceTier);
+      if (result.mandatory?.length || result.preferred?.length) {
+        const merged = [
+          ...(result.mandatory || []).filter((s: string) => !skills.mandatory.includes(s)),
+          ...skills.mandatory,
+        ];
+        const mergedPref = [
+          ...(result.preferred || []).filter((s: string) => !skills.preferred.includes(s) && !merged.includes(s)),
+          ...skills.preferred,
+        ];
+        setSkills({ mandatory: merged, preferred: mergedPref });
+      }
+    } catch (err: any) {
+      console.error('Skill extraction failed:', err);
+    } finally {
+      setExtractingSkills(false);
+    }
+  };
+
   if (loading) return <div className="flex-1 flex items-center justify-center bg-background h-screen w-screen"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div></div>;
 
   const skillStateIcon = (name: string) => {
@@ -275,7 +302,17 @@ export function HRPreferences() {
         <section className="bg-surface-container border border-outline-variant rounded-md p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Job Description</h3>
-            <span className="text-[10px] text-on-surface-variant">{jdContent.length} chars</span>
+            <div className="flex items-center gap-2">
+              <button onClick={handleExtractSkills} disabled={extractingSkills || jdContent.length < 50}
+                className="text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-2.5 py-1 rounded transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1">
+                {extractingSkills ? (
+                  <><span className="animate-spin">⏳</span> Extracting...</>
+                ) : (
+                  <><span className="material-symbols-outlined text-[14px]">auto_fix_high</span> Extract Skills from JD</>
+                )}
+              </button>
+              <span className="text-[10px] text-on-surface-variant">{jdContent.length} chars</span>
+            </div>
           </div>
           <textarea value={jdContent} onChange={(e) => setJdContent(e.target.value)} rows={6}
             placeholder="Paste the full job description here..."
