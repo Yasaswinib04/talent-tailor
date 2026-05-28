@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { getSession, uploadFiles, startAnalysis, associateFilesWithSession } from '../../lib/api.js';
+import { getSession, uploadFiles, startAnalysis, associateFilesWithSession, deleteSession } from '../../lib/api.js';
 import { FileUploadZone } from '../../components/FileUploadZone.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
 import { RefreshCw, Zap } from 'lucide-react';
@@ -104,6 +104,16 @@ export function HRRoleDashboard() {
   const technicalCleared = candidates.filter((c: any) => c.score >= 7.0).length;
   const criticalGaps = candidates.filter((c: any) => !c.meetsMandatoryCriteria).length;
 
+  const handleDeleteRole = async () => {
+    if (!confirm(`Delete "${jp.name || 'Untitled Role'}"? All candidates and analysis for this role will be permanently removed.`)) return;
+    try {
+      await deleteSession(id!);
+      navigate('/hr');
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message}`);
+    }
+  };
+
   return (
     <div className="p-6 h-full flex flex-col">
       {/* Breadcrumbs */}
@@ -114,6 +124,14 @@ export function HRRoleDashboard() {
         </Link>
         <span className="text-on-surface-variant">/</span>
         <span className="text-on-surface-variant font-medium">{jp.name || 'Untitled Role'}</span>
+        <button
+          onClick={handleDeleteRole}
+          className="ml-auto text-on-surface-variant hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
+          title="Delete this role"
+        >
+          <span className="material-symbols-outlined text-[14px]">delete</span>
+          Delete Role
+        </button>
       </div>
 
       {session.status === 'error' && analysisError && (
@@ -228,7 +246,7 @@ export function HRRoleDashboard() {
               {copied ? "Link Copied!" : "Share Job Link"}
             </button>
             <button
-              onClick={() => setIsUploadOpen(true)}
+              onClick={() => navigate('/hr/pools')}
               className="border border-outline-variant bg-surface-container-low/60 hover:bg-surface-container-high text-on-surface px-6 py-2.5 rounded-md font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer min-w-[150px] justify-center"
             >
               <span className="material-symbols-outlined text-[16px]">group_add</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getSessions, createSession } from '../../lib/api.js';
+import { getSessions, createSession, deleteSession } from '../../lib/api.js';
 
 export function HRDashboard() {
   const navigate = useNavigate();
@@ -32,6 +32,17 @@ export function HRDashboard() {
       alert(`Failed to create role: ${err.message || 'Database connection error'}`);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteRole = async (sessionId: string, roleName: string) => {
+    if (!confirm(`Delete "${roleName}"? This cannot be undone.`)) return;
+    try {
+      await deleteSession(sessionId);
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+    } catch (err: any) {
+      console.error('Failed to delete role:', err);
+      alert(`Failed to delete: ${err.message}`);
     }
   };
 
@@ -256,10 +267,19 @@ export function HRDashboard() {
                     </div>
                   </div>
                   
-                  <button onClick={() => navigate(`/hr/role/${session.id}`)} className="mt-auto pt-4 border-t border-outline-variant w-full text-left text-sm font-medium text-primary hover:opacity-80 transition-all flex items-center justify-between cursor-pointer">
-                    View Details
-                    <span className="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
-                  </button>
+                   <div className="mt-auto pt-4 border-t border-outline-variant flex items-center gap-2">
+                     <button onClick={() => navigate(`/hr/role/${session.id}`)} className="flex-1 text-left text-sm font-medium text-primary hover:opacity-80 transition-all flex items-center justify-between cursor-pointer">
+                       View Details
+                       <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                     </button>
+                     <button
+                       onClick={(e) => { e.stopPropagation(); handleDeleteRole(session.id, jp.name || 'Untitled Role'); }}
+                       className="text-on-surface-variant hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+                       title="Delete role"
+                     >
+                       <span className="material-symbols-outlined text-[16px]">delete</span>
+                     </button>
+                   </div>
                 </div>
               );
             })}

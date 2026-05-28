@@ -279,6 +279,23 @@ export const getSessions = async () => {
   }
 };
 
+export const deleteSession = async (sessionId: string) => {
+  try {
+    const res = await fetchWithTimeout(`/api/hr/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: await getAuthHeaders()
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (error) {
+    console.warn("API deleteSession failed, falling back to LocalStorage:", error);
+    const sessions = getLocalSessions();
+    const filtered = sessions.filter(s => s.id !== sessionId);
+    saveLocalSessions(filtered);
+    return { success: true };
+  }
+};
+
 export const reportBug = async (bugData: any) => {
   try {
     const res = await fetchWithTimeout('/api/hr/bugs', {
