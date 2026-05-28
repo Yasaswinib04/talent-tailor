@@ -80,6 +80,7 @@ export interface HiringPreferences {
   mandatorySkills: string[];
   maxFailedCriteria?: number;
   topN: number;
+  scoringWeights?: { technical: number; experience: number; domain: number; education: number; softSkills: number; custom?: Record<string, number> };
 }
 
 export interface CandidateAnalysis {
