@@ -259,40 +259,6 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, se
 
         <div className="flex-1 overflow-auto custom-scrollbar px-6 pb-6">
 
-          {/* Floating Bulk Action Bar */}
-          {selectedIds.size > 0 && (
-            <div className="sticky top-0 z-20 mb-2 bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-center gap-3 backdrop-blur-sm animate-in slide-in-from-top-2 duration-200">
-              <span className="text-sm font-semibold text-primary">{selectedIds.size} selected</span>
-              <div className="h-5 w-px bg-primary/30"></div>
-              <select
-                value={targetRoleId}
-                onChange={(e) => setTargetRoleId(e.target.value)}
-                className="flex-1 bg-surface-container-low border border-primary/30 rounded-md px-3 py-1.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23666'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '2rem' }}
-              >
-                <option value="">Select target role...</option>
-                {sessions.map((s: any) => {
-                  const jp = s.job_profile || {};
-                  return <option key={s.id} value={s.id}>{jp.name || 'Untitled Role'}</option>;
-                })}
-              </select>
-              <button
-                onClick={() => { if (targetRoleId) addSelectedToRole(targetRoleId); }}
-                disabled={!targetRoleId}
-                className="bg-primary text-on-primary hover:opacity-90 px-4 py-1.5 rounded-md text-sm font-semibold transition-all cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                Go to Role
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="text-on-surface-variant hover:text-on-surface p-1 rounded cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
-            </div>
-          )}
-
           <div className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden shadow-lg shadow-black/20 flex flex-col min-h-full">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -435,6 +401,44 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, se
             </div>
           </div>
         </div>
+
+        {/* Fixed Bottom Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 z-50 bg-surface-container-high border-t-2 border-primary/40 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] p-4 flex items-center gap-4 animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1.5 rounded-full bg-primary/15 text-primary font-bold text-sm border border-primary/30">
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-on-surface-variant hover:text-on-surface underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </div>
+            <div className="h-8 w-px bg-outline-variant"></div>
+            <select
+              value={targetRoleId}
+              onChange={(e) => setTargetRoleId(e.target.value)}
+              className="flex-1 max-w-sm bg-surface-container-low border border-outline-variant rounded-md px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23666'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '2rem' }}
+            >
+              <option value="">Select a role to add candidates to...</option>
+              {sessions.map((s: any) => {
+                const jp = s.job_profile || {};
+                return <option key={s.id} value={s.id}>{jp.name || 'Untitled Role'}</option>;
+              })}
+            </select>
+            <button
+              onClick={() => { if (targetRoleId) addSelectedToRole(targetRoleId); }}
+              disabled={!targetRoleId}
+              className="bg-primary text-on-primary hover:opacity-95 px-6 py-2.5 rounded-md font-semibold text-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-[0_0_20px_rgba(167,139,250,0.3)]"
+            >
+              <span className="material-symbols-outlined text-[18px]">group_add</span>
+              {targetRoleId ? `Add to ${(sessions.find((s: any) => s.id === targetRoleId)?.job_profile?.name || 'Role')}` : 'Add to Role'}
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );
