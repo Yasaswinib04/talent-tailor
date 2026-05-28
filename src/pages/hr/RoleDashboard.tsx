@@ -4,6 +4,8 @@ import { getSession, uploadFiles, startAnalysis, associateFilesWithSession, dele
 import { FileUploadZone } from '../../components/FileUploadZone.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
 import { RefreshCw, Zap } from 'lucide-react';
+import { getEffectiveWeights } from '../../constants/roles.js';
+import type { RoleType, ExperienceTier, IndustryType } from '../../types.js';
 
 export function HRRoleDashboard() {
   const { id } = useParams();
@@ -99,6 +101,38 @@ export function HRRoleDashboard() {
       ? session.analysis_results
       : [];
   const filesCount = (session.uploaded_files || []).length;
+  const roleType = (jp.roleType || jp.role || 'Full Stack Developer') as RoleType;
+  const experienceTier = (jp.experienceTier || 'Senior') as ExperienceTier;
+  const industry = (jp.industry || 'Technology / SaaS') as IndustryType;
+
+  const rubricDimensions = (() => {
+    const prefs = jp.preferences || {};
+    const sw = prefs.scoringWeights;
+    if (sw) {
+      const dims: { key: string; label: string }[] = [
+        { key: 'technical', label: 'Technical Skills' },
+        { key: 'experience', label: 'Experience' },
+        { key: 'domain', label: 'Domain Knowledge' },
+        { key: 'education', label: 'Education' },
+        { key: 'softSkills', label: 'Soft Skills' },
+      ];
+      if (sw.custom) {
+        for (const k of Object.keys(sw.custom)) {
+          dims.push({ key: k, label: k });
+        }
+      }
+      return dims;
+    }
+    const effective = getEffectiveWeights(roleType, experienceTier, industry);
+    const dims: { key: string; label: string }[] = [
+      { key: 'technical', label: 'Technical Skills' },
+      { key: 'experience', label: 'Experience' },
+      { key: 'domain', label: 'Domain Knowledge' },
+      { key: 'education', label: 'Education' },
+      { key: 'softSkills', label: 'Soft Skills' },
+    ];
+    return dims;
+  })();
   
   // Stats
   const avgScore = candidates.length ? Math.round(candidates.reduce((acc: number, c: any) => acc + (c.score || 0), 0) / candidates.length * 10) : 0;
@@ -319,12 +353,12 @@ export function HRRoleDashboard() {
                     <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-24">Mandatory</th>
                     <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] min-w-[200px]">Skills Matched</th>
                     <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] min-w-[160px]">Gaps / Missing</th>
-                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-28">Category Scores</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-28">Scores by Rubric</th>
                     <th className="p-3 pr-4 text-right text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-28">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/40">
-                  {shortlisted.map((c: any, idx: number) => <CandidateRow key={c.id || idx} c={c} idx={idx} />)}
+                  {shortlisted.map((c: any, idx: number) => <CandidateRow key={c.id || idx} c={c} idx={idx} rubricDimensions={rubricDimensions} />)}
                   {rejected.length > 0 && (
                     <>
                       <tr className="bg-surface-container-highest/30 hover:bg-surface-container-highest/50 transition-colors cursor-pointer">
@@ -340,7 +374,7 @@ export function HRRoleDashboard() {
                         </td>
                       </tr>
                       {showRejected && rejected.map((c: any, idx: number) => (
-                        <CandidateRow key={c.id || `r${idx}`} c={c} idx={shortlisted.length + idx + 1} />
+                        <CandidateRow key={c.id || `r${idx}`} c={c} idx={shortlisted.length + idx + 1} rubricDimensions={rubricDimensions} />
                       ))}
                     </>
                   )}
@@ -381,12 +415,32 @@ export function HRRoleDashboard() {
   );
 }
 
-function CandidateRow({ c, idx }: { c: any; idx: number; key?: React.Key }) {
+function CandidateRow({ c, idx, rubricDimensions }: { c: any; idx: number; key?: React.Key; rubricDimensions: { key: string; label: string }[] }) {
   const scorePercent = Math.round((c.score || 0) * 10);
   const competencies = c.competencies || [];
   const matchedSkills = competencies.filter((comp: any) => comp.score >= 6);
   const weakSkills = competencies.filter((comp: any) => comp.score < 6);
   const keywords = c.keywords || { present: [], missing: [] };
+
+  function getCategoryScore(dimKey: string): number {
+    const dimKeywords: Record<string, string[]> = {
+      technical: ['technical', 'code', 'programming', 'architecture', 'system', 'design', 'framework', 'api', 'database', 'algorithm', 'infrastructure', 'deployment', 'testing', 'react', 'node', 'python', 'java', 'typescript', 'javascript', 'sql', 'docker', 'kubernetes', 'ci/cd', 'aws', 'cloud', 'frontend', 'backend', 'devops', 'security', 'performance', 'optimization', 'ml', 'ai', 'machine learning', 'pipeline', 'etl'],
+      experience: ['experience', 'delivery', 'ownership', 'execution', 'track record', 'led', 'managed', 'built', 'launched', 'scaled', 'shipped', 'delivered', 'production', 'mentor'],
+      domain: ['domain', 'industry', 'market', 'business', 'strategy', 'product', 'customer', 'revenue', 'growth', 'fintech', 'healthcare', 'ecommerce', 'saas', 'enterprise', 'compliance', 'regulatory', 'finance', 'sales', 'marketing'],
+      education: ['education', 'degree', 'university', 'college', 'gpa', 'bachelor', 'master', 'phd', 'mba', 'certification', 'certified', 'course'],
+      softSkills: ['soft', 'communication', 'leadership', 'collaboration', 'team', 'stakeholder', 'presentation', 'coaching', 'empathy', 'negotiation', 'facilitation', 'influence', 'adaptability', 'ownership', 'agency'],
+    };
+    const related = competencies.filter(comp => {
+      const name = (comp.name || '').toLowerCase();
+      const evidence = (comp.evidence || '').toLowerCase();
+      const kws = dimKeywords[dimKey] || [];
+      if (kws.length === 0) return name.includes(dimKey.toLowerCase());
+      return kws.some(kw => name.includes(kw) || evidence.includes(kw));
+    });
+    if (related.length === 0) return 0;
+    const avg = related.reduce((sum: number, comp: any) => sum + (comp.score || 0), 0) / related.length;
+    return Math.round(avg * 10);
+  }
   return (
     <tr className="hover:bg-surface-container-highest/40 transition-colors group">
       <td className="p-3 pl-4">
@@ -465,18 +519,17 @@ function CandidateRow({ c, idx }: { c: any; idx: number; key?: React.Key }) {
       </td>
       <td className="p-3">
         <div className="space-y-1">
-          {['Technical', 'Experience', 'Domain', 'Education', 'Soft Skills'].map(cat => {
-            const comp = competencies.find((comp: any) => comp.name?.toLowerCase().includes(cat.toLowerCase()));
-            const catScore = comp?.score || c.atsScore ? Math.round((comp?.score || c.atsScore || 0) * 10) : null;
-            return catScore !== null ? (
-              <div key={cat} className="flex items-center gap-1.5">
-                <span className="text-[9px] text-on-surface-variant w-16 truncate">{cat}</span>
+          {rubricDimensions.map(dim => {
+            const catScore = getCategoryScore(dim.key);
+            return (
+              <div key={dim.key} className="flex items-center gap-1.5">
+                <span className="text-[9px] text-on-surface-variant w-16 truncate" title={dim.label}>{dim.label}</span>
                 <div className="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${catScore >= 80 ? 'bg-primary' : catScore >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${catScore}%` }}></div>
+                  <div className={`h-full rounded-full ${catScore >= 80 ? 'bg-primary' : catScore >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(catScore, 100)}%` }}></div>
                 </div>
                 <span className="text-[9px] font-mono font-bold text-on-surface w-7 text-right">{catScore}</span>
               </div>
-            ) : null;
+            );
           })}
         </div>
       </td>
