@@ -94,7 +94,17 @@ export function HRRoleDashboard() {
         let inputs: (string | { data: string; mimeType: string })[] = [];
 
         if (resumeFiles.length > 0) {
-          inputs = await Promise.all(resumeFiles.map(async (f) => {
+          const pdfFiles = resumeFiles.filter(f => f.type !== 'image/png' && f.type !== 'image/jpeg' && f.type !== 'image/jpg');
+          if (pdfFiles.length === 0) {
+            const skipped = resumeFiles.length - pdfFiles.length;
+            setAnalyzing(false);
+            alert(`Cannot analyze image files. ${skipped} image file(s) were skipped. Please upload PDF or DOCX resumes only.`);
+            return;
+          }
+          if (pdfFiles.length < resumeFiles.length) {
+            console.warn(`Skipping ${resumeFiles.length - pdfFiles.length} image file(s) — not supported by AI model`);
+          }
+          inputs = await Promise.all(pdfFiles.map(async (f) => {
             const base64 = await fileToBase64(f);
             return { data: base64, mimeType: f.type || 'application/pdf' };
           }));
