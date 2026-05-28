@@ -212,34 +212,21 @@ export const startAnalysis = async (sessionId: string) => {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.warn("API startAnalysis failed, falling back to LocalStorage mock analysis:", error);
+    console.warn("API startAnalysis failed:", error);
     const sessions = getLocalSessions();
     const idx = sessions.findIndex(s => s.id === sessionId);
     if (idx !== -1) {
-      sessions[idx].status = 'analyzing';
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isDBError = errorMsg.includes('Database connection failed') || errorMsg.includes('503');
+      const msg = isDBError
+        ? 'Database is not available.'
+        : `Server unreachable: ${errorMsg.substring(0, 100)}`;
+      sessions[idx].status = 'error';
+      sessions[idx].analysisResults = { error: msg };
+      sessions[idx].analysis_results = sessions[idx].analysisResults;
+      sessions[idx].updatedAt = new Date().toISOString();
+      sessions[idx].updated_at = new Date().toISOString();
       saveLocalSessions(sessions);
-      
-      // The server cannot start analysis because it is unreachable or DB is down.
-      // Set the session to error state so the UI shows a clear message.
-      setTimeout(() => {
-        const currentSessions = getLocalSessions();
-        const sIdx = currentSessions.findIndex(s => s.id === sessionId);
-        if (sIdx !== -1) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          const isDBError = errorMsg.includes('Database connection failed') || errorMsg.includes('503');
-          const msg = isDBError
-            ? 'Database is not available. Analysis requires PostgreSQL + Supabase. Please configure DATABASE_URL, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY in your Railway environment variables.'
-            : 'Server unreachable. Check that the app is running and your network connection is active.';
-          currentSessions[sIdx].status = 'error';
-          currentSessions[sIdx].analysisResults = { error: msg };
-          currentSessions[sIdx].analysis_results = currentSessions[sIdx].analysisResults;
-          currentSessions[sIdx].updatedAt = new Date().toISOString();
-          currentSessions[sIdx].updated_at = new Date().toISOString();
-          saveLocalSessions(currentSessions);
-        }
-      }, 2000);
-
-      return { status: 'analyzing', session: sessions[idx] };
     }
     throw error;
   }

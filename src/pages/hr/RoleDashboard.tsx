@@ -5,7 +5,20 @@ import { FileUploadZone } from '../../components/FileUploadZone.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
 import { RefreshCw, Zap } from 'lucide-react';
 import { getEffectiveWeights } from '../../constants/roles.js';
+import { analyzeResumes as clientAnalyze } from '../../services/gemini.js';
 import type { RoleType, ExperienceTier, IndustryType } from '../../types.js';
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function HRRoleDashboard() {
   const { id } = useParams();
@@ -70,12 +83,62 @@ export function HRRoleDashboard() {
 
   const handleAnalyze = async () => {
     if (!id) return;
+    setAnalyzing(true);
     try {
-      setAnalyzing(true);
       await startAnalysis(id);
       await fetchSession();
-    } catch (err) {
-      console.error(err);
+    } catch (serverErr) {
+      console.warn('Server analysis failed, attempting client-side fallback:', serverErr);
+      try {
+        const jdText = jp.jd || jp.jdContent || session.jdContent || session.jd_content || '';
+        let inputs: (string | { data: string; mimeType: string })[] = [];
+
+        if (resumeFiles.length > 0) {
+          inputs = await Promise.all(resumeFiles.map(async (f) => {
+            const base64 = await fileToBase64(f);
+            return { data: base64, mimeType: f.type || 'application/pdf' };
+          }));
+          setResumeFiles([]);
+        } else {
+          const uploaded = session.uploadedFiles || session.uploaded_files || [];
+          if (uploaded.length === 0) {
+            setAnalyzing(false);
+            alert('No resume files found. Please upload resumes first before running analysis.');
+            return;
+          }
+          setAnalyzing(false);
+          alert('Server is unreachable and no local files are available. Please upload resumes through the dialog to run client-side analysis.');
+          return;
+        }
+
+        const role = jp.roleType || jp.role || 'Full Stack Developer';
+        const tier = jp.experienceTier || 'Senior';
+        const prefs = jp.preferences || {};
+
+        const result = await clientAnalyze(
+          inputs, jdText, role, tier,
+          ['score', 'competencies', 'questions'],
+          undefined, prefs, jp.targetMarket || 'India'
+        );
+
+        const sessions = (() => {
+          try { return JSON.parse(localStorage.getItem('local_sessions') || '[]'); } catch { return []; }
+        })();
+        const idx = sessions.findIndex((s: any) => s.id === id);
+        if (idx !== -1) {
+          sessions[idx].status = 'completed';
+          sessions[idx].analysisResults = result;
+          sessions[idx].analysis_results = result;
+          sessions[idx].updatedAt = new Date().toISOString();
+          sessions[idx].updated_at = new Date().toISOString();
+          localStorage.setItem('local_sessions', JSON.stringify(sessions));
+        }
+        await fetchSession();
+      } catch (clientErr: any) {
+        console.error('Client-side analysis also failed:', clientErr);
+        alert(`Analysis failed: ${clientErr.message || 'Unknown error'}`);
+      }
+    } finally {
       setAnalyzing(false);
     }
   };
