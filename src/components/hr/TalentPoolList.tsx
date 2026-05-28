@@ -24,13 +24,13 @@ const DEMO_CANDIDATES: Candidate[] = [
   { id: 'demo-5', name: 'Bena Caneiit', role: 'Data Scientist', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'R', color: 'bg-secondary/20 text-secondary border-secondary/30'}], source: 'Website', date: 'Oct 24, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
 ];
 
-function useIsSandbox(): boolean {
-  return localStorage.getItem('uat_bypass_user') === 'true' || localStorage.getItem('developer_mode') === 'true';
+function useIsDevMode(): boolean {
+  return localStorage.getItem('developer_mode') === 'true';
 }
 
 export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: Props) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const isSandbox = useIsSandbox();
+  const isDevMode = useIsDevMode();
 
   useEffect(() => {
     const closeMenu = () => setActiveMenuId(null);
@@ -40,7 +40,7 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: 
 
   const candidates: Candidate[] = externalCandidates && externalCandidates.length > 0
     ? externalCandidates
-    : isSandbox
+    : isDevMode
       ? DEMO_CANDIDATES
       : [];
 
