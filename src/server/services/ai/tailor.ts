@@ -9,7 +9,7 @@ export async function tailorResume(resume: string, jd: string, analysis: Candida
     .join("\n\n");
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [{
         text: `You are an elite career strategist. Analyze the Resume vs JD and provide specific, high-impact improvements using the STAR method.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSessions } from '../../lib/api.js';
-import { Check, X, ArrowLeft, Sliders, AlertTriangle, Layers, Award, ShieldAlert, Download, Sparkles } from 'lucide-react';
+import { getSessions, generateScreeningQuestions } from '../../lib/api.js';
+import { Check, X, ArrowLeft, Sliders, AlertTriangle, Layers, Award, ShieldAlert, Download, Sparkles, RefreshCw } from 'lucide-react';
 
 interface Candidate {
   id: string;
@@ -28,6 +28,39 @@ export function HRCompare() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingQuestionsFor, setGeneratingQuestionsFor] = useState<string | null>(null);
+
+  const handleGenerateQuestions = async (candidateId: string) => {
+    if (!selectedPipelineId) return;
+    try {
+      setGeneratingQuestionsFor(candidateId);
+      const res = await generateScreeningQuestions(selectedPipelineId, candidateId);
+      if (res && res.discoveryQuestions) {
+        setPipelines(prev => prev.map(p => {
+          if (p.id === selectedPipelineId) {
+            return {
+              ...p,
+              candidates: p.candidates.map(c => {
+                if (c.id === candidateId) {
+                  return {
+                    ...c,
+                    discoveryQuestions: res.discoveryQuestions
+                  };
+                }
+                return c;
+              })
+            };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate screening call contents.");
+    } finally {
+      setGeneratingQuestionsFor(null);
+    }
+  };
 
   // Mock Demo Pipeline fallback for UAT review
   const demoPipeline: RolePipeline = {
@@ -426,14 +459,35 @@ export function HRCompare() {
                                   <span className="font-bold text-primary">Q:</span>
                                   <span className="font-bold text-on-surface leading-tight text-[11px]">{q.question}</span>
                                 </div>
-                                <div className="flex gap-2 text-on-surface-variant pl-4 text-[10px] leading-relaxed border-l border-outline-variant/50">
-                                  <span className="italic">Candidate Answer: "{q.answer}"</span>
-                                </div>
+                                {q.answer && (
+                                  <div className="flex gap-2 text-on-surface-variant pl-4 text-[10px] leading-relaxed border-l border-outline-variant/50">
+                                    <span className="italic">Candidate Answer: "{q.answer}"</span>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-on-surface-variant italic text-[11px]">No interview questions generated yet.</span>
+                          <div className="flex flex-col gap-2">
+                            <span className="text-on-surface-variant italic text-[11px] block mb-1">No interview questions generated yet.</span>
+                            <button
+                              onClick={() => handleGenerateQuestions(c.id)}
+                              disabled={generatingQuestionsFor === c.id}
+                              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary font-bold text-[10px] uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer w-fit"
+                            >
+                              {generatingQuestionsFor === c.id ? (
+                                <>
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                  Generate screening call contents
+                                </>
+                              )}
+                            </button>
+                          </div>
                         )}
                       </td>
                     ))}

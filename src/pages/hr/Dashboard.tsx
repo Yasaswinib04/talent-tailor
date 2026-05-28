@@ -25,10 +25,11 @@ export function HRDashboard() {
   const handleNewRole = async () => {
     try {
       setCreating(true);
-      const res = await createSession({ name: "New Role", roleType: "General", experienceTier: "Mid" });
+      const res = await createSession({ name: "New Role", roleType: "General", experienceTier: "Mid-Level" });
       navigate(`/hr/role/${res.sessionId}/setup`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create role", err);
+      alert(`Failed to create role: ${err.message || 'Database connection error'}`);
     } finally {
       setCreating(false);
     }

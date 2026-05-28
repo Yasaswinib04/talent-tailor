@@ -78,6 +78,7 @@ export interface HiringPreferences {
   minExperienceYears: number;
   preferredCompanies: string[];
   mandatorySkills: string[];
+  maxFailedCriteria?: number;
   topN: number;
 }
 

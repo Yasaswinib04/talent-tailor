@@ -3,7 +3,8 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { google } from 'googleapis';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { supabase } from '../db.js';
+import { supabase, setResumeText, markResumeTextFailed } from '../db.js';
+import { extractResumeText } from '../services/extract.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -51,6 +52,13 @@ router.post('/', upload.array('files', 50), async (req: AuthRequest, res: Respon
         path: storagePath,
         mimeType: file.mimetype
       });
+
+      extractResumeText(file.buffer, file.mimetype)
+        .then(({ text, tokenCount }) => setResumeText(storagePath, text, tokenCount))
+        .catch((err) => {
+          console.error(`Text extraction failed for ${storagePath}:`, err.message);
+          markResumeTextFailed(storagePath);
+        });
     }
 
     res.status(200).json({ files: metadata });
@@ -100,6 +108,13 @@ router.post('/gdrive/import', async (req: AuthRequest, res: Response): Promise<v
       console.error("Supabase Storage GDrive upload error:", error);
       throw error;
     }
+
+    extractResumeText(buffer, mimeType || 'application/pdf')
+      .then(({ text, tokenCount }) => setResumeText(storagePath, text, tokenCount))
+      .catch((err) => {
+        console.error(`Text extraction failed for GDrive ${storagePath}:`, err.message);
+        markResumeTextFailed(storagePath);
+      });
 
     res.status(200).json({
       files: [{

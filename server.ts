@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
 import bugsRouter from "./src/server/routes/bugs.js";
-import { initDb } from "./src/server/db.js";
+import { initDb, isDbConnected } from "./src/server/db.js";
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -15,11 +15,30 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3001;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+  // Middleware to check database connection status for database-dependent API endpoints
+  app.use(["/api/hr/sessions", "/api/hr/upload"], (req, res, next) => {
+    if (!isDbConnected) {
+      return res.status(503).json({
+        error: "Database connection failed. Please check that DATABASE_URL is configured correctly in your environment variables."
+      });
+    }
+    next();
+  });
 
   app.use("/api/hr/sessions", sessionsRouter);
   app.use("/api/hr/upload", uploadRouter);
   app.use("/api/hr/bugs", bugsRouter);
+
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: isDbConnected ? "healthy" : "degraded",
+      dbConnected: isDbConnected,
+      timestamp: new Date().toISOString()
+    });
+  });
 
   // API Route to fetch URL content
   app.get("/api/proxy", async (req, res) => {
@@ -65,6 +84,13 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("Unhandled API Error:", err.message || err);
+    res.status(err.status || 500).json({
+      error: err.message || "Internal Server Error",
+    });
+  });
 
   await initDb();
 

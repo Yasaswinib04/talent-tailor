@@ -17,6 +17,9 @@ export function HRLayout() {
   const navigate = useNavigate();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [hasSkippedSignIn, setHasSkippedSignIn] = useState(() => {
+    return sessionStorage.getItem('hasSkippedSignIn') === 'true';
+  });
   const [creating, setCreating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   
@@ -55,8 +58,15 @@ export function HRLayout() {
     } as any);
   };
 
+  const handleSkipSignIn = () => {
+    setHasSkippedSignIn(true);
+    sessionStorage.setItem('hasSkippedSignIn', 'true');
+  };
+
   const handleSignOut = async () => {
     localStorage.removeItem('uat_bypass_user');
+    sessionStorage.removeItem('hasSkippedSignIn');
+    setHasSkippedSignIn(false);
     setUser(null);
     try {
       await signOut(auth);
@@ -93,10 +103,11 @@ export function HRLayout() {
   const handleNewRole = async () => {
     try {
       setCreating(true);
-      const res = await createSession({ name: "New Role", roleType: "General", experienceTier: "Mid" });
+      const res = await createSession({ name: "New Role", roleType: "General", experienceTier: "Mid-Level" });
       navigate(`/hr/role/${res.sessionId}/setup`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create role", err);
+      alert(`Failed to create role: ${err.message || 'Database connection error'}`);
     } finally {
       setCreating(false);
     }
@@ -108,22 +119,24 @@ export function HRLayout() {
     <div className="bg-background text-on-surface font-body antialiased flex h-screen overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
       
       <AnimatePresence>
-        {!user && (
+        {!user && !hasSkippedSignIn && (
           <AuthOverlay
             onLogin={async () => {
               try {
                 setAuthError(null);
                 await signInWithGoogle();
-              } catch (err) {
-                console.error("Google sign in failed, falling back to sandbox", err);
-                setAuthError("Google Sign-In failed (unauthorized domain or popup blocked). Automatically logging into Sandbox/Demo Workspace instead...");
-                setTimeout(() => {
-                  handleSandboxSignIn();
-                  setAuthError(null);
-                }, 2500);
+              } catch (err: any) {
+                const msg = err?.message || err?.code || '';
+                if (msg.includes('popup-closed-by-user')) {
+                  setAuthError('Sign-in popup was closed. Please try again or use Sandbox below.');
+                } else if (msg.includes('unauthorized-domain') || msg.includes('operation-not-allowed')) {
+                  setAuthError('Google Sign-In is not configured for this domain. Please use Sandbox or Continue as Guest below.');
+                } else {
+                  setAuthError(`Sign-in failed: ${msg.substring(0, 100)}. Please use Sandbox or Continue as Guest below.`);
+                }
               }
             }}
-            onSkip={() => {}} // Remove skip capability for HR
+            onSkip={handleSkipSignIn}
             onSandboxLogin={handleSandboxSignIn}
             error={authError}
           />
@@ -248,15 +261,26 @@ export function HRLayout() {
               Sign Out
             </button>
             
-            <div className="w-8 h-8 rounded-full bg-secondary-container border border-outline-variant overflow-hidden">
-              <img alt="Recruiter Profile" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCG4imHjCae9n9cYEVrEkgR35KdYFLBkBaAPM8LBbkAJKfhh_9_hKWXxsbOeIiiJzS3mleOYhpw64z_8YrIEUJguq2qxLiXJGl-jBGoOvVgDsc2nxBAcwz3ViLxGX7sZ9jCgSfjOowrCN-qKjvBeD_vrJH-0laScJ2OBAy7puEx8TibIVSiEvOOBIRSUpJaUbxGW-a8A5Hvvy8NAjvDbZynbk8DI040sezZPUQV8pngJ3WHj7x3HPJNx5WtR5CV3LsqEx2cQtujCaX-" />
-            </div>
+            {user && (
+              <div className="flex items-center gap-2.5 pl-2 border-l border-outline-variant/60">
+                <span className="text-xs font-semibold text-on-surface hidden sm:inline">
+                  {user.displayName || user.email || 'Recruiter'}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-primary/10 border border-outline-variant overflow-hidden flex items-center justify-center text-primary font-bold text-xs shrink-0 select-none shadow-sm">
+                  {user.photoURL ? (
+                    <img alt={user.displayName || 'Profile'} className="w-full h-full object-cover" src={user.photoURL} referrerpolicy="no-referrer" />
+                  ) : (
+                    <span>{(user.displayName || user.email || 'R').charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </header>
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-background">
-          <Routes location={location}>
+          <Routes>
             <Route path="/" element={<HRDashboard />} />
             <Route path="/role/:id" element={<HRRoleDashboard />} />
             <Route path="/role/:id/setup" element={<HRPreferences />} />

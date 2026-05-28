@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { createSession, getSessionById, updateSession, listSessionsByUser, deleteSession } from '../db.js';
-import { runScreeningAnalysis } from '../services/ai.js';
+import { runScreeningAnalysis, generateQuestions } from '../services/ai.js';
 
 const router = Router();
 
@@ -97,6 +97,50 @@ router.post('/:id/analyze', async (req: AuthRequest, res): Promise<void> => {
     res.json({ status: 'analyzing', session: updatedSession });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/:id/candidates/:candidateId/questions', async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const session = await getSessionById(req.params.id, req.userId!);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const candidateId = req.params.candidateId;
+    const candidates = session.analysisResults?.candidates || [];
+    const candidateIndex = candidates.findIndex((c: any) => c.id === candidateId);
+
+    if (candidateIndex === -1) {
+      res.status(404).json({ error: 'Candidate not found in session' });
+      return;
+    }
+
+    const candidate = candidates[candidateIndex];
+    const role = session.jobProfile?.role || 'General';
+    const tier = session.jobProfile?.experienceTier || 'Mid';
+    const gaps = candidate.gaps || [];
+
+    const questions = await generateQuestions(gaps, role, tier);
+
+    // Update the candidate inside the session object
+    candidates[candidateIndex] = {
+      ...candidate,
+      discoveryQuestions: questions
+    };
+
+    // Save the updated session
+    await updateSession(req.params.id, req.userId!, {
+      analysisResults: {
+        ...session.analysisResults,
+        candidates
+      }
+    });
+
+    res.json({ success: true, discoveryQuestions: questions });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

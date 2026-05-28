@@ -1,17 +1,26 @@
 import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier } from "../../../types.js";
-import { getSessionById, updateSession, supabase, logPipelineEvent } from "../../db.js";
+import { getSessionById, updateSession, supabase, logPipelineEvent, getResumeText, setResumeText } from "../../db.js";
 import PQueue from 'p-queue';
 import { classifyTrack } from "./classifier.js";
 import { scoreCandidate } from "./scorer.js";
 import { generateQuestions } from "./questions.js";
+import { preFilterResume, PreFilterResult } from "../preFilter.js";
+import { extractResumeText } from "../extract.js";
+
+interface ResumeInput {
+  text: string;
+  inlineData?: { data: string; mimeType: string };
+  filePath?: string;
+  preFilter?: PreFilterResult;
+}
 
 export async function analyzeResumes(
   sessionId: string,
-  resumes: (string | { data: string, mimeType: string })[],
+  resumes: ResumeInput[],
   jd: string | { data: string, mimeType: string },
   role: RoleType,
   tier: ExperienceTier = 'Senior',
-  features: string[] = ['score', 'competencies', 'questions'],
+  features: string[] = ['score', 'competencies'],
   discoveryAnswers?: { question: string, answer: string }[],
   preferences?: HiringPreferences,
   targetMarket: string = 'India'
@@ -19,7 +28,8 @@ export async function analyzeResumes(
   const includeQuestions = features.includes('questions');
 
   const startTrack = Date.now();
-  const { track } = await classifyTrack(jd);
+  const jdText = typeof jd === 'string' ? jd : (jd as any).text || '';
+  const { track } = await classifyTrack(jdText);
   await logPipelineEvent(sessionId, 'batch-level', 'TrackClassifier', Date.now() - startTrack, 'success');
 
   const queue = new PQueue({ concurrency: 5 });
@@ -28,13 +38,52 @@ export async function analyzeResumes(
   const analysisPromises = resumes.map(async (resume, index) => {
     return queue.add(async () => {
       const candidateId = `candidate-${index}-${Math.random().toString(36).substr(2, 5)}`;
+
+      if (resume.preFilter && !resume.preFilter.pass) {
+        processedCandidates.push({
+          name: 'Pre-Filtered Candidate',
+          score: 0,
+          meetsMandatoryCriteria: false,
+          failedCriteria: resume.preFilter.failedCriteria,
+          overallFeedback: resume.preFilter.reason,
+          professionalSummary: '',
+          bulletedAchievements: [],
+          strengths: [],
+          weaknesses: [],
+          competencies: [],
+          gaps: [],
+          experienceYears: '0',
+          atsScore: 0,
+          keywords: { present: [], missing: [] },
+          roleType: role,
+          experienceTier: tier,
+          track,
+          discoveryQuestions: [],
+          preFiltered: true,
+          id: candidateId,
+          resumeContent: resume.text.slice(0, 500),
+        });
+        return;
+      }
+
       try {
         const startScore = Date.now();
-        const data = await scoreCandidate(resume, jd, track, role, tier, preferences, targetMarket, discoveryAnswers);
+        const resumeArg = resume.inlineData?.data
+          ? { data: resume.inlineData.data, mimeType: resume.inlineData.mimeType }
+          : resume.text;
+        const data = await scoreCandidate(
+          resumeArg,
+          jdText,
+          track,
+          role,
+          tier,
+          preferences,
+          targetMarket,
+          discoveryAnswers
+        );
         await logPipelineEvent(sessionId, candidateId, 'CoreScorer', Date.now() - startScore, 'success');
-        
+
         let questions: { question: string }[] = [];
-        // Optimize trigger: Only generate interview questions if they are a viable candidate
         if (includeQuestions && data.gaps && data.gaps.length > 0 && data.meetsMandatoryCriteria !== false && data.score >= 5.0) {
           const startQ = Date.now();
           questions = await generateQuestions(data.gaps, role, tier);
@@ -48,7 +97,7 @@ export async function analyzeResumes(
           strengths: (data.strengths || []).map((s: string) => ({ text: s })),
           weaknesses: (data.weaknesses || []).map((w: string) => ({ text: w })),
           id: candidateId,
-          resumeContent: typeof resume === 'string' ? resume : "[File Content]"
+          resumeContent: resume.text,
         });
       } catch (err: any) {
         await logPipelineEvent(sessionId, candidateId, 'CoreScorer', 0, 'failed', err.message);
@@ -60,7 +109,11 @@ export async function analyzeResumes(
   await Promise.all(analysisPromises);
   const candidates = processedCandidates;
 
-  let rankedCandidates = candidates.sort((a, b) => (b.score || 0) - (a.score || 0));
+  let rankedCandidates = candidates.sort((a, b) => {
+    if (a.preFiltered && !b.preFiltered) return 1;
+    if (!a.preFiltered && b.preFiltered) return -1;
+    return (b.score || 0) - (a.score || 0);
+  });
 
   if (preferences && preferences.topN > 0) {
     rankedCandidates = rankedCandidates.slice(0, preferences.topN);
@@ -85,40 +138,85 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
 
     const jobProfile = session.jobProfile || {};
     const uploadedFiles = session.uploadedFiles || [];
-    
-    const resumes = [];
+    const preferences: HiringPreferences | null = jobProfile.preferences || null;
+
+    const resumeInputs: ResumeInput[] = [];
+    let preFilteredCount = 0;
+    let extractedCount = 0;
+
     for (const file of uploadedFiles) {
       try {
+        const cached = await getResumeText(file.path);
+        if (cached?.extracted_text) {
+          extractedCount++;
+          const preFilter = preferences ? preFilterResume(cached.extracted_text, preferences) : undefined;
+          if (preFilter && preFilter.failedCount > (preferences?.maxFailedCriteria ?? 0)) {
+            preFilteredCount++;
+          }
+          resumeInputs.push({
+            text: cached.extracted_text,
+            filePath: file.path,
+            preFilter,
+          });
+          continue;
+        }
+
         const { data, error } = await supabase.storage.from('resumes').download(file.path);
         if (error) throw error;
-        
+
         const arrayBuffer = await data.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const base64Data = buffer.toString('base64');
-        
-        resumes.push({ data: base64Data, mimeType: file.mimeType || 'application/pdf' });
+        const mimeType = file.mimeType || 'application/pdf';
+
+        let text: string | null = null;
+        try {
+          const result = await extractResumeText(buffer, mimeType);
+          if (!result.isScanned && result.text.length > 50) {
+            text = result.text;
+            setResumeText(file.path, result.text, result.tokenCount);
+            extractedCount++;
+          }
+        } catch (extractErr) {
+          console.warn(`On-the-fly extraction failed for ${file.path}: ${(extractErr as Error).message}`);
+        }
+
+        if (text) {
+          const preFilter = preferences ? preFilterResume(text, preferences) : undefined;
+          if (preFilter && preFilter.failedCount > (preferences?.maxFailedCriteria ?? 0)) {
+            preFilteredCount++;
+          }
+          resumeInputs.push({ text, filePath: file.path, preFilter });
+        } else {
+          const base64Data = buffer.toString('base64');
+          resumeInputs.push({
+            text: base64Data,
+            inlineData: { data: base64Data, mimeType },
+            filePath: file.path,
+          });
+        }
       } catch (e) {
-        console.error(`Error downloading file ${file.path} from Supabase:`, e);
+        console.error(`Error loading resume ${file.path} from Supabase:`, e);
       }
     }
 
-    if (resumes.length === 0) {
+    if (resumeInputs.length === 0) {
       throw new Error("No readable resumes found for analysis.");
     }
+
+    console.log(`[Pipeline] ${resumeInputs.length} resumes: ${extractedCount} cached text, ${preFilteredCount} pre-filtered out`);
 
     const role = jobProfile.role || "Developer";
     const tier = jobProfile.experienceTier || "Senior";
     const jd = jobProfile.jd || "General Job Description";
-    const preferences = jobProfile.preferences || null;
     const targetMarket = jobProfile.targetMarket || "India";
 
     const results = await analyzeResumes(
       sessionId,
-      resumes,
+      resumeInputs,
       jd,
       role,
       tier,
-      ['score', 'competencies', 'questions'],
+      ['score', 'competencies'],
       undefined,
       preferences,
       targetMarket

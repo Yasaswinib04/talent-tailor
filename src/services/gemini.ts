@@ -82,7 +82,7 @@ function normalizeScore(score: any): number {
 export async function classifyTrack(jd: string | { data: string, mimeType: string }): Promise<{ track: 'IC' | 'Manager' }> {
   const jdPart = typeof jd === 'string' ? { text: jd } : { inlineData: jd };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: "Analyze this Job Description and classify the track as either 'IC' (Individual Contributor) or 'Manager'." },
@@ -92,7 +92,6 @@ export async function classifyTrack(jd: string | { data: string, mimeType: strin
     },
     config: {
       temperature: 0,
-      thinkingConfig: { thinkingLevel: "HIGH" as any },
       systemInstruction: "You are an Expert HR Lead. Read the JD and return ONLY a JSON object classifying the track.",
       responseMimeType: "application/json",
       responseSchema: {
@@ -208,15 +207,12 @@ When calculating the 'score', apply these dynamic weights strictly. Identify evi
   const scorerRules = SYSTEM_PROMPT + "\n\nINFERRED SKILLS ALLOWED: If a candidate describes performing an action that clearly demonstrates a competency (e.g., ‘reduced latency by 40%’), you may infer the skill ‘Performance Optimization’ even if the exact phrase is not used. You must still cite the original action as evidence.";
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: promptParts
     },
     config: {
       temperature: 0,
-      thinkingConfig: {
-        thinkingLevel: "HIGH" as any
-      },
       systemInstruction: scorerRules + "\n\n" + weightInfo,
       responseMimeType: "application/json",
       responseSchema: {
@@ -241,7 +237,7 @@ When calculating the 'score', apply these dynamic weights strictly. Identify evi
 
 export async function generateQuestions(gaps: string[], role: RoleType, tier: ExperienceTier): Promise<{ question: string }[]> {
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: `Generate 6-8 discovery questions based on these identified gaps and weaknesses: ${gaps.join(', ')}` },
@@ -274,7 +270,7 @@ export async function analyzeResumes(
   jd: string | { data: string, mimeType: string },
   role: RoleType,
   tier: ExperienceTier = 'Senior',
-  features: string[] = ['score', 'competencies', 'tailor', 'questions'],
+  features: string[] = ['score', 'competencies', 'tailor'],
   discoveryAnswers?: { question: string, answer: string }[],
   preferences?: HiringPreferences,
   targetMarket: string = 'India'
@@ -330,7 +326,7 @@ export async function tailorResume(resume: string, jd: string, analysis: Candida
     .join("\n\n");
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [{
         text: `You are an elite career strategist. Analyze the Resume vs JD and provide specific, high-impact improvements using the STAR method.
@@ -396,7 +392,7 @@ export async function tailorResume(resume: string, jd: string, analysis: Candida
 export async function extractProfile(resume: string | { data: string, mimeType: string }): Promise<CandidateProfile> {
   const resumePart = typeof resume === 'string' ? { text: resume } : { inlineData: resume };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: "Extract detailed profile information from this resume." },

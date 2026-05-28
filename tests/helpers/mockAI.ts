@@ -42,7 +42,8 @@ export class GoogleGenAI {
         }
 
         if (textParts.includes("classify the track as either 'IC'")) {
-          if (textParts.includes("manage headcount") || textParts.includes("Manager")) {
+          const jdText = promptParts[2]?.text || '';
+          if (jdText.includes("manage headcount") || jdText.includes("Manager") || jdText.includes("people manager")) {
             return loadMockResponse("classify_manager.json");
           }
           return loadMockResponse("classify_ic.json");

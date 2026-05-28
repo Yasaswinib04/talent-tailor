@@ -102,15 +102,12 @@ When calculating the 'score', apply these dynamic weights strictly. Identify evi
   const scorerRules = SYSTEM_PROMPT + "\n\nINFERRED SKILLS ALLOWED: If a candidate describes performing an action that clearly demonstrates a competency (e.g., ‘reduced latency by 40%’), you may infer the skill ‘Performance Optimization’ even if the exact phrase is not used. You must still cite the original action as evidence.";
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: promptParts
     },
     config: {
       temperature: 0,
-      thinkingConfig: {
-        thinkingLevel: "HIGH" as any
-      },
       systemInstruction: scorerRules + "\n\n" + weightInfo,
       responseMimeType: "application/json",
       responseSchema: {

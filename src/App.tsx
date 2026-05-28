@@ -53,7 +53,7 @@ import {
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Persona, RoleType, ExperienceTier, AnalysisResult, CandidateAnalysis, Competency, InputMode, CandidateProfile, ProposedChange, HiringPreferences, WorkExperience, JobProfile } from './types';
-import { analyzeResumes, tailorResume, extractProfile } from './services/gemini';
+import { analyzeResumes, tailorResume, extractProfile, generateQuestions } from './services/gemini';
 import { MOCK_ANALYSIS } from './constants';
 import { auth, signInWithGoogle, db, handleFirestoreError } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
@@ -218,6 +218,8 @@ export interface DashboardShellProps {
   isTailoring: boolean;
   tailoredResume: { fullText: string, changes: ProposedChange[] } | null;
   setTailoredResume: (val: { fullText: string, changes: ProposedChange[] } | null) => void;
+  handleGenerateCandidateQuestions: (c: CandidateAnalysis) => void;
+  isGeneratingQuestions: boolean;
 }
 
 const DashboardShell: React.FC<DashboardShellProps> = (props) => {
@@ -231,7 +233,8 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
     analysisState, selectedCandidate, setSelectedCandidate, isDeepDiveOpen, setIsDeepDiveOpen,
     activeStep, setActiveStep, handleToggleSkill, handleToggleFeature, handleFeatureFeedback,
     jobProfiles, setJobProfiles, profile, setProfile, handleExtractProfile, isExtracting,
-    handleTailor, isTailoring, tailoredResume, setTailoredResume
+    handleTailor, isTailoring, tailoredResume, setTailoredResume,
+    handleGenerateCandidateQuestions, isGeneratingQuestions
   } = props;
 
   const activeCandidate = analysis?.candidates[0];
@@ -541,6 +544,8 @@ const DashboardShell: React.FC<DashboardShellProps> = (props) => {
               const newChanges = selectedCandidate!.proposedChanges?.map(c => c.id === id ? { ...c, accepted: true } : c);
               setSelectedCandidate({ ...selectedCandidate!, proposedChanges: newChanges });
             }}
+            onGenerateQuestions={() => handleGenerateCandidateQuestions(selectedCandidate)}
+            isGeneratingQuestions={isGeneratingQuestions}
           />
         )}
       </AnimatePresence>
@@ -623,6 +628,7 @@ export function LegacyCandidateApp() {
   const [activeStep, setActiveStep] = useState(1);
   const [isTailoring, setIsTailoring] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [candidateAnalysis, setCandidateAnalysis] = useState<AnalysisResult | null>(() => {
     const saved = sessionStorage.getItem('candidateAnalysis');
@@ -929,6 +935,36 @@ export function LegacyCandidateApp() {
     }
   };
 
+  const handleGenerateCandidateQuestions = async (candidate: CandidateAnalysis) => {
+    setIsGeneratingQuestions(true);
+    try {
+      const roleToUse = persona === 'hr' ? activeProfile.role : role;
+      const tierToUse = selectedTier;
+      const gaps = candidate.gaps || [];
+      const questions = await generateQuestions(gaps, roleToUse, tierToUse);
+      
+      const updatedCand = {
+        ...candidate,
+        discoveryQuestions: questions
+      };
+      
+      setSelectedCandidate(updatedCand);
+
+      if (analysis) {
+        const updatedCandidates = analysis.candidates.map(c => c.id === candidate.id ? updatedCand : c);
+        setAnalysis({ ...analysis, candidates: updatedCandidates });
+        if (user && analysis.id) {
+          await updateAnalysisInDb(analysis.id, { candidates: updatedCandidates });
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate screening call contents.");
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
   const syncAnalysis = async (updated: AnalysisResult) => {
     setAnalysis(updated);
     if (user && updated.id) {
@@ -1105,10 +1141,16 @@ export function LegacyCandidateApp() {
     try {
       await signInWithGoogle();
       handleSkipSignIn(); // Also mark as skipped so overlay doesn't reappear
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign in failed", error);
-      alert("Google Sign-In failed (unauthorized domain, popup blocked, or disabled provider in Firebase). Automatically logging into Sandbox/Demo Workspace instead.");
-      handleSandboxSignIn();
+      const msg = error?.message || error?.code || '';
+      if (msg.includes('popup-closed-by-user')) {
+        alert('Sign-in popup was closed. Please try again or use Sandbox / Continue as Guest.');
+      } else if (msg.includes('unauthorized-domain') || msg.includes('operation-not-allowed')) {
+        alert('Google Sign-In is not configured for this domain yet. Please use Sandbox or Continue as Guest.');
+      } else {
+        alert(`Sign-in failed. Please use Sandbox or Continue as Guest. (${msg.substring(0, 80)})`);
+      }
     }
   };
 
@@ -1130,7 +1172,8 @@ export function LegacyCandidateApp() {
     analysisState, selectedCandidate, setSelectedCandidate, isDeepDiveOpen, setIsDeepDiveOpen,
     activeStep, setActiveStep, handleToggleSkill, handleToggleFeature, handleFeatureFeedback,
     jobProfiles, setJobProfiles, profile, setProfile, handleExtractProfile, isExtracting,
-    handleTailor, isTailoring, tailoredResume, setTailoredResume
+    handleTailor, isTailoring, tailoredResume, setTailoredResume,
+    handleGenerateCandidateQuestions, isGeneratingQuestions
   };
 
   return (
@@ -1155,10 +1198,10 @@ export function LegacyCandidateApp() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/hr/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/hr" replace />} />
       <Route path="/hr/*" element={<HRLayout />} />
       <Route path="/legacy/*" element={<LegacyCandidateApp />} />
-      <Route path="*" element={<Navigate to="/hr/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/hr" replace />} />
     </Routes>
   );
 }

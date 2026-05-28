@@ -4,17 +4,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Ensure critical environment variables exist
-if (!process.env.DATABASE_URL || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn("WARNING: Missing Supabase environment variables. Database operations will fail in production.");
-}
+let sql: ReturnType<typeof postgres> | null = null;
 
-// 1. Initialize PostgreSQL Connection Pool
-const sql = postgres(process.env.DATABASE_URL || '', {
-  max: 10,
-  idle_timeout: 20,
-  connect_timeout: 10,
-});
+function getSql() {
+  if (!sql) {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      throw new Error("DATABASE_URL environment variable is missing.");
+    }
+    sql = postgres(dbUrl, {
+      max: 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    });
+  }
+  return sql;
+}
 
 // 2. Initialize Supabase Client for Storage access
 export const supabase = createClient(
@@ -22,12 +27,17 @@ export const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
 );
 
+export let isDbConnected = false;
+
 /**
  * Ensures the target PostgreSQL table schema exists.
  */
 export async function initDb() {
   try {
-    await sql`
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL environment variable is missing.");
+    }
+    await getSql()`
       CREATE TABLE IF NOT EXISTS screening_sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         hr_user_id TEXT NOT NULL,
@@ -39,7 +49,7 @@ export async function initDb() {
         updated_at TIMESTAMPTZ DEFAULT now()
       )
     `;
-    await sql`
+    await getSql()`
       CREATE TABLE IF NOT EXISTS pipeline_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         session_id UUID REFERENCES screening_sessions(id) ON DELETE CASCADE,
@@ -51,7 +61,7 @@ export async function initDb() {
         created_at TIMESTAMPTZ DEFAULT now()
       )
     `;
-    await sql`
+    await getSql()`
       CREATE TABLE IF NOT EXISTS uat_bugs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         reporter_email TEXT NOT NULL,
@@ -66,8 +76,23 @@ export async function initDb() {
         created_at TIMESTAMPTZ DEFAULT now()
       )
     `;
+    await getSql()`
+      CREATE TABLE IF NOT EXISTS resume_text (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        file_path TEXT UNIQUE NOT NULL,
+        extracted_text TEXT NOT NULL,
+        token_count INTEGER,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
+    await getSql()`
+      CREATE INDEX IF NOT EXISTS idx_resume_text_file_path ON resume_text(file_path)
+    `;
+    isDbConnected = true;
     console.log("PostgreSQL schema validated successfully.");
   } catch (error) {
+    isDbConnected = false;
     console.error("Failed to initialize PostgreSQL schema:", error);
   }
 }
@@ -76,7 +101,7 @@ export async function initDb() {
  * Creates a new screening session securely bound to the HR User ID.
  */
 export async function createSession(hrUserId: string): Promise<string> {
-  const [row] = await sql`
+  const [row] = await getSql()`
     INSERT INTO screening_sessions (hr_user_id, status)
     VALUES (${hrUserId}, 'draft')
     RETURNING id
@@ -88,7 +113,7 @@ export async function createSession(hrUserId: string): Promise<string> {
  * Retrieves a session, strictly checking hrUserId ownership.
  */
 export async function getSessionById(sessionId: string, hrUserId: string) {
-  const [row] = await sql`
+  const [row] = await getSql()`
     SELECT * FROM screening_sessions
     WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
   `;
@@ -109,14 +134,14 @@ export async function getSessionById(sessionId: string, hrUserId: string) {
  * Updates a screening session, mapped from camelCase to snake_case.
  */
 export async function updateSession(sessionId: string, hrUserId: string, updates: any) {
-  const toUpdate: any = { updated_at: sql`now()` };
+  const toUpdate: any = { updated_at: getSql()`now()` };
   
-  if (updates.jobProfile !== undefined) toUpdate.job_profile = sql.json(updates.jobProfile);
+  if (updates.jobProfile !== undefined) toUpdate.job_profile = getSql().json(updates.jobProfile);
   if (updates.status !== undefined) toUpdate.status = updates.status;
-  if (updates.uploadedFiles !== undefined) toUpdate.uploaded_files = sql.json(updates.uploadedFiles);
-  if (updates.analysisResults !== undefined) toUpdate.analysis_results = sql.json(updates.analysisResults);
+  if (updates.uploadedFiles !== undefined) toUpdate.uploaded_files = getSql().json(updates.uploadedFiles);
+  if (updates.analysisResults !== undefined) toUpdate.analysis_results = getSql().json(updates.analysisResults);
 
-  await sql`
+  await getSql()`
     UPDATE screening_sessions
     SET ${sql(toUpdate)}
     WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
@@ -127,7 +152,7 @@ export async function updateSession(sessionId: string, hrUserId: string, updates
  * Lists all active sessions for an HR user.
  */
 export async function listSessionsByUser(hrUserId: string) {
-  const rows = await sql`
+  const rows = await getSql()`
     SELECT * FROM screening_sessions
     WHERE hr_user_id = ${hrUserId}
     ORDER BY created_at DESC
@@ -146,7 +171,7 @@ export async function listSessionsByUser(hrUserId: string) {
  * Deletes a session securely.
  */
 export async function deleteSession(sessionId: string, hrUserId: string) {
-  await sql`
+  await getSql()`
     DELETE FROM screening_sessions
     WHERE id = ${sessionId} AND hr_user_id = ${hrUserId}
   `;
@@ -164,7 +189,7 @@ export async function logPipelineEvent(
   errorText?: string
 ) {
   try {
-    await sql`
+    await getSql()`
       INSERT INTO pipeline_logs (session_id, candidate_id, agent_name, duration_ms, status, error)
       VALUES (${sessionId}, ${candidateId}, ${agentName}, ${durationMs}, ${status}, ${errorText || null})
     `;
@@ -186,7 +211,7 @@ export async function createBugReport(
   browserInfo: any,
   stateSnapshot: any
 ): Promise<string> {
-  const [row] = await sql`
+  const [row] = await getSql()`
     INSERT INTO uat_bugs (
       reporter_email,
       screen_path,
@@ -203,8 +228,8 @@ export async function createBugReport(
       ${severity},
       ${description},
       ${stepsToReproduce || null},
-      ${sql.json(browserInfo)},
-      ${sql.json(stateSnapshot)}
+      ${getSql().json(browserInfo)},
+      ${getSql().json(stateSnapshot)}
     )
     RETURNING id
   `;
@@ -215,10 +240,37 @@ export async function createBugReport(
  * Retrieves all reported UAT bug logs.
  */
 export async function listBugReports() {
-  return await sql`
+  return await getSql()`
     SELECT * FROM uat_bugs
     ORDER BY created_at DESC
   `;
 }
 
-export default sql;
+export async function getResumeText(filePath: string): Promise<{ extracted_text: string; token_count: number | null } | null> {
+  const [row] = await getSql()`
+    SELECT extracted_text, token_count FROM resume_text
+    WHERE file_path = ${filePath} AND status = 'active'
+  `;
+  return row ? { extracted_text: row.extracted_text, token_count: row.token_count } : null;
+}
+
+export async function setResumeText(filePath: string, text: string, tokenCount?: number): Promise<void> {
+  await getSql()`
+    INSERT INTO resume_text (file_path, extracted_text, token_count)
+    VALUES (${filePath}, ${text}, ${tokenCount ?? null})
+    ON CONFLICT (file_path) DO UPDATE SET
+      extracted_text = EXCLUDED.extracted_text,
+      token_count = EXCLUDED.token_count,
+      status = 'active'
+  `;
+}
+
+export async function markResumeTextFailed(filePath: string): Promise<void> {
+  await getSql()`
+    INSERT INTO resume_text (file_path, extracted_text, status)
+    VALUES (${filePath}, '', 'failed')
+    ON CONFLICT (file_path) DO UPDATE SET status = 'failed'
+  `;
+}
+
+export default getSql;

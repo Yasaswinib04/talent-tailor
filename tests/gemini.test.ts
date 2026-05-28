@@ -1,16 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 
-// Conditionally mock the Google GenAI client based on environment variable
-jest.mock('@google/genai', () => {
-  if (process.env.MOCK_AI === 'true') {
-    return require('./helpers/mockAI');
-  }
-  return jest.requireActual('@google/genai');
-});
-
 import { extractProfile, classifyTrack, scoreCandidate, analyzeResumes, tailorResume } from '../src/services/gemini';
 import { HiringPreferences } from '../src/types';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Helper to read fixture content
 function getFixture(filename: string) {

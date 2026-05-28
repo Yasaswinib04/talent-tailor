@@ -4,7 +4,7 @@ import { getAI, safeJsonParse } from "./config.js";
 export async function classifyTrack(jd: string | { data: string, mimeType: string }): Promise<{ track: 'IC' | 'Manager' }> {
   const jdPart = typeof jd === 'string' ? { text: jd } : { inlineData: jd };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: "Analyze this Job Description and classify the track as either 'IC' (Individual Contributor) or 'Manager'." },
@@ -14,7 +14,6 @@ export async function classifyTrack(jd: string | { data: string, mimeType: strin
     },
     config: {
       temperature: 0,
-      thinkingConfig: { thinkingLevel: "HIGH" as any },
       systemInstruction: "You are an Expert HR Lead. Read the JD and return ONLY a JSON object classifying the track.",
       responseMimeType: "application/json",
       responseSchema: {

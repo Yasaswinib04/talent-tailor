@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   HelpCircle,
   ChevronRight,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-react';
 import { CandidateAnalysis, ProposedChange } from '../types';
 import { cn } from '../lib/utils';
@@ -26,6 +27,8 @@ interface CandidateDeepDiveProps {
   onAcceptChange: (changeId: string) => void;
   onRejectChange: (changeId: string) => void;
   onConfirmSkill: (skill: string) => void;
+  onGenerateQuestions?: () => void;
+  isGeneratingQuestions?: boolean;
 }
 
 export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
@@ -35,7 +38,9 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
   isTailoring,
   onAcceptChange,
   onRejectChange,
-  onConfirmSkill
+  onConfirmSkill,
+  onGenerateQuestions,
+  isGeneratingQuestions = false
 }) => (
   <motion.div
     initial={{ opacity: 0 }}
@@ -237,27 +242,56 @@ export const CandidateDeepDive: React.FC<CandidateDeepDiveProps> = ({
             </TabsContent>
 
             <TabsContent value="questions" className="pt-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {candidate.discoveryQuestions.map((dq, i) => (
-                  <div key={i} className="p-8 bg-slate-50 rounded-md border border-slate-100 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 bg-white rounded-md flex items-center justify-center font-black text-primary border border-slate-100 shadow-sm text-xs">
-                        {i + 1}
+              {candidate.discoveryQuestions && candidate.discoveryQuestions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {candidate.discoveryQuestions.map((dq, i) => (
+                    <div key={i} className="p-8 bg-slate-50 rounded-md border border-slate-100 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 bg-white rounded-md flex items-center justify-center font-black text-primary border border-slate-100 shadow-sm text-xs">
+                          {i + 1}
+                        </div>
+                        <p className="text-[11px] font-black text-slate-900 leading-tight uppercase tracking-tight">{dq.question}</p>
                       </div>
-                      <p className="text-[11px] font-black text-slate-900 leading-tight uppercase tracking-tight">{dq.question}</p>
+                      {dq.answer ? (
+                        <p className="text-xs text-slate-600 leading-relaxed pl-11 italic">"{dq.answer}"</p>
+                      ) : (
+                        <div className="pl-11 pt-2">
+                          <button className="flex items-center gap-2 text-[9px] font-black text-primary uppercase tracking-widest hover:text-primary/80">
+                            <Plus className="h-3 w-3" /> Add Candidate Answer
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {dq.answer ? (
-                      <p className="text-xs text-slate-600 leading-relaxed pl-11 italic">"{dq.answer}"</p>
-                    ) : (
-                      <div className="pl-11 pt-2">
-                        <button className="flex items-center gap-2 text-[9px] font-black text-primary uppercase tracking-widest hover:text-primary/80">
-                          <Plus className="h-3 w-3" /> Add Candidate Answer
-                        </button>
-                      </div>
-                    )}
+                  ))}
+                </div>
+              ) : (
+                <div className="py-20 text-center space-y-6">
+                  <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                    <Sparkles className="h-8 w-8 text-primary animate-pulse" />
                   </div>
-                ))}
-              </div>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">No Discovery Content</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">Click below to generate specialized screening call discovery questions targeting the candidate's gaps.</p>
+                    <button
+                      onClick={onGenerateQuestions}
+                      disabled={isGeneratingQuestions}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isGeneratingQuestions ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Generating Call Contents...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Generate screening call contents
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

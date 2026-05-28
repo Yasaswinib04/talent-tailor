@@ -5,7 +5,7 @@ import { getAI, safeJsonParse, GLOBAL_GROUNDING_RULES } from "./config.js";
 export async function extractProfile(resume: string | { data: string, mimeType: string }): Promise<CandidateProfile> {
   const resumePart = typeof resume === 'string' ? { text: resume } : { inlineData: resume };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: "Extract detailed profile information from this resume." },

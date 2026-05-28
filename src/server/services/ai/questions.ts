@@ -4,7 +4,7 @@ import { getAI, safeJsonParse } from "./config.js";
 
 export async function generateQuestions(gaps: string[], role: RoleType, tier: ExperienceTier): Promise<{ question: string }[]> {
   const response = await getAI().models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         { text: `Generate 6-8 discovery questions based on these identified gaps and weaknesses: ${gaps.join(', ')}` },
