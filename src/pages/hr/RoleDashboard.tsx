@@ -302,75 +302,152 @@ export function HRRoleDashboard() {
             </Link>
           </div>
 
-          {/* High Density Ranking Table */}
-          <div className="bg-surface-container border border-outline-variant rounded-md flex flex-col flex-1 min-h-[300px]">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-outline-variant bg-surface-container-highest/50 text-xs font-medium text-on-surface-variant uppercase tracking-wider sticky top-0 z-10 rounded-t-lg shrink-0">
-              <div className="col-span-3 flex items-center gap-2">
-                <input className="rounded border-outline-variant bg-surface-container text-primary focus:ring-primary focus:ring-offset-0 focus:ring-offset-transparent" type="checkbox"/>
-                Rank / Candidate
-              </div>
-              <div className="col-span-2 text-center">Match Score</div>
-              <div className="col-span-4">Feedback Summary</div>
-              <div className="col-span-3">Mandatory Checks</div>
-            </div>
-
-            {/* Table Body (Scrollable) */}
-            <div className="flex-1 overflow-y-auto high-density-scrollbar">
-              {candidates.sort((a: any, b: any) => b.score - a.score).map((c: any, idx: number) => {
-                const scorePercent = Math.round((c.score || 0) * 10);
-                return (
-                  <div key={idx} className="grid grid-cols-12 gap-4 px-4 py-4 border-b border-outline-variant hover:bg-surface-container-highest transition-colors group">
-                    <div className="col-span-3 flex items-center gap-3">
-                      <input className="rounded border-outline-variant bg-surface-container text-primary focus:ring-primary focus:ring-offset-0 focus:ring-offset-transparent" type="checkbox"/>
-                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/20 text-primary font-bold text-xs border border-primary/30">{idx + 1}</div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-secondary-container flex items-center justify-center text-on-surface text-xs font-bold border border-outline-variant uppercase">
-                          {c.profile?.name ? c.profile.name.substring(0,2) : '?'}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-on-surface group-hover:text-primary transition-colors cursor-pointer">{c.profile?.name || 'Unknown'}</p>
-                          <p className="text-xs text-on-surface-variant truncate w-32" title={c.profile?.currentLocation}>{c.profile?.currentLocation || 'No location'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Circular Gauge Match Score */}
-                    <div className="col-span-2 flex justify-center items-center">
-                      <div className="relative w-12 h-12">
-                        <svg className="circular-chart w-full h-full" viewBox="0 0 36 36">
-                          <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
-                          <path className={`circle ${scorePercent >= 80 ? 'stroke-primary' : scorePercent >= 60 ? 'stroke-tertiary' : 'stroke-error'}`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" strokeDasharray={`${scorePercent}, 100`}></path>
-                          <text className="percentage" x="18" y="20.35">{scorePercent}</text>
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* Feedback Summary */}
-                    <div className="col-span-4 flex flex-col justify-center">
-                      <p className="text-xs text-on-surface-variant line-clamp-2" title={c.overallFeedback}>{c.overallFeedback}</p>
-                    </div>
-
-                    {/* Mandatory Checks & Skills */}
-                    <div className="col-span-3 flex flex-col justify-center items-start gap-2">
-                      {c.meetsMandatoryCriteria ? (
-                         <span className="px-2 py-0.5 text-[10px] font-medium rounded border border-primary/30 bg-primary/10 text-primary flex items-center gap-1">
-                           <span className="material-symbols-outlined text-[12px]">check_circle</span> Meets Criteria
-                         </span>
-                      ) : (
-                         <span className="px-2 py-0.5 text-[10px] font-medium rounded border border-error/30 bg-error/10 text-error flex items-center gap-1">
-                           <span className="material-symbols-outlined text-[12px]">cancel</span> Fails Criteria
-                         </span>
-                      )}
-                      <div className="flex flex-wrap gap-1">
-                        {(c.strengths || []).slice(0, 2).map((s: string, i: number) => (
-                          <span key={i} className="px-1.5 py-0.5 text-[9px] rounded border border-outline-variant bg-surface-container-low text-on-surface-variant truncate max-w-[80px]" title={s}>{s}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Detailed Ranking Table */}
+          <div className="bg-surface-container border border-outline-variant rounded-md flex flex-col flex-1 min-h-[300px] overflow-hidden">
+            <div className="overflow-auto high-density-scrollbar flex-1">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-surface-container-highest/80 backdrop-blur-sm border-b border-outline-variant">
+                    <th className="p-3 pl-4 w-10 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px]">#</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] min-w-[140px]">Candidate</th>
+                    <th className="p-3 text-center text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-16">Score</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-24">Mandatory</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] min-w-[200px]">Skills Matched</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] min-w-[160px]">Gaps / Missing</th>
+                    <th className="p-3 text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-28">Category Scores</th>
+                    <th className="p-3 pr-4 text-right text-on-surface-variant font-semibold uppercase tracking-wider text-[10px] w-28">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/40">
+                  {candidates.sort((a: any, b: any) => b.score - a.score).map((c: any, idx: number) => {
+                    const scorePercent = Math.round((c.score || 0) * 10);
+                    const competencies = c.competencies || [];
+                    const matchedSkills = competencies.filter((comp: any) => comp.score >= 6);
+                    const weakSkills = competencies.filter((comp: any) => comp.score < 6);
+                    const keywords = c.keywords || { present: [], missing: [] };
+                    return (
+                      <tr key={c.id || idx} className="hover:bg-surface-container-highest/40 transition-colors group">
+                        <td className="p-3 pl-4">
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[11px] border border-primary/20">{idx + 1}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-[10px] border border-outline-variant uppercase shrink-0">
+                              {(c.name || '?').substring(0, 2)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-on-surface truncate">{c.name || 'Unknown'}</p>
+                              <p className="text-[10px] text-on-surface-variant">{c.experienceYears ? `${c.experienceYears}yrs` : ''} {c.overqualified ? '· Overqualified' : ''}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="relative w-10 h-10 mx-auto">
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                              <circle cx="18" cy="18" r="15" fill="none" stroke="#27272a" strokeWidth="3" />
+                              <circle cx="18" cy="18" r="15" fill="none" stroke={scorePercent >= 80 ? '#a78bfa' : scorePercent >= 60 ? '#f59e0b' : '#ef4444'} strokeWidth="3" strokeDasharray={`${scorePercent} 100`} strokeLinecap="round" />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-on-surface">{scorePercent}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          {c.meetsMandatoryCriteria === false ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1 w-fit">
+                              <span className="material-symbols-outlined text-[12px]">close</span> Fails
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                              <span className="material-symbols-outlined text-[12px]">check</span> Pass
+                            </span>
+                          )}
+                          {c.failedCriteria && c.failedCriteria.length > 0 && (
+                            <div className="mt-1 text-[9px] text-red-400/70 max-w-[120px] truncate" title={c.failedCriteria.join(', ')}>
+                              {c.failedCriteria.slice(0, 2).join(', ')}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-wrap gap-1">
+                            {matchedSkills.slice(0, 4).map((comp: any) => (
+                              <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-primary/10 text-primary border border-primary/20" title={`Score: ${comp.score?.toFixed(1)}`}>
+                                {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
+                              </span>
+                            ))}
+                            {matchedSkills.length > 4 && <span className="text-[9px] text-on-surface-variant">+{matchedSkills.length - 4}</span>}
+                            {keywords.present && keywords.present.length > 0 && (
+                              <div className="flex flex-wrap gap-0.5 mt-1 w-full">
+                                {keywords.present.slice(0, 3).map((kw: string) => (
+                                  <span key={kw} className="px-1 py-0 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{kw}</span>
+                                ))}
+                                {keywords.present.length > 3 && <span className="text-[8px] text-on-surface-variant">+{keywords.present.length - 3}</span>}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-wrap gap-1">
+                            {weakSkills.slice(0, 3).map((comp: any) => (
+                              <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20" title={`Score: ${comp.score?.toFixed(1)}`}>
+                                {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
+                              </span>
+                            ))}
+                            {weakSkills.length === 0 && keywords.missing && keywords.missing.length > 0 && (
+                              keywords.missing.slice(0, 3).map((kw: string) => (
+                                <span key={kw} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">{kw}</span>
+                              ))
+                            )}
+                            {((weakSkills.length === 0) && (!keywords.missing || keywords.missing.length === 0)) && (
+                              <span className="text-[9px] text-on-surface-variant italic">None</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            {['Technical', 'Experience', 'Domain', 'Education', 'Soft Skills'].map(cat => {
+                              const comp = competencies.find((comp: any) => comp.name?.toLowerCase().includes(cat.toLowerCase()));
+                              const catScore = comp?.score || c.atsScore ? Math.round((comp?.score || c.atsScore || 0) * 10) : null;
+                              return catScore !== null ? (
+                                <div key={cat} className="flex items-center gap-1.5">
+                                  <span className="text-[9px] text-on-surface-variant w-16 truncate">{cat}</span>
+                                  <div className="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${catScore >= 80 ? 'bg-primary' : catScore >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${catScore}%` }}></div>
+                                  </div>
+                                  <span className="text-[9px] font-mono font-bold text-on-surface w-7 text-right">{catScore}</span>
+                                </div>
+                              ) : null;
+                            })}
+                          </div>
+                        </td>
+                        <td className="p-3 pr-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => alert(`Accepted: ${c.name}`)}
+                              className="p-1.5 rounded hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                              title="Accept candidate"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">thumb_up</span>
+                            </button>
+                            <button
+                              onClick={() => alert(`Rejected: ${c.name}`)}
+                              className="p-1.5 rounded hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                              title="Reject candidate"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">thumb_down</span>
+                            </button>
+                            <button
+                              onClick={() => alert(`Viewing profile: ${c.name}`)}
+                              className="p-1.5 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+                              title="View details"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">visibility</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </>

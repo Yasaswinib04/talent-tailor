@@ -200,49 +200,15 @@ export const startAnalysis = async (sessionId: string) => {
         const currentSessions = getLocalSessions();
         const sIdx = currentSessions.findIndex(s => s.id === sessionId);
         if (sIdx !== -1) {
-          const mockResults = [
-            {
-              id: "demo-c1",
-              name: "Marcus Chen",
-              location: "San Francisco, CA",
-              score: 8.8,
-              meetsMandatoryCriteria: true,
-              strengths: ["React & TypeScript", "LCP Optimization", "Vite & State Management"],
-              weaknesses: ["Limited backend database experience"],
-              overallFeedback: "Marcus is an outstanding frontend developer who demonstrated excellent problem solving. He is highly proficient with React, state management, and modern Web APIs.",
-              discoveryQuestions: [
-                {
-                  question: "Explain how you optimized Largest Contentful Paint (LCP) in React.",
-                  answer: "I lazy-loaded non-critical components, optimized hero images, and minimized render-blocking assets."
-                }
-              ]
-            },
-            {
-              id: "demo-c2",
-              name: "Sophia Rodriguez",
-              location: "Austin, TX",
-              score: 8.2,
-              meetsMandatoryCriteria: true,
-              strengths: ["UI Architecture", "A11y/Accessibility standards", "TailwindCSS"],
-              weaknesses: ["Limited Node.js server knowledge"],
-              overallFeedback: "Sophia has a strong eye for visual design aesthetics, detail, and layout consistency. She builds clean component structures and maintains high accessibility standards.",
-              discoveryQuestions: [
-                {
-                  question: "How do you handle responsive design and container queries?",
-                  answer: "I use CSS container queries and flexbox layouts to ensure visual elements scale gracefully across viewport sizes."
-                }
-              ]
-            }
-          ];
-          currentSessions[sIdx].status = 'completed';
-          currentSessions[sIdx].analysisResults = mockResults;
-          currentSessions[sIdx].analysis_results = mockResults;
+          currentSessions[sIdx].status = 'error';
+          currentSessions[sIdx].analysisResults = { error: 'Server unreachable. Analysis could not be started. Please check your connection and try again.' };
+          currentSessions[sIdx].analysis_results = currentSessions[sIdx].analysisResults;
           currentSessions[sIdx].updatedAt = new Date().toISOString();
           currentSessions[sIdx].updated_at = new Date().toISOString();
           saveLocalSessions(currentSessions);
-          console.log(`[LocalStorage Fallback] Simulated analysis complete for session: ${sessionId}`);
+          console.warn(`[LocalStorage Fallback] Analysis failed for session: ${sessionId} — server unreachable`);
         }
-      }, 3000);
+      }, 2000);
 
       return { status: 'analyzing', session: sessions[idx] };
     }
