@@ -2,28 +2,47 @@ import React, { useState, useEffect } from 'react';
 
 interface Props {
   onAddTalent: () => void;
+  candidates?: Candidate[];
 }
 
-export function TalentPoolList({ onAddTalent }: Props) {
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+interface Candidate {
+  id: string;
+  name: string;
+  role: string;
+  skills: { name: string; color: string }[];
+  source: string;
+  date: string;
+  status: string;
+  statusColor: string;
+}
 
-  // Close menus on clicking anywhere outside
+const DEMO_CANDIDATES: Candidate[] = [
+  { id: 'demo-1', name: 'Alex Johnson', role: 'Senior Software Engineer', skills: [{name: 'Java', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'React', color: 'bg-secondary/20 text-secondary border-secondary/30'}, {name: 'Node.js', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'LinkedIn', date: 'Oct 26, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
+  { id: 'demo-2', name: 'Maria Garcia', role: 'UX Designer', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'Adobe XD', color: 'bg-error/10 text-error border-error/20'}], source: 'Referral', date: 'Oct 25, 2023', status: 'Reviewing', statusColor: 'bg-error/10 text-error border-error/20' },
+  { id: 'demo-3', name: 'David Chen', role: 'Data Scientist', skills: [{name: 'Python', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}, {name: 'R', color: 'bg-secondary/20 text-secondary border-secondary/30'}, {name: 'SQL', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Machine Learning', color: 'bg-primary/20 text-primary border-primary/30'}], source: 'Website', date: 'Oct 24, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
+  { id: 'demo-4', name: 'Johan Garey', role: 'Senior Software', skills: [{name: 'Java', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'UX Design', color: 'bg-error/10 text-error border-error/20'}, {name: 'Data Analysis', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'LinkedIn', date: 'Oct 26, 2023', status: 'New', statusColor: 'bg-primary/10 text-primary border-primary/20' },
+  { id: 'demo-5', name: 'Bena Caneiit', role: 'Data Scientist', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'R', color: 'bg-secondary/20 text-secondary border-secondary/30'}], source: 'Website', date: 'Oct 24, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
+];
+
+function useIsSandbox(): boolean {
+  return localStorage.getItem('uat_bypass_user') === 'true' || localStorage.getItem('developer_mode') === 'true';
+}
+
+export function TalentPoolList({ onAddTalent, candidates: externalCandidates }: Props) {
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const isSandbox = useIsSandbox();
+
   useEffect(() => {
     const closeMenu = () => setActiveMenuId(null);
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  // Mock Data mimicking the screenshot
-  const [candidates] = useState([
-    { id: 1, name: 'Alex Johnson', role: 'Senior Software Engineer', skills: [{name: 'Java', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'React', color: 'bg-secondary/20 text-secondary border-secondary/30'}, {name: 'Node.js', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'LinkedIn', date: 'Oct 26, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
-    { id: 2, name: 'Maria Garcia', role: 'UX Designer', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'Adobe XD', color: 'bg-error/10 text-error border-error/20'}], source: 'Referral', date: 'Oct 25, 2023', status: 'Reviewing', statusColor: 'bg-error/10 text-error border-error/20' },
-    { id: 3, name: 'David Chen', role: 'Data Scientist', skills: [{name: 'Python', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}, {name: 'R', color: 'bg-secondary/20 text-secondary border-secondary/30'}, {name: 'SQL', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Machine Learning', color: 'bg-primary/20 text-primary border-primary/30'}], source: 'Website', date: 'Oct 24, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
-    { id: 4, name: 'Johan Garey', role: 'Senior Software', skills: [{name: 'Java', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'UX Design', color: 'bg-error/10 text-error border-error/20'}, {name: 'Data Analysis', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'LinkedIn', date: 'Oct 26, 2023', status: 'New', statusColor: 'bg-primary/10 text-primary border-primary/20' },
-    { id: 5, name: 'David Chen', role: 'Senior Scientist', skills: [{name: 'Python', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}, {name: 'UX Cnet', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Node.js', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'Website', date: 'Oct 25, 2023', status: 'Reviewing', statusColor: 'bg-error/10 text-error border-error/20' },
-    { id: 6, name: 'Bena Caneiit', role: 'Data Scientist', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'R', color: 'bg-secondary/20 text-secondary border-secondary/30'}], source: 'Website', date: 'Oct 24, 2023', status: 'Interviewed', statusColor: 'bg-tertiary/10 text-tertiary border-tertiary/20' },
-    { id: 7, name: 'Maria Garcia', role: 'UX Designer', skills: [{name: 'Figma', color: 'bg-primary/20 text-primary border-primary/30'}, {name: 'Sketch', color: 'bg-secondary-container text-on-surface-variant border-outline-variant'}, {name: 'Node.js', color: 'bg-tertiary/20 text-tertiary border-tertiary/30'}], source: 'Website', date: 'Oct 25, 2023', status: 'Reviewing', statusColor: 'bg-error/10 text-error border-error/20' },
-  ]);
+  const candidates: Candidate[] = externalCandidates && externalCandidates.length > 0
+    ? externalCandidates
+    : isSandbox
+      ? DEMO_CANDIDATES
+      : [];
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -225,15 +244,14 @@ export function TalentPoolList({ onAddTalent }: Props) {
 
             {/* Pagination Footer */}
             <div className="mt-auto p-4 border-t border-outline-variant bg-surface-container-low flex justify-between items-center text-sm text-on-surface-variant">
-              <div>Showing 1-20 of 245 candidates</div>
+              <div>Showing {candidates.length} candidate{candidates.length !== 1 ? 's' : ''}</div>
               <div className="flex items-center gap-1">
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button>
-                <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary font-medium">1</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors">2</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors">3</button>
-                <span className="w-8 h-8 flex items-center justify-center">...</span>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors">10</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors"><span className="material-symbols-outlined text-sm">chevron_right</span></button>
+                {candidates.length > 0 && (
+                  <>
+                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors"><span className="material-symbols-outlined text-sm">chevron_left</span></button>
+                    <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary font-medium">1</button>
+                  </>
+                )}
               </div>
             </div>
           </div>
