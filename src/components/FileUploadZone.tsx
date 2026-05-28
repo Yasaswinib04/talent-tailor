@@ -20,11 +20,20 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
+      const valid = acceptedFiles.filter(f => {
+        const name = f.name.toLowerCase();
+        const isImage = f.type?.startsWith('image/') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif') || name.endsWith('.webp');
+        if (isImage) {
+          console.warn(`FileUploadZone: rejected image file "${f.name}" — only PDF/DOCX accepted`);
+          return false;
+        }
+        return true;
+      });
+      if (valid.length === 0) return;
       if (multiple) {
-        onFilesSelect([...currentFiles, ...acceptedFiles]);
+        onFilesSelect([...currentFiles, ...valid]);
       } else {
-        onFilesSelect([acceptedFiles[0]]);
+        onFilesSelect([valid[0]]);
       }
     },
     multiple,

@@ -94,15 +94,21 @@ export function HRRoleDashboard() {
         let inputs: (string | { data: string; mimeType: string })[] = [];
 
         if (resumeFiles.length > 0) {
-          const pdfFiles = resumeFiles.filter(f => f.type !== 'image/png' && f.type !== 'image/jpeg' && f.type !== 'image/jpg');
+          const pdfFiles = resumeFiles.filter(f => {
+            const name = f.name.toLowerCase();
+            const isImageType = f.type?.startsWith('image/');
+            const isImageExt = name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif') || name.endsWith('.webp') || name.endsWith('.bmp');
+            return !isImageType && !isImageExt;
+          });
           if (pdfFiles.length === 0) {
             const skipped = resumeFiles.length - pdfFiles.length;
             setAnalyzing(false);
-            alert(`Cannot analyze image files. ${skipped} image file(s) were skipped. Please upload PDF or DOCX resumes only.`);
+            alert(`Cannot analyze image files (${resumeFiles.map(f => f.name).join(', ')}). Please upload PDF or DOCX resumes only.`);
             return;
           }
           if (pdfFiles.length < resumeFiles.length) {
-            console.warn(`Skipping ${resumeFiles.length - pdfFiles.length} image file(s) — not supported by AI model`);
+            const skipped = resumeFiles.filter(f => !pdfFiles.includes(f)).map(f => f.name);
+            console.warn(`Skipping ${skipped.length} image/unreadable file(s): ${skipped.join(', ')}`);
           }
           inputs = await Promise.all(pdfFiles.map(async (f) => {
             const base64 = await fileToBase64(f);
