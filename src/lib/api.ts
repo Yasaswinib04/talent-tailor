@@ -133,6 +133,24 @@ export const uploadFiles = async (sessionId: string, files: File[]) => {
   }
 };
 
+export const importFromGDrive = async (fileId: string, sessionId: string, mimeType?: string, fileName?: string) => {
+  try {
+    const res = await fetchWithTimeout('/api/hr/upload/gdrive/import', {
+      method: 'POST',
+      headers: {
+        ...(await getAuthHeaders()),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fileId, sessionId: sessionId || 'unassigned', mimeType: mimeType || 'application/pdf', fileName })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (error) {
+    console.warn("API importFromGDrive failed:", error);
+    throw error;
+  }
+};
+
 export const associateFilesWithSession = async (sessionId: string, uploadedFiles: any[]) => {
   try {
       const res = await fetchWithTimeout(`/api/hr/sessions/${sessionId}/resumes`, {

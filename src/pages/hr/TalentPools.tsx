@@ -59,24 +59,22 @@ function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
     }
 
     const uploadedFiles = session.uploadedFiles || session.uploaded_files || [];
-    for (const file of uploadedFiles) {
-      if (!file.fileName && !file.name) continue;
-      const fname = file.fileName || file.name || '';
-      const alreadyAnalyzed = candidates.some((c: any) =>
-        c.resumeContent && c.resumeContent.includes(fname)
-      );
-      if (alreadyAnalyzed) continue;
-      pool.push({
-        id: `pending-${file.path || fname}`,
-        name: fname.replace(/^[\w-]+-/, '').replace(/\.(pdf|docx?)$/i, ''),
-        role: jp.name || 'Pending Role',
-        skills: [],
-        source: 'Upload',
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: 'Pending Analysis',
-        statusColor: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-        sessionId: session.id,
-      });
+    if (candidates.length === 0 && uploadedFiles.length > 0) {
+      for (const file of uploadedFiles) {
+        if (!file.fileName && !file.name) continue;
+        const fname = file.fileName || file.name || '';
+        pool.push({
+          id: `pending-${file.path || fname}-${pool.length}`,
+          name: fname.replace(/^[\w-]+-/, '').replace(/\.(pdf|docx?)$/i, ''),
+          role: jp.name || 'Pending Role',
+          skills: [],
+          source: 'Upload',
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          status: 'Pending Analysis',
+          statusColor: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+          sessionId: session.id,
+        });
+      }
     }
   }
   return pool;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Cloud, Link2, FileText, CheckCircle2 } from 'lucide-react';
-import { getSessions, uploadFiles, associateFilesWithSession, createSession } from '../../lib/api.js';
+import { getSessions, uploadFiles, associateFilesWithSession, createSession, importFromGDrive } from '../../lib/api.js';
 
 interface Props {
   isOpen: boolean;
@@ -27,6 +27,8 @@ export function AddTalentModal({ isOpen, onClose, onAddSuccess }: Props) {
   const [creatingSession, setCreatingSession] = useState(false);
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
+  const [gdriveUrl, setGdriveUrl] = useState('');
+  const [gdriveImporting, setGdriveImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,6 +81,54 @@ export function AddTalentModal({ isOpen, onClose, onAddSuccess }: Props) {
 
   const handleRemoveFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const extractGDriveFileId = (url: string): string | null => {
+    const patterns = [
+      /\/d\/([a-zA-Z0-9_-]+)/,
+      /id=([a-zA-Z0-9_-]+)/,
+      /^[a-zA-Z0-9_-]{20,}$/,
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return m[1] || m[0];
+    }
+    return null;
+  };
+
+  const handleGDriveImport = async () => {
+    if (!gdriveUrl.trim()) {
+      setError('Please paste a Google Drive file link.');
+      return;
+    }
+    const fileId = extractGDriveFileId(gdriveUrl.trim());
+    if (!fileId) {
+      setError('Could not extract file ID from the Google Drive URL. Please use the share link from Google Drive.');
+      return;
+    }
+    if (!selectedSessionId) {
+      setError('Please select a JD/session to associate this file with.');
+      return;
+    }
+    setGdriveImporting(true);
+    setError(null);
+    try {
+      const res = await importFromGDrive(fileId, selectedSessionId);
+      if (res?.files?.length > 0) {
+        await associateFilesWithSession(selectedSessionId, res.files);
+      }
+      setUploadComplete(true);
+      setTimeout(() => {
+        if (onAddSuccess) onAddSuccess();
+        setGdriveUrl('');
+        setUploadComplete(false);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setError(err.message || 'Google Drive import failed. Ensure the file is shared with the service account.');
+    } finally {
+      setGdriveImporting(false);
+    }
   };
 
   const handleCreateAndUpload = async () => {
@@ -211,8 +261,42 @@ export function AddTalentModal({ isOpen, onClose, onAddSuccess }: Props) {
           )}
 
           {activeSourceTab === 'cloud' && (
-            <div className="space-y-6">
-              <p className="text-sm text-on-surface-variant">Cloud integration coming soon. Use Upload Files tab for now.</p>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-on-surface mb-2">Import from Google Drive</h3>
+                <p className="text-xs text-on-surface-variant mb-3">
+                  Paste a Google Drive share link to import the resume directly. Make sure the file is shared with anyone with the link.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={gdriveUrl}
+                  onChange={(e) => setGdriveUrl(e.target.value)}
+                  placeholder="https://drive.google.com/file/d/..."
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-md py-2.5 px-4 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                />
+                <p className="text-[10px] text-on-surface-variant">
+                  Also accepts direct file IDs (e.g. 1abc2DEF3ghi...)
+                </p>
+              </div>
+              {uploadComplete ? (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+                  <CheckCircle2 className="h-4 w-4" /> File imported successfully!
+                </div>
+              ) : (
+                <button
+                  onClick={handleGDriveImport}
+                  disabled={gdriveImporting || !gdriveUrl.trim() || !selectedSessionId}
+                  className="bg-primary text-on-primary hover:opacity-90 px-4 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer disabled:opacity-40 flex items-center gap-2"
+                >
+                  {gdriveImporting ? (
+                    <><span className="animate-spin">⏳</span> Importing...</>
+                  ) : (
+                    'Import from Google Drive'
+                  )}
+                </button>
+              )}
             </div>
           )}
 
