@@ -68,9 +68,12 @@ export function HRTalentPools() {
         const sessions = await getSessions();
         const pool = extractCandidatesFromSessions(sessions);
         setCandidates(pool);
-        if (pool.length > 0) setHasTalent(true);
+        const isDevMode = localStorage.getItem('developer_mode') === 'true';
+        if (pool.length > 0 || isDevMode) setHasTalent(true);
       } catch (err) {
         console.error('Failed to load candidates for talent pool:', err);
+        const isDevMode = localStorage.getItem('developer_mode') === 'true';
+        if (isDevMode) setHasTalent(true);
       } finally {
         setLoading(false);
       }
