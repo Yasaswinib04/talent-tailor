@@ -15,6 +15,7 @@ export function HRRoleDashboard() {
   const [analyzing, setAnalyzing] = useState(false);
   const [resumeFiles, setResumeFiles] = useState<File[]>([]);
   const [copied, setCopied] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
 
   const fetchSession = async () => {
     if (!id) return;
@@ -103,6 +104,10 @@ export function HRRoleDashboard() {
   const avgScore = candidates.length ? Math.round(candidates.reduce((acc: number, c: any) => acc + (c.score || 0), 0) / candidates.length * 10) : 0;
   const technicalCleared = candidates.filter((c: any) => c.score >= 7.0).length;
   const criticalGaps = candidates.filter((c: any) => !c.meetsMandatoryCriteria).length;
+
+  const sorted = [...candidates].sort((a: any, b: any) => b.score - a.score);
+  const shortlisted = sorted.filter((c: any) => c.score >= 5.0 && c.meetsMandatoryCriteria !== false && !c.preFiltered);
+  const rejected = sorted.filter((c: any) => c.score < 5.0 || c.meetsMandatoryCriteria === false || c.preFiltered);
 
   const handleDeleteRole = async () => {
     if (!confirm(`Delete "${jp.name || 'Untitled Role'}"? All candidates and analysis for this role will be permanently removed.`)) return;
@@ -319,133 +324,26 @@ export function HRRoleDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/40">
-                  {candidates.sort((a: any, b: any) => b.score - a.score).map((c: any, idx: number) => {
-                    const scorePercent = Math.round((c.score || 0) * 10);
-                    const competencies = c.competencies || [];
-                    const matchedSkills = competencies.filter((comp: any) => comp.score >= 6);
-                    const weakSkills = competencies.filter((comp: any) => comp.score < 6);
-                    const keywords = c.keywords || { present: [], missing: [] };
-                    return (
-                      <tr key={c.id || idx} className="hover:bg-surface-container-highest/40 transition-colors group">
-                        <td className="p-3 pl-4">
-                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[11px] border border-primary/20">{idx + 1}</div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-[10px] border border-outline-variant uppercase shrink-0">
-                              {(c.name || '?').substring(0, 2)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-on-surface truncate">{c.name || 'Unknown'}</p>
-                              <p className="text-[10px] text-on-surface-variant">{c.experienceYears ? `${c.experienceYears}yrs` : ''} {c.overqualified ? '· Overqualified' : ''}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="relative w-10 h-10 mx-auto">
-                            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                              <circle cx="18" cy="18" r="15" fill="none" stroke="#27272a" strokeWidth="3" />
-                              <circle cx="18" cy="18" r="15" fill="none" stroke={scorePercent >= 80 ? '#a78bfa' : scorePercent >= 60 ? '#f59e0b' : '#ef4444'} strokeWidth="3" strokeDasharray={`${scorePercent} 100`} strokeLinecap="round" />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-on-surface">{scorePercent}</span>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          {c.meetsMandatoryCriteria === false ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1 w-fit">
-                              <span className="material-symbols-outlined text-[12px]">close</span> Fails
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
-                              <span className="material-symbols-outlined text-[12px]">check</span> Pass
-                            </span>
-                          )}
-                          {c.failedCriteria && c.failedCriteria.length > 0 && (
-                            <div className="mt-1 text-[9px] text-red-400/70 max-w-[120px] truncate" title={c.failedCriteria.join(', ')}>
-                              {c.failedCriteria.slice(0, 2).join(', ')}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-wrap gap-1">
-                            {matchedSkills.slice(0, 4).map((comp: any) => (
-                              <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-primary/10 text-primary border border-primary/20" title={`Score: ${comp.score?.toFixed(1)}`}>
-                                {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
-                              </span>
-                            ))}
-                            {matchedSkills.length > 4 && <span className="text-[9px] text-on-surface-variant">+{matchedSkills.length - 4}</span>}
-                            {keywords.present && keywords.present.length > 0 && (
-                              <div className="flex flex-wrap gap-0.5 mt-1 w-full">
-                                {keywords.present.slice(0, 3).map((kw: string) => (
-                                  <span key={kw} className="px-1 py-0 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{kw}</span>
-                                ))}
-                                {keywords.present.length > 3 && <span className="text-[8px] text-on-surface-variant">+{keywords.present.length - 3}</span>}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-wrap gap-1">
-                            {weakSkills.slice(0, 3).map((comp: any) => (
-                              <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20" title={`Score: ${comp.score?.toFixed(1)}`}>
-                                {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
-                              </span>
-                            ))}
-                            {weakSkills.length === 0 && keywords.missing && keywords.missing.length > 0 && (
-                              keywords.missing.slice(0, 3).map((kw: string) => (
-                                <span key={kw} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">{kw}</span>
-                              ))
-                            )}
-                            {((weakSkills.length === 0) && (!keywords.missing || keywords.missing.length === 0)) && (
-                              <span className="text-[9px] text-on-surface-variant italic">None</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="space-y-1">
-                            {['Technical', 'Experience', 'Domain', 'Education', 'Soft Skills'].map(cat => {
-                              const comp = competencies.find((comp: any) => comp.name?.toLowerCase().includes(cat.toLowerCase()));
-                              const catScore = comp?.score || c.atsScore ? Math.round((comp?.score || c.atsScore || 0) * 10) : null;
-                              return catScore !== null ? (
-                                <div key={cat} className="flex items-center gap-1.5">
-                                  <span className="text-[9px] text-on-surface-variant w-16 truncate">{cat}</span>
-                                  <div className="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full ${catScore >= 80 ? 'bg-primary' : catScore >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${catScore}%` }}></div>
-                                  </div>
-                                  <span className="text-[9px] font-mono font-bold text-on-surface w-7 text-right">{catScore}</span>
-                                </div>
-                              ) : null;
-                            })}
-                          </div>
-                        </td>
-                        <td className="p-3 pr-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => alert(`Accepted: ${c.name}`)}
-                              className="p-1.5 rounded hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                              title="Accept candidate"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">thumb_up</span>
-                            </button>
-                            <button
-                              onClick={() => alert(`Rejected: ${c.name}`)}
-                              className="p-1.5 rounded hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                              title="Reject candidate"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">thumb_down</span>
-                            </button>
-                            <button
-                              onClick={() => alert(`Viewing profile: ${c.name}`)}
-                              className="p-1.5 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-                              title="View details"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">visibility</span>
-                            </button>
-                          </div>
+                  {shortlisted.map((c: any, idx: number) => <CandidateRow key={c.id || idx} c={c} idx={idx} />)}
+                  {rejected.length > 0 && (
+                    <>
+                      <tr className="bg-surface-container-highest/30 hover:bg-surface-container-highest/50 transition-colors cursor-pointer">
+                        <td colSpan={8} className="p-0">
+                          <button
+                            onClick={() => setShowRejected(!showRejected)}
+                            className="w-full text-left px-4 py-2.5 flex items-center gap-2 text-xs font-semibold text-on-surface-variant transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">{showRejected ? 'expand_less' : 'expand_more'}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">{rejected.length}</span>
+                            Rejected / Low Match — click to {showRejected ? 'collapse' : 'expand'}
+                          </button>
                         </td>
                       </tr>
-                    );
-                  })}
+                      {showRejected && rejected.map((c: any, idx: number) => (
+                        <CandidateRow key={c.id || `r${idx}`} c={c} idx={shortlisted.length + idx + 1} />
+                      ))}
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -480,5 +378,133 @@ export function HRRoleDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CandidateRow({ c, idx }: { c: any; idx: number; key?: React.Key }) {
+  const scorePercent = Math.round((c.score || 0) * 10);
+  const competencies = c.competencies || [];
+  const matchedSkills = competencies.filter((comp: any) => comp.score >= 6);
+  const weakSkills = competencies.filter((comp: any) => comp.score < 6);
+  const keywords = c.keywords || { present: [], missing: [] };
+  return (
+    <tr className="hover:bg-surface-container-highest/40 transition-colors group">
+      <td className="p-3 pl-4">
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[11px] border border-primary/20">{idx + 1}</div>
+      </td>
+      <td className="p-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-[10px] border border-outline-variant uppercase shrink-0">
+            {(c.name || '?').substring(0, 2)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-on-surface truncate">{c.name || 'Unknown'}</p>
+            <p className="text-[10px] text-on-surface-variant">{c.experienceYears ? `${c.experienceYears}yrs` : ''} {c.overqualified ? '· Overqualified' : ''}</p>
+          </div>
+        </div>
+      </td>
+      <td className="p-3 text-center">
+        <div className="relative w-10 h-10 mx-auto">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#27272a" strokeWidth="3" />
+            <circle cx="18" cy="18" r="15" fill="none" stroke={scorePercent >= 80 ? '#a78bfa' : scorePercent >= 60 ? '#f59e0b' : '#ef4444'} strokeWidth="3" strokeDasharray={`${scorePercent} 100`} strokeLinecap="round" />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-on-surface">{scorePercent}</span>
+        </div>
+      </td>
+      <td className="p-3">
+        {c.meetsMandatoryCriteria === false ? (
+          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1 w-fit">
+            <span className="material-symbols-outlined text-[12px]">close</span> Fails
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+            <span className="material-symbols-outlined text-[12px]">check</span> Pass
+          </span>
+        )}
+        {c.failedCriteria && c.failedCriteria.length > 0 && (
+          <div className="mt-1 text-[9px] text-red-400/70 max-w-[120px] truncate" title={c.failedCriteria.join(', ')}>
+            {c.failedCriteria.slice(0, 2).join(', ')}
+          </div>
+        )}
+      </td>
+      <td className="p-3">
+        <div className="flex flex-wrap gap-1">
+          {matchedSkills.slice(0, 4).map((comp: any) => (
+            <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-primary/10 text-primary border border-primary/20" title={`Score: ${comp.score?.toFixed(1)}`}>
+              {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
+            </span>
+          ))}
+          {matchedSkills.length > 4 && <span className="text-[9px] text-on-surface-variant">+{matchedSkills.length - 4}</span>}
+          {keywords.present && keywords.present.length > 0 && (
+            <div className="flex flex-wrap gap-0.5 mt-1 w-full">
+              {keywords.present.slice(0, 3).map((kw: string) => (
+                <span key={kw} className="px-1 py-0 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{kw}</span>
+              ))}
+              {keywords.present.length > 3 && <span className="text-[8px] text-on-surface-variant">+{keywords.present.length - 3}</span>}
+            </div>
+          )}
+        </div>
+      </td>
+      <td className="p-3">
+        <div className="flex flex-wrap gap-1">
+          {weakSkills.slice(0, 3).map((comp: any) => (
+            <span key={comp.name} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20" title={`Score: ${comp.score?.toFixed(1)}`}>
+              {comp.name} <span className="text-[8px] opacity-60">{comp.score?.toFixed(1)}</span>
+            </span>
+          ))}
+          {weakSkills.length === 0 && keywords.missing && keywords.missing.length > 0 && (
+            keywords.missing.slice(0, 3).map((kw: string) => (
+              <span key={kw} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">{kw}</span>
+            ))
+          )}
+          {((weakSkills.length === 0) && (!keywords.missing || keywords.missing.length === 0)) && (
+            <span className="text-[9px] text-on-surface-variant italic">None</span>
+          )}
+        </div>
+      </td>
+      <td className="p-3">
+        <div className="space-y-1">
+          {['Technical', 'Experience', 'Domain', 'Education', 'Soft Skills'].map(cat => {
+            const comp = competencies.find((comp: any) => comp.name?.toLowerCase().includes(cat.toLowerCase()));
+            const catScore = comp?.score || c.atsScore ? Math.round((comp?.score || c.atsScore || 0) * 10) : null;
+            return catScore !== null ? (
+              <div key={cat} className="flex items-center gap-1.5">
+                <span className="text-[9px] text-on-surface-variant w-16 truncate">{cat}</span>
+                <div className="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${catScore >= 80 ? 'bg-primary' : catScore >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${catScore}%` }}></div>
+                </div>
+                <span className="text-[9px] font-mono font-bold text-on-surface w-7 text-right">{catScore}</span>
+              </div>
+            ) : null;
+          })}
+        </div>
+      </td>
+      <td className="p-3 pr-4 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            onClick={() => alert(`Accepted: ${c.name}`)}
+            className="p-1.5 rounded hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+            title="Accept candidate"
+          >
+            <span className="material-symbols-outlined text-[16px]">thumb_up</span>
+          </button>
+          <button
+            onClick={() => alert(`Rejected: ${c.name}`)}
+            className="p-1.5 rounded hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+            title="Reject candidate"
+          >
+            <span className="material-symbols-outlined text-[16px]">thumb_down</span>
+          </button>
+          <button
+            onClick={() => alert(`Viewing profile: ${c.name}`)}
+            className="p-1.5 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+            title="View details"
+          >
+            <span className="material-symbols-outlined text-[16px]">visibility</span>
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }

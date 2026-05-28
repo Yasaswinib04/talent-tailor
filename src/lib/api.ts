@@ -31,7 +31,31 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
 // --- LocalStorage Fallback Utilities ---
 const getLocalSessions = (): any[] => {
   try {
-    return JSON.parse(localStorage.getItem('local_sessions') || '[]');
+    const raw = localStorage.getItem('local_sessions');
+    if (!raw) return [];
+    const sessions = JSON.parse(raw);
+    const cleaned = sessions.filter((s: any) => {
+      const candidates = Array.isArray(s.analysis_results?.candidates)
+        ? s.analysis_results.candidates
+        : Array.isArray(s.analysis_results)
+          ? s.analysis_results
+          : [];
+      if (candidates.length > 0) {
+        const hasMock = candidates.some((c: any) =>
+          c.id && (String(c.id).startsWith('demo-') || c.name === 'Marcus Chen' || c.name === 'Sophia Rodriguez')
+        );
+        if (hasMock) {
+          s.analysis_results = [];
+          s.analysisResults = [];
+          s.status = 'draft';
+        }
+      }
+      return true;
+    });
+    if (cleaned.length !== sessions.length || JSON.stringify(cleaned) !== raw) {
+      localStorage.setItem('local_sessions', JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return [];
   }

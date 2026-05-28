@@ -54,7 +54,6 @@ import {
 import { cn } from './lib/utils';
 import { Persona, RoleType, ExperienceTier, AnalysisResult, CandidateAnalysis, Competency, InputMode, CandidateProfile, ProposedChange, HiringPreferences, WorkExperience, JobProfile } from './types';
 import { analyzeResumes, tailorResume, extractProfile, generateQuestions } from './services/gemini';
-import { MOCK_ANALYSIS } from './constants';
 import { auth, signInWithGoogle, db, handleFirestoreError } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import {
