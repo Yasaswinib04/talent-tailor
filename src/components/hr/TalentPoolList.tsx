@@ -24,7 +24,9 @@ interface Filters {
 interface Props {
   onAddTalent: () => void;
   candidates?: Candidate[];
+  sessions?: any[];
   onRefresh?: () => void;
+  onNavigateToRole?: (roleId: string) => void;
 }
 
 const DEMO_CANDIDATES: Candidate[] = [
@@ -39,8 +41,10 @@ function useIsDevMode(): boolean {
   return localStorage.getItem('developer_mode') === 'true';
 }
 
-export function TalentPoolList({ onAddTalent, candidates: externalCandidates, onRefresh }: Props) {
+export function TalentPoolList({ onAddTalent, candidates: externalCandidates, sessions = [], onRefresh, onNavigateToRole }: Props) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [targetRoleId, setTargetRoleId] = useState<string>('');
   const isDevMode = useIsDevMode();
 
   const [filters, setFilters] = useState<Filters>({
@@ -68,13 +72,14 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, on
   };
 
   const clearAllFilters = () => {
-    setFilters({
-      location: [],
-      experienceMin: 0,
-      experienceMax: 10,
-      salaryMin: '',
-      salaryMax: '',
-      skillSearch: '',
+    setFilters({ location: [], experienceMin: 0, experienceMax: 10, salaryMin: '', salaryMax: '', skillSearch: '' });
+  };
+
+  const toggleSelectCandidate = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   };
 
@@ -96,6 +101,23 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, on
       return true;
     });
   }, [externalCandidates, isDevMode, filters]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCandidates.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCandidates.map(c => c.id)));
+    }
+  };
+
+  const addSelectedToRole = (roleId: string) => {
+    if (!roleId || selectedIds.size === 0) return;
+    setSelectedIds(new Set());
+    setTargetRoleId('');
+    onNavigateToRole?.(roleId);
+  };
+
+  const isAllSelected = filteredCandidates.length > 0 && selectedIds.size === filteredCandidates.length;
 
   const hasActiveFilters = filters.location.length > 0 || filters.skillSearch.trim().length > 0;
 
@@ -236,11 +258,48 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, on
         </header>
 
         <div className="flex-1 overflow-auto custom-scrollbar px-6 pb-6">
+
+          {/* Floating Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="sticky top-0 z-20 mb-2 bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-center gap-3 backdrop-blur-sm animate-in slide-in-from-top-2 duration-200">
+              <span className="text-sm font-semibold text-primary">{selectedIds.size} selected</span>
+              <div className="h-5 w-px bg-primary/30"></div>
+              <select
+                value={targetRoleId}
+                onChange={(e) => setTargetRoleId(e.target.value)}
+                className="flex-1 bg-surface-container-low border border-primary/30 rounded-md px-3 py-1.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23666'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '2rem' }}
+              >
+                <option value="">Select target role...</option>
+                {sessions.map((s: any) => {
+                  const jp = s.job_profile || {};
+                  return <option key={s.id} value={s.id}>{jp.name || 'Untitled Role'}</option>;
+                })}
+              </select>
+              <button
+                onClick={() => { if (targetRoleId) addSelectedToRole(targetRoleId); }}
+                disabled={!targetRoleId}
+                className="bg-primary text-on-primary hover:opacity-90 px-4 py-1.5 rounded-md text-sm font-semibold transition-all cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                Go to Role
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
+
           <div className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden shadow-lg shadow-black/20 flex flex-col min-h-full">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-outline-variant bg-surface-container-low">
-                  <th className="p-4 pl-5 w-12"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary cursor-pointer" /></th>
+                  <th className="p-4 pl-5 w-12">
+                    <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="rounded border-outline-variant bg-transparent focus:ring-primary cursor-pointer" />
+                  </th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Name</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Role</th>
                   <th className="p-4 font-semibold text-on-surface-variant text-sm tracking-wide">Skills</th>
@@ -268,7 +327,14 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, on
                 ) : (
                   filteredCandidates.map((c) => (
                     <tr key={c.id} className="hover:bg-surface-container-highest/50 transition-colors group">
-                      <td className="p-4 pl-5"><input type="checkbox" className="rounded border-outline-variant bg-transparent focus:ring-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" /></td>
+                        <td className="p-4 pl-5">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(c.id)}
+                            onChange={() => toggleSelectCandidate(c.id)}
+                            className={`rounded border-outline-variant bg-transparent focus:ring-primary cursor-pointer ${selectedIds.has(c.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
+                          />
+                        </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-surface font-bold text-xs shrink-0 overflow-hidden border border-outline-variant">
@@ -322,11 +388,11 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, on
                               View Profile
                             </button>
                             <button
-                              onClick={() => { alert(`Adding ${c.name} to Active Screening Pipeline`); setActiveMenuId(null); }}
+                              onClick={() => { toggleSelectCandidate(c.id); setActiveMenuId(null); }}
                               className="w-full px-4 py-2.5 text-xs font-semibold text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer border-t border-outline-variant/30"
                             >
-                              <span className="material-symbols-outlined text-sm">assignment_ind</span>
-                              Add to Pipeline
+                              <span className="material-symbols-outlined text-sm">checklist</span>
+                              Select for Pipeline
                             </button>
                             <button
                               onClick={() => { alert(`Exporting profile of ${c.name} as PDF summary`); setActiveMenuId(null); }}

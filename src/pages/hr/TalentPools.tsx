@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TalentPoolEmptyState } from '../../components/hr/TalentPoolEmptyState';
 import { TalentPoolList } from '../../components/hr/TalentPoolList';
 import { AddTalentModal } from '../../components/hr/AddTalentModal';
@@ -81,15 +82,18 @@ function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
 }
 
 export function HRTalentPools() {
+  const navigate = useNavigate();
   const [hasTalent, setHasTalent] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [candidates, setCandidates] = useState<PoolCandidate[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadCandidates = useCallback(async () => {
     try {
-      const sessions = await getSessions();
-      const pool = extractCandidatesFromSessions(sessions);
+      const data = await getSessions();
+      setSessions(data || []);
+      const pool = extractCandidatesFromSessions(data || []);
       setCandidates(pool);
       const isDevMode = localStorage.getItem('developer_mode') === 'true';
       if (pool.length > 0 || isDevMode) setHasTalent(true);
@@ -125,7 +129,9 @@ export function HRTalentPools() {
         <TalentPoolList
           onAddTalent={() => setIsModalOpen(true)}
           candidates={candidates}
+          sessions={sessions}
           onRefresh={loadCandidates}
+          onNavigateToRole={(roleId) => navigate(`/hr/role/${roleId}`)}
         />
       )}
 
