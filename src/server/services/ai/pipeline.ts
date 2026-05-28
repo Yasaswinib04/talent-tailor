@@ -186,6 +186,8 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
             preFilteredCount++;
           }
           resumeInputs.push({ text, filePath: file.path, preFilter });
+        } else if (mimeType.startsWith('image/')) {
+          console.warn(`[Pipeline] Skipping image file ${file.path} — image resumes are not supported.`);
         } else {
           const base64Data = buffer.toString('base64');
           resumeInputs.push({

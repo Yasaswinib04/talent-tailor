@@ -212,9 +212,14 @@ export function HRDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
             {sessions.map((session: any) => {
               const jp = session.job_profile || {};
-              const candidates = session.analysis_results || [];
+              const candidates = Array.isArray(session.analysis_results?.candidates)
+                ? session.analysis_results.candidates
+                : Array.isArray(session.analysis_results)
+                  ? session.analysis_results
+                  : [];
               const highMatchCount = candidates.filter((c: any) => c.score >= 8.0).length;
               const isAnalyzing = session.status === 'analyzing';
+              const isError = session.status === 'error';
               
               return (
                 <div key={session.id} className="bg-surface-container border border-outline-variant rounded-md p-6 flex flex-col gap-6 hover:border-primary/40 transition-all duration-300 relative overflow-hidden group h-fit">
@@ -224,9 +229,9 @@ export function HRDashboard() {
                       <div className="text-xs font-mono text-primary mb-1 uppercase tracking-wider">{jp.department || "General"}</div>
                       <h3 className="text-xl font-headline font-semibold text-on-surface leading-tight">{jp.name || "Untitled Role"}</h3>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${isAnalyzing ? 'bg-primary/10 text-primary border-primary/20' : 'bg-tertiary/10 text-tertiary border-tertiary/20'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isAnalyzing ? 'bg-primary animate-pulse' : 'bg-tertiary'}`}></span>
-                      {isAnalyzing ? 'Analyzing...' : 'Active'}
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${isAnalyzing ? 'bg-primary/10 text-primary border-primary/20' : isError ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-tertiary/10 text-tertiary border-tertiary/20'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isAnalyzing ? 'bg-primary animate-pulse' : isError ? 'bg-red-400' : 'bg-tertiary'}`}></span>
+                      {isAnalyzing ? 'Analyzing...' : isError ? 'Error' : 'Active'}
                     </span>
                   </div>
                   

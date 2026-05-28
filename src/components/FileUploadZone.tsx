@@ -30,8 +30,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     multiple,
     accept: {
       'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'image/*': ['.png', '.jpg', '.jpeg']
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
     }
   } as any);
 

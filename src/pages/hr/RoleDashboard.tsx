@@ -91,7 +91,12 @@ export function HRRoleDashboard() {
   if (!session) return <div className="p-8 text-on-surface-variant">Role not found.</div>;
 
   const jp = session.job_profile || {};
-  const candidates = session.analysis_results || [];
+  const analysisError = session.analysis_results?.error || null;
+  const candidates = Array.isArray(session.analysis_results?.candidates)
+    ? session.analysis_results.candidates
+    : Array.isArray(session.analysis_results)
+      ? session.analysis_results
+      : [];
   const filesCount = (session.uploaded_files || []).length;
   
   // Stats
@@ -110,6 +115,22 @@ export function HRRoleDashboard() {
         <span className="text-on-surface-variant">/</span>
         <span className="text-on-surface-variant font-medium">{jp.name || 'Untitled Role'}</span>
       </div>
+
+      {session.status === 'error' && analysisError && (
+        <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+          <span className="material-symbols-outlined text-red-500 shrink-0 mt-0.5">error</span>
+          <div>
+            <p className="text-sm font-semibold text-red-400">Analysis Failed</p>
+            <p className="text-xs text-red-300/80 mt-1">{analysisError}</p>
+            <button
+              onClick={() => startAnalysis(id!)}
+              className="mt-2 text-xs font-semibold text-red-400 hover:text-red-300 underline cursor-pointer"
+            >
+              Retry Analysis
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Glassmorphic Header Card */}
       <div className="bg-surface-container/40 backdrop-blur-sm border border-outline-variant rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 relative overflow-hidden">
