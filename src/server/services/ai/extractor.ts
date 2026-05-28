@@ -1,11 +1,12 @@
 import { Type } from "@google/genai";
 import { CandidateProfile } from "../../../types.js";
 import { getAI, safeJsonParse, GLOBAL_GROUNDING_RULES } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function extractProfile(resume: string | { data: string, mimeType: string }): Promise<CandidateProfile> {
   const resumePart = typeof resume === 'string' ? { text: resume } : { inlineData: resume };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("extractor"),
     contents: {
       parts: [
         { text: "Extract detailed profile information from this resume." },

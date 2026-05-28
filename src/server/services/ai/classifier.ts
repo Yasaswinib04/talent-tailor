@@ -1,10 +1,11 @@
 import { Type } from "@google/genai";
 import { getAI, safeJsonParse } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function classifyTrack(jd: string | { data: string, mimeType: string }): Promise<{ track: 'IC' | 'Manager' }> {
   const jdPart = typeof jd === 'string' ? { text: jd } : { inlineData: jd };
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("classifier"),
     contents: {
       parts: [
         { text: "Analyze this Job Description and classify the track as either 'IC' (Individual Contributor) or 'Manager'." },

@@ -1,10 +1,11 @@
 import { Type } from "@google/genai";
 import { RoleType, ExperienceTier } from "../../../types.js";
 import { getAI, safeJsonParse } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function generateQuestions(gaps: string[], role: RoleType, tier: ExperienceTier): Promise<{ question: string }[]> {
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("questions"),
     contents: {
       parts: [
         { text: `Generate 6-8 discovery questions based on these identified gaps and weaknesses: ${gaps.join(', ')}` },

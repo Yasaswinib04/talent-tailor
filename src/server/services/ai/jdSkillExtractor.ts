@@ -1,5 +1,6 @@
 import { Type } from "@google/genai";
 import { getAI, safeJsonParse } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function extractSkillsFromJD(
   jdText: string,
@@ -11,7 +12,7 @@ export async function extractSkillsFromJD(
   }
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("jdSkillExtractor"),
     contents: {
       parts: [
         {

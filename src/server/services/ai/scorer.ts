@@ -2,6 +2,7 @@ import { Type } from "@google/genai";
 import { RoleType, HiringPreferences, ExperienceTier, IndustryType } from "../../../types.js";
 import { getEffectiveWeights } from "../../../constants/roles.js";
 import { getAI, safeJsonParse, normalizeScore, SYSTEM_PROMPT } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function scoreCandidate(
   resume: string | { data: string, mimeType: string },
@@ -103,7 +104,7 @@ When calculating the 'score', apply these dynamic weights strictly. Identify evi
   const scorerRules = SYSTEM_PROMPT + "\n\nINFERRED SKILLS ALLOWED: If a candidate describes performing an action that clearly demonstrates a competency (e.g., ‘reduced latency by 40%’), you may infer the skill ‘Performance Optimization’ even if the exact phrase is not used. You must still cite the original action as evidence.";
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("scorer"),
     contents: {
       parts: promptParts
     },

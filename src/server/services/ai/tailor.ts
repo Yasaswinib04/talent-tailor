@@ -1,6 +1,7 @@
 import { Type } from "@google/genai";
 import { CandidateAnalysis } from "../../../types.js";
 import { getAI, safeJsonParse, GLOBAL_GROUNDING_RULES } from "./config.js";
+import { getModelForStep } from "./modelConfig.js";
 
 export async function tailorResume(resume: string, jd: string, analysis: CandidateAnalysis, targetMarket: string = 'India'): Promise<{ fullText: string, changes: any[] }> {
   const insights = analysis.discoveryQuestions
@@ -9,7 +10,7 @@ export async function tailorResume(resume: string, jd: string, analysis: Candida
     .join("\n\n");
 
   const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
+    model: getModelForStep("tailor"),
     contents: {
       parts: [{
         text: `You are an elite career strategist. Analyze the Resume vs JD and provide specific, high-impact improvements using the STAR method.
