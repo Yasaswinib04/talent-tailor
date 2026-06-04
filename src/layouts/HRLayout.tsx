@@ -211,22 +211,13 @@ export function HRLayout() {
         {/* TopNavBar */}
         <header className="bg-surface-container text-primary text-on-surface font-body antialiased docked full-width top-0 border-b border-outline-variant flex justify-between items-center w-full px-6 h-16 z-50 sticky shrink-0">
           <div className="flex items-center gap-4">
-            <button className="md:hidden text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors">
-              <span className="material-symbols-outlined" data-icon="menu">menu</span>
-            </button>
-            <div className="md:hidden flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-xl">robot_2</span>
-              <span className="text-xl font-headline font-black tracking-tight text-on-surface">TalentMatch AI</span>
-            </div>
-            
-            {/* Search Bar */}
-            <div className="hidden md:flex items-center relative w-96">
-              <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-sm">search</span>
-              <input className="w-full bg-surface-container-low border border-outline-variant rounded-md py-1.5 pl-9 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder={location.pathname.includes('/compare') ? "Search candidates..." : "Search..."} type="text"/>
+            <div className="hidden md:flex items-center">
+              <span className="text-lg font-headline font-bold tracking-tight text-on-surface">TalentMatch AI</span>
+              <span className="ml-2 text-[9px] text-on-surface-variant font-mono">/ {location.pathname.includes('/pools') ? 'Talent Pool' : location.pathname.includes('/compare') ? 'Compare' : location.pathname.includes('/role/') ? 'Role' : 'Dashboard'}</span>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 ml-auto">
             <button 
               onClick={handleSignOut}
               className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer"
