@@ -120,12 +120,12 @@ export function HRRoleDashboard() {
         } else {
           const uploaded = session.uploadedFiles || session.uploaded_files || [];
           if (uploaded.length === 0) {
-            setAnalyzing(false);
             alert('No resume files found. Please upload resumes first before running analysis.');
+            setAnalyzing(false);
             return;
           }
+          alert('The database server is not available. Please add DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GEMINI_API_KEY as service-specific variables in Railway and redeploy. Your uploaded files are safe on the server and will be processed once the backend is connected.');
           setAnalyzing(false);
-          alert('Server is unreachable and no local files are available. Please upload resumes through the dialog to run client-side analysis.');
           return;
         }
 
