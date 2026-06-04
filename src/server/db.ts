@@ -19,17 +19,19 @@ function getSql() {
     if (!dbUrl) {
       throw new Error("DATABASE_URL environment variable is missing or empty.");
     }
+    const maskedUrl = dbUrl.substring(0, 15) + '...' + dbUrl.substring(dbUrl.length - 10);
     try {
       new URL(dbUrl);
-    } catch {
+    } catch (e: any) {
+      const msg = `DATABASE_URL is not a valid URL (${e.message || 'parse error'}). Value starts with: "${dbUrl.substring(0, 30)}..."`;
       if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
         dbUrl = 'postgresql://' + dbUrl;
-        try { new URL(dbUrl); } catch { throw new Error(`DATABASE_URL is not a valid URL. Got: "${dbUrl.substring(0, 50)}..."`); }
+        try { new URL(dbUrl); } catch { throw new Error(msg); }
       } else {
-        throw new Error(`DATABASE_URL is not a valid URL. Got: "${dbUrl.substring(0, 50)}..."`);
+        throw new Error(msg);
       }
     }
-    console.log("[DB] PostgreSQL URL parsed successfully — connecting...");
+    console.log("[DB] PostgreSQL URL parsed successfully:", maskedUrl);
     sql = postgres(dbUrl, {
       max: 10,
       idle_timeout: 20,
