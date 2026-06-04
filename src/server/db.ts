@@ -19,25 +19,29 @@ function getSql() {
     if (!dbUrl) {
       throw new Error("DATABASE_URL environment variable is missing or empty.");
     }
-    const maskedUrl = dbUrl.substring(0, 15) + '...' + dbUrl.substring(dbUrl.length - 10);
-    try {
-      new URL(dbUrl);
-    } catch (e: any) {
-      const msg = `DATABASE_URL is not a valid URL (${e.message || 'parse error'}). Value starts with: "${dbUrl.substring(0, 30)}..."`;
-      if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
-        dbUrl = 'postgresql://' + dbUrl;
-        try { new URL(dbUrl); } catch { throw new Error(msg); }
-      } else {
-        throw new Error(msg);
+    if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+      if (dbUrl.includes('://')) {
+        throw new Error(`DATABASE_URL uses unsupported protocol. Expected postgresql:// or postgres://. Value starts with: "${dbUrl.substring(0, 30)}..."`);
       }
+      dbUrl = 'postgresql://' + dbUrl;
     }
-    console.log("[DB] PostgreSQL URL parsed successfully:", maskedUrl);
-    sql = postgres(dbUrl, {
-      max: 10,
-      idle_timeout: 20,
-      connect_timeout: 15,
-      ssl: 'require',
-    });
+    const masked = dbUrl.substring(0, 18) + '...' + dbUrl.substring(dbUrl.length - 10);
+    console.log("[DB] PostgreSQL URL:", masked);
+    try {
+      sql = postgres(dbUrl, {
+        max: 10,
+        idle_timeout: 20,
+        connect_timeout: 15,
+        ssl: 'require',
+      });
+    } catch (e: any) {
+      const msg = (e.message || e || '').toString();
+      if (msg.includes('Invalid URL') || msg.includes('invalid url') || msg.includes('URL')) {
+        console.error("[DB] DATABASE_URL contains characters that need URL-encoding. Common culprits: # & @ [ ] ! *");
+        console.error("[DB] Try manually from Railway's PostgreSQL Connect tab — copy the URL field directly without editing.");
+      }
+      throw new Error(`DATABASE_URL connection failed: ${msg.substring(0, 120)}`);
+    }
   }
   return sql;
 }
