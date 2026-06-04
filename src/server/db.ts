@@ -13,6 +13,13 @@ dotenv.config();
 
 let sql: ReturnType<typeof postgres> | null = null;
 
+function encodePasswordInUrl(url: string): string {
+  const match = url.match(/^(postgres(?:ql)?:\/\/[^:]+:)([^@]+)(@.+)$/);
+  if (!match) return url;
+  const encodedPass = encodeURIComponent(match[2]).replace(/%40/g, '@');
+  return match[1] + encodedPass + match[3];
+}
+
 function getSql() {
   if (!sql) {
     let dbUrl = (process.env.DATABASE_URL || '').trim();
@@ -25,10 +32,11 @@ function getSql() {
       }
       dbUrl = 'postgresql://' + dbUrl;
     }
-    const masked = dbUrl.substring(0, 18) + '...' + dbUrl.substring(dbUrl.length - 10);
-    console.log("[DB] PostgreSQL URL:", masked);
+    const safeUrl = encodePasswordInUrl(dbUrl);
+    const masked = safeUrl.substring(0, 18) + '...' + safeUrl.substring(safeUrl.length - 10);
+    console.log("[DB] PostgreSQL URL (password encoded):", masked);
     try {
-      sql = postgres(dbUrl, {
+      sql = postgres(safeUrl, {
         max: 10,
         idle_timeout: 20,
         connect_timeout: 15,
@@ -37,8 +45,8 @@ function getSql() {
     } catch (e: any) {
       const msg = (e.message || e || '').toString();
       if (msg.includes('Invalid URL') || msg.includes('invalid url') || msg.includes('URL')) {
-        console.error("[DB] DATABASE_URL contains characters that need URL-encoding. Common culprits: # & @ [ ] ! *");
-        console.error("[DB] Try manually from Railway's PostgreSQL Connect tab — copy the URL field directly without editing.");
+        console.error("[DB] DATABASE_URL has characters that break URL parsing (# & [ ] ! *). The password should be URL-encoded.");
+        console.error("[DB] Re-encode attempt failed. Copy the URL from Railway PostgreSQL → Connect tab.");
       }
       throw new Error(`DATABASE_URL connection failed: ${msg.substring(0, 120)}`);
     }

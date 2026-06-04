@@ -124,8 +124,9 @@ export function HRRoleDashboard() {
             setAnalyzing(false);
             return;
           }
-          alert('The database server is not available. Please add DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and GEMINI_API_KEY as service-specific variables in Railway and redeploy. Your uploaded files are safe on the server and will be processed once the backend is connected.');
           setAnalyzing(false);
+          setIsUploadOpen(true);
+          alert('Server unavailable (database offline). The upload dialog is now open. Select your PDF/DOCX files and click "Run AI Analysis" again — the analysis will run directly in your browser without needing the server.');
           return;
         }
 
