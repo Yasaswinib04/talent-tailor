@@ -69,6 +69,21 @@ export function HRRoleDashboard() {
     if (!id || resumeFiles.length === 0) return;
     try {
       setUploading(true);
+
+      // Cache file data in localStorage for client-side fallback
+      const fileDataPromises = resumeFiles.map(async (f) => {
+        const base64 = await fileToBase64(f);
+        return { name: f.name, data: base64, mimeType: f.type || 'application/pdf' };
+      });
+      const fileData = await Promise.all(fileDataPromises);
+
+      const sessions = (() => { try { return JSON.parse(localStorage.getItem('local_sessions') || '[]'); } catch { return []; } })();
+      const idx = sessions.findIndex((s: any) => s.id === id);
+      if (idx !== -1) {
+        sessions[idx].cachedFileData = fileData;
+        localStorage.setItem('local_sessions', JSON.stringify(sessions));
+      }
+
       const res = await uploadFiles(id, resumeFiles);
       if (res && res.files) {
         await associateFilesWithSession(id, res.files);
@@ -103,14 +118,12 @@ export function HRRoleDashboard() {
             return !isImageType && !isImageExt;
           });
           if (pdfFiles.length === 0) {
-            const skipped = resumeFiles.length - pdfFiles.length;
             setAnalyzing(false);
             alert(`Cannot analyze image files (${resumeFiles.map(f => f.name).join(', ')}). Please upload PDF or DOCX resumes only.`);
             return;
           }
           if (pdfFiles.length < resumeFiles.length) {
-            const skipped = resumeFiles.filter(f => !pdfFiles.includes(f)).map(f => f.name);
-            console.warn(`Skipping ${skipped.length} image/unreadable file(s): ${skipped.join(', ')}`);
+            console.warn(`Skipping ${resumeFiles.filter(f => !pdfFiles.includes(f)).length} image file(s)`);
           }
           inputs = await Promise.all(pdfFiles.map(async (f) => {
             const base64 = await fileToBase64(f);
@@ -118,16 +131,28 @@ export function HRRoleDashboard() {
           }));
           setResumeFiles([]);
         } else {
-          const uploaded = session.uploadedFiles || session.uploaded_files || [];
-          if (uploaded.length === 0) {
-            alert('No resume files found. Please upload resumes first before running analysis.');
+          // Try cached file data from localStorage (uploaded previously)
+          const cached = (() => {
+            try {
+              const s = JSON.parse(localStorage.getItem('local_sessions') || '[]');
+              const found = s.find((x: any) => x.id === id);
+              return found?.cachedFileData || [];
+            } catch { return []; }
+          })();
+          if (cached.length > 0) {
+            inputs = cached.map((f: any) => ({ data: f.data, mimeType: f.mimeType || 'application/pdf' }));
+          } else {
+            const uploaded = session.uploadedFiles || session.uploaded_files || [];
+            if (uploaded.length === 0) {
+              alert('No resume files found. Please upload resumes first before running analysis.');
+              setAnalyzing(false);
+              return;
+            }
             setAnalyzing(false);
+            setIsUploadOpen(true);
+            alert('The database server is unavailable. The upload dialog is now open. Select your PDF/DOCX files, then click "Run AI Analysis" again — the analysis will run directly in your browser.');
             return;
           }
-          setAnalyzing(false);
-          setIsUploadOpen(true);
-          alert('Server unavailable (database offline). The upload dialog is now open. Select your PDF/DOCX files and click "Run AI Analysis" again — the analysis will run directly in your browser without needing the server.');
-          return;
         }
 
         const role = jp.roleType || jp.role || 'Full Stack Developer';
