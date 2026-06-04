@@ -76,6 +76,9 @@ export function HRLayout() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => { if (!cancelled) setAuthLoading(false); }, 3000);
+
     if (localStorage.getItem('uat_bypass_user') === 'true') {
       setUser({
         uid: 'uat-test-user-id',
@@ -84,14 +87,23 @@ export function HRLayout() {
         getIdToken: async () => 'uat-test-token-76839210-9b37-4d76-88d4-539c94b7f83e'
       } as any);
       setAuthLoading(false);
+      clearTimeout(timer);
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (u) => {
+        if (cancelled) return;
+        setUser(u);
+        setAuthLoading(false);
+        clearTimeout(timer);
+      });
+      return () => { cancelled = true; clearTimeout(timer); unsubscribe(); };
+    } catch (e) {
+      console.warn("Firebase auth initialization failed:", e);
+      if (!cancelled) setAuthLoading(false);
+      clearTimeout(timer);
+    }
   }, []);
 
   const isRouteActive = (path: string) => {

@@ -691,6 +691,9 @@ export function LegacyCandidateApp() {
   }, [hrAnalysis]);
 
   useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => { if (!cancelled) setIsAuthLoading(false); }, 3000);
+
     if (localStorage.getItem('uat_bypass_user') === 'true') {
       const mockUser = {
         uid: 'uat-test-user-id',
@@ -702,30 +705,36 @@ export function LegacyCandidateApp() {
       setUser(mockUser as any);
       setIsAuthLoading(false);
       loadHistory(mockUser.uid);
+      clearTimeout(timer);
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      setIsAuthLoading(false);
-      if (user) {
-        // Load history immediately so the user sees their data even if profile sync is slow/fails
-        loadHistory(user.uid);
-
-        // Sync user profile in background
-        try {
-          await setDoc(doc(db, 'users', user.uid), {
-            userId: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            createdAt: serverTimestamp()
-          }, { merge: true });
-        } catch (error) {
-          console.warn("Profile sync skipped (likely existing user)", error);
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (cancelled) return;
+        setUser(user);
+        setIsAuthLoading(false);
+        clearTimeout(timer);
+        if (user) {
+          loadHistory(user.uid);
+          try {
+            await setDoc(doc(db, 'users', user.uid), {
+              userId: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              createdAt: serverTimestamp()
+            }, { merge: true });
+          } catch (error) {
+            console.warn("Profile sync skipped (likely existing user)", error);
+          }
         }
-      }
-    });
-    return () => unsubscribe();
+      });
+      return () => { cancelled = true; clearTimeout(timer); unsubscribe(); };
+    } catch (e) {
+      console.warn("Firebase auth init failed in App.tsx:", e);
+      if (!cancelled) setIsAuthLoading(false);
+      clearTimeout(timer);
+    }
   }, []);
 
   const loadHistory = async (userId: string) => {
