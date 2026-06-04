@@ -1151,14 +1151,8 @@ export function LegacyCandidateApp() {
       handleSkipSignIn(); // Also mark as skipped so overlay doesn't reappear
     } catch (error: any) {
       console.error("Sign in failed", error);
-      const msg = error?.message || error?.code || '';
-      if (msg.includes('popup-closed-by-user')) {
-        alert('Sign-in popup was closed. Please try again or use Sandbox / Continue as Guest.');
-      } else if (msg.includes('unauthorized-domain') || msg.includes('operation-not-allowed')) {
-        alert('Google Sign-In is not configured for this domain yet. Please use Sandbox or Continue as Guest.');
-      } else {
-        alert(`Sign-in failed. Please use Sandbox or Continue as Guest. (${msg.substring(0, 80)})`);
-      }
+      alert("Google Sign-In is not configured for this domain. Automatically switching to Sandbox/Demo mode instead.");
+      handleSandboxSignIn();
     }
   };
 

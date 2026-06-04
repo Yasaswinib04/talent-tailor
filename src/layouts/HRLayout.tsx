@@ -139,13 +139,11 @@ export function HRLayout() {
                 await signInWithGoogle();
               } catch (err: any) {
                 const msg = err?.message || err?.code || '';
-                if (msg.includes('popup-closed-by-user')) {
-                  setAuthError('Sign-in popup was closed. Please try again or use Sandbox below.');
-                } else if (msg.includes('unauthorized-domain') || msg.includes('operation-not-allowed')) {
-                  setAuthError('Google Sign-In is not configured for this domain. Please use Sandbox or Continue as Guest below.');
-                } else {
-                  setAuthError(`Sign-in failed: ${msg.substring(0, 100)}. Please use Sandbox or Continue as Guest below.`);
-                }
+                setAuthError('Google Sign-In is not configured for this domain. Automatically switching to Sandbox/Demo mode...');
+                setTimeout(() => {
+                  handleSandboxSignIn();
+                  setAuthError(null);
+                }, 2000);
               }
             }}
             onSkip={handleSkipSignIn}
