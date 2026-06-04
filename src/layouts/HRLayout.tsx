@@ -185,43 +185,23 @@ export function HRLayout() {
             className="w-full bg-primary text-on-primary px-4 py-2.5 rounded-md font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(167,139,250,0.15)] disabled:opacity-50 cursor-pointer"
           >
             <span className="material-symbols-outlined text-lg">{creating ? "sync" : "add"}</span>
-            {creating ? "Creating..." : "New Request"}
+            {creating ? "Creating..." : "Create New Role"}
           </button>
         </div>
 
         <div className="flex flex-col gap-1 flex-1">
-          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-lg" data-icon="group">group</span>
-            <span className="text-sm">Talent Pools</span>
-          </Link>
-          <Link to="/hr" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-lg" data-icon="work" data-weight={isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? "fill" : "outline"} style={{ fontVariationSettings: isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') && !isRouteActive('/hr/analytics') && !isRouteActive('/hr/settings') ? "'FILL' 1" : "'FILL' 0" }}>work</span>
+          <Link to="/hr" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr') && !isRouteActive('/hr/pools') && !isRouteActive('/hr/compare') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg">work</span>
             <span className="text-sm">Active Roles</span>
           </Link>
+          <Link to="/hr/pools" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/pools') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-lg">group</span>
+            <span className="text-sm">Talent Pools</span>
+          </Link>
           <Link to="/hr/compare" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/compare') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-lg" data-icon="compare_arrows">compare_arrows</span>
+            <span className="material-symbols-outlined text-lg">compare_arrows</span>
             <span className="text-sm">Compare</span>
           </Link>
-          <Link to="/hr/analytics" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/analytics') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-lg" data-icon="analytics">analytics</span>
-            <span className="text-sm">Analytics</span>
-          </Link>
-          <Link to="/hr/settings" className={`flex items-center gap-3 px-4 py-2.5 rounded-md transition-all duration-200 group ${isRouteActive('/hr/settings') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-lg" data-icon="settings">settings</span>
-            <span className="text-sm">Settings</span>
-          </Link>
-          
-          {/* Bottom Help & Docs items */}
-          <div className="mt-auto border-t border-outline-variant pt-4 flex flex-col gap-1">
-            <Link to="/hr/help" className={`flex items-center gap-3 px-4 py-2 rounded-md transition-all duration-200 group ${isRouteActive('/hr/help') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-              <span className="material-symbols-outlined text-lg" data-icon="help">help</span>
-              <span className="text-sm">Help</span>
-            </Link>
-            <Link to="/hr/docs" className={`flex items-center gap-3 px-4 py-2 rounded-md transition-all duration-200 group ${isRouteActive('/hr/docs') ? 'bg-primary-container text-primary border-l-2 border-primary font-medium' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}>
-              <span className="material-symbols-outlined text-lg" data-icon="description">description</span>
-              <span className="text-sm">Docs</span>
-            </Link>
-          </div>
         </div>
       </nav>
 
@@ -247,23 +227,6 @@ export function HRLayout() {
           </div>
           
           <div className="flex items-center gap-4">
-            <button className="text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors active:scale-[0.98] relative flex items-center justify-center">
-              <span className="material-symbols-outlined text-xl" data-icon="notifications">notifications</span>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border border-surface-container"></span>
-            </button>
-            
-            <button className="text-on-surface-variant hover:text-on-surface p-2 rounded hover:bg-surface-container-highest transition-colors active:scale-[0.98] flex items-center justify-center">
-              <span className="material-symbols-outlined text-xl" data-icon="history">history</span>
-            </button>
-            
-            <div className="h-4 w-[1px] bg-outline-variant"></div>
-            
-            <a href="#support" className="text-sm text-on-surface-variant hover:text-on-surface transition-colors font-medium">Support</a>
-            
-            <button className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors">
-              Invite Team
-            </button>
-
             <button 
               onClick={handleSignOut}
               className="border border-outline-variant text-on-surface hover:bg-surface-container-high px-4 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer"
