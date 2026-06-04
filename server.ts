@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
 import bugsRouter from "./src/server/routes/bugs.js";
-import { initDb } from "./src/server/db.js";
+import { initDb, isDbConnected, dbError } from "./src/server/db.js";
 import { extractSkillsFromJD } from "./src/server/services/ai/jdSkillExtractor.js";
 import axios from "axios";
 import path from "path";
@@ -64,6 +64,8 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({
       status: "running",
+      dbConnected: isDbConnected,
+      dbError: dbError || null,
       env: {
         hasDatabaseUrl: !!process.env.DATABASE_URL,
         hasGeminiKey: !!process.env.GEMINI_API_KEY,
