@@ -1,9 +1,8 @@
-import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier, IndustryType, CandidateProfile } from "../../../types.js";
+import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier, IndustryType } from "../../../types.js";
 import { getSessionById, updateSession, supabase, logPipelineEvent, getResumeText, setResumeText, findProfileByTextHash, upsertTalentProfile } from "../../db.js";
 import PQueue from 'p-queue';
 import { classifyTrack } from "./classifier.js";
 import { scoreCandidate } from "./scorer.js";
-import { generateQuestions } from "./questions.js";
 import { extractProfile } from "./extractor.js";
 import { preFilterResume, PreFilterResult } from "../preFilter.js";
 import { extractResumeText } from "../extract.js";
@@ -28,13 +27,11 @@ export async function analyzeResumes(
   jd: string | { data: string, mimeType: string },
   role: RoleType,
   tier: ExperienceTier = 'Senior',
-  features: string[] = ['score', 'competencies'],
   discoveryAnswers?: { question: string, answer: string }[],
   preferences?: HiringPreferences,
   targetMarket: string = 'India',
   industry?: IndustryType
 ): Promise<AnalysisResult> {
-  const includeQuestions = features.includes('questions');
 
   const startTrack = Date.now();
   const jdText = typeof jd === 'string' ? jd : (jd as any).text || '';
@@ -93,18 +90,11 @@ export async function analyzeResumes(
         );
         await logPipelineEvent(sessionId, candidateId, 'CoreScorer', Date.now() - startScore, 'success');
 
-        let questions: { question: string }[] = [];
-        if (includeQuestions && data.gaps && data.gaps.length > 0 && data.meetsMandatoryCriteria !== false && data.score >= 5.0) {
-          const startQ = Date.now();
-          questions = await generateQuestions(data.gaps, role, tier);
-          await logPipelineEvent(sessionId, candidateId, 'GapInterrogator', Date.now() - startQ, 'success');
-        }
-
         processedCandidates.push({
           ...data,
           track,
           overqualified: checkOverqualified(data.experienceYears, preferences?.minExperienceYears),
-          discoveryQuestions: questions,
+          discoveryQuestions: [],
           strengths: (data.strengths || []).map((s: string) => ({ text: s })),
           weaknesses: (data.weaknesses || []).map((w: string) => ({ text: w })),
           id: candidateId,
@@ -244,7 +234,6 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
       jd,
       role,
       tier,
-      ['score', 'competencies'],
       undefined,
       preferences,
       targetMarket,
