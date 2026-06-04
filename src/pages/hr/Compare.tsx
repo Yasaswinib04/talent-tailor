@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getSessions, generateScreeningQuestions } from '../../lib/api.js';
 import { Check, X, ArrowLeft, Sliders, AlertTriangle, Layers, Award, ShieldAlert, Download, Sparkles, RefreshCw } from 'lucide-react';
 
@@ -20,6 +20,7 @@ interface RolePipeline {
   name: string;
   department: string;
   candidates: Candidate[];
+  uploadedFilesCount: number;
 }
 
 export function HRCompare() {
@@ -67,6 +68,7 @@ export function HRCompare() {
     id: 'demo-role-123',
     name: 'Senior Frontend Architect (Demo)',
     department: 'Engineering',
+    uploadedFilesCount: 3,
     candidates: [
       {
         id: 'demo-c1',
@@ -151,6 +153,7 @@ export function HRCompare() {
             name: jp.name || 'Untitled Role',
             department: jp.department || 'General',
             candidates: mapped,
+            uploadedFilesCount: (session.uploaded_files || session.uploadedFiles || []).length,
           });
         }
 
@@ -290,12 +293,7 @@ export function HRCompare() {
         {/* Candidate Checklist */}
         <div className="lg:col-span-3 bg-surface-container border border-outline-variant rounded-xl p-5 flex flex-col justify-center">
           <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-3">Select Candidates to Compare (Max 3)</span>
-          {activeCandidates.length === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-on-surface-variant italic py-1 bg-surface-container-low/50 px-3 rounded-md border border-outline-variant">
-              <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-              No candidates have been analyzed in this pipeline yet. Go back to upload resumes first.
-            </div>
-          ) : (
+          {activeCandidates.length === 0 ? null : (
             <div className="flex flex-wrap gap-3">
               {activeCandidates.map(c => {
                 const isSelected = selectedCandidateIds.includes(c.id);
@@ -322,19 +320,61 @@ export function HRCompare() {
 
       {/* Comparison Matrix Area */}
       <div className="flex-1 min-h-[400px] relative z-10 flex flex-col">
-        {selectedCandidates.length < 2 ? (
-          /* Empty Selector State */
-          <div className="flex-1 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center p-12 text-center bg-surface-container/20">
-            <div className="w-16 h-16 rounded-full bg-primary-container text-primary flex items-center justify-center border border-primary/20 mb-4 shadow-[0_0_20px_rgba(167,139,250,0.1)]">
-              <Sliders className="h-7 w-7" />
-            </div>
-            <h3 className="text-lg font-headline font-bold text-on-surface mb-2">Side-by-Side Comparison Workspace</h3>
-            <p className="text-xs text-on-surface-variant max-w-sm leading-relaxed">
-              Please check checkboxes for 2 or 3 candidates above. The comparison board will immediately generate structured competency ratings, strengths, and interview check logs.
-            </p>
-          </div>
-        ) : (
-          /* Matrix Table Card */
+        {(() => {
+          const isEmpty = activeCandidates.length === 0;
+          const hasFiles = activePipeline && activePipeline.uploadedFilesCount > 0;
+
+          if (isEmpty && hasFiles) {
+            return (
+              <div className="flex-1 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center p-12 text-center bg-surface-container/20">
+                <div className="w-16 h-16 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center border border-yellow-500/20 mb-4">
+                  <span className="material-symbols-outlined text-3xl">pending</span>
+                </div>
+                <h3 className="text-lg font-headline font-bold text-on-surface mb-2">Candidates Pending Analysis</h3>
+                <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
+                  Candidates for this pipeline are pending analysis. Uploaded resumes need to be processed before they appear here.
+                </p>
+                <Link to={`/hr/role/${selectedPipelineId}`} className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-md font-semibold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(167,139,250,0.15)]">
+                  <span className="material-symbols-outlined text-[18px]">analytics</span>
+                  Go to Role Dashboard to Run Analysis
+                </Link>
+              </div>
+            );
+          }
+
+          if (isEmpty && !hasFiles) {
+            return (
+              <div className="flex-1 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center p-12 text-center bg-surface-container/20">
+                <div className="w-16 h-16 rounded-full bg-surface-container-low text-on-surface-variant flex items-center justify-center border border-outline-variant mb-4">
+                  <span className="material-symbols-outlined text-3xl">person_add</span>
+                </div>
+                <h3 className="text-lg font-headline font-bold text-on-surface mb-2">No Candidates in Pipeline</h3>
+                <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
+                  No candidates have been added to this pipeline yet. Upload resumes or source from the talent pool to get started.
+                </p>
+                <Link to={`/hr/role/${selectedPipelineId}`} className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-md font-semibold text-sm hover:opacity-90 transition-all shadow-[0_0_20px_rgba(167,139,250,0.15)]">
+                  <span className="material-symbols-outlined text-[18px]">group_add</span>
+                  Go to Role Dashboard to Source Candidates
+                </Link>
+              </div>
+            );
+          }
+
+          if (selectedCandidates.length < 2) {
+            return (
+              <div className="flex-1 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center p-12 text-center bg-surface-container/20">
+                <div className="w-16 h-16 rounded-full bg-primary-container text-primary flex items-center justify-center border border-primary/20 mb-4 shadow-[0_0_20px_rgba(167,139,250,0.1)]">
+                  <Sliders className="h-7 w-7" />
+                </div>
+                <h3 className="text-lg font-headline font-bold text-on-surface mb-2">Side-by-Side Comparison Workspace</h3>
+                <p className="text-xs text-on-surface-variant max-w-sm leading-relaxed">
+                  Please check checkboxes for 2 or 3 candidates above. The comparison board will immediately generate structured competency ratings, strengths, and interview check logs.
+                </p>
+              </div>
+            );
+          }
+
+          return (
           <div className="flex-1 bg-surface-container border border-outline-variant rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             <div className="overflow-x-auto custom-scrollbar flex-1">
               <table className="w-full text-left border-collapse min-w-[700px] table-fixed">
@@ -519,7 +559,8 @@ export function HRCompare() {
               </table>
             </div>
           </div>
-        )}
+        );
+      })()}
       </div>
     </div>
   );
