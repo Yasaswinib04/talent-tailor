@@ -23,6 +23,7 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [targetRoleId, setTargetRoleId] = useState('');
   const [skillSearch, setSkillSearch] = useState('');
+  const [activePickerId, setActivePickerId] = useState<string | null>(null);
 
   const filteredCandidates = useMemo(() => {
     const raw = externalCandidates || [];
@@ -49,6 +50,13 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const handleAddToRole = (candidateId: string, roleId: string) => {
+    if (!roleId) return;
+    toggleSelect(candidateId);
+    setActivePickerId(null);
+    onNavigateToRole?.(roleId);
   };
 
   const addSelectedToRole = (roleId: string) => {
@@ -162,7 +170,7 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
                           {c.globalStatus}
                         </span>
                       </td>
-                      <td className="p-4 pr-5 text-right">
+                      <td className="p-4 pr-5 text-right relative">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => alert(`Viewing profile: ${c.name}`)}
@@ -171,19 +179,37 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
                           >
                             <span className="material-symbols-outlined text-[16px]">visibility</span>
                           </button>
-                          <button
-                            onClick={() => {
-                              if (targetRoleId) {
-                                addSelectedToRole(targetRoleId);
-                              } else {
-                                toggleSelect(c.id);
-                              }
-                            }}
-                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">add</span>
-                            Add to Active Role
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setActivePickerId(activePickerId === c.id ? null : c.id)}
+                              className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">add</span>
+                              Add to Active Role
+                            </button>
+                            {activePickerId === c.id && (
+                              <div className="absolute right-0 top-9 z-30 bg-surface-container-high border border-outline-variant rounded-md shadow-xl py-1 w-56 text-left animate-in fade-in slide-in-from-top-1 duration-150">
+                                <p className="px-3 py-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/30">Select a role</p>
+                                {sessions.length === 0 ? (
+                                  <p className="px-3 py-2 text-xs text-on-surface-variant italic">No roles available</p>
+                                ) : (
+                                  sessions.map(s => {
+                                    const jp = s.job_profile || {};
+                                    return (
+                                      <button
+                                        key={s.id}
+                                        onClick={() => handleAddToRole(c.id, s.id)}
+                                        className="w-full px-4 py-2.5 text-xs font-medium text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-2 cursor-pointer text-left"
+                                      >
+                                        <span className="material-symbols-outlined text-sm text-primary">work</span>
+                                        {jp.name || 'Untitled Role'}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
