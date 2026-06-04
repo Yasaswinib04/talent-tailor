@@ -154,13 +154,15 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1.5">
                           {c.evaluationHistory.slice(0, 3).map((e, i) => (
-                            <span key={i} className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${e.statusColor} flex items-center gap-1`} title={`Role: ${e.roleName}`}>
-                              {e.roleName.length > 14 ? e.roleName.substring(0, 12) + '…' : e.roleName}
-                              <span className="text-[9px] opacity-70">{e.status === 'Pending Analysis' ? '' : `${Math.round(e.score * 10)}%`}</span>
+                            <span key={i} className={`inline-flex flex-col px-2 py-1 rounded text-[10px] font-semibold border ${e.statusColor}`} title={`${e.roleName} — ${e.status}${e.score > 0 ? ` (${Math.round(e.score * 10)}%)` : ''}`}>
+                              <span className="max-w-[100px] truncate leading-tight">{e.roleName}</span>
+                              <span className="text-[8px] opacity-80 leading-tight mt-0.5">
+                                {e.status === 'Pending Analysis' ? 'Pending Analysis' : `${e.status} · ${Math.round(e.score * 10)}%`}
+                              </span>
                             </span>
                           ))}
                           {c.evaluationHistory.length > 3 && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-surface-container-low text-on-surface-variant border border-outline-variant">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-surface-container-low text-on-surface-variant border border-outline-variant self-center">
                               +{c.evaluationHistory.length - 3} more
                             </span>
                           )}
