@@ -2,6 +2,12 @@ import postgres from 'postgres';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local'), override: false });
 
 dotenv.config();
 
@@ -9,10 +15,21 @@ let sql: ReturnType<typeof postgres> | null = null;
 
 function getSql() {
   if (!sql) {
-    const dbUrl = process.env.DATABASE_URL;
+    let dbUrl = (process.env.DATABASE_URL || '').trim();
     if (!dbUrl) {
-      throw new Error("DATABASE_URL environment variable is missing.");
+      throw new Error("DATABASE_URL environment variable is missing or empty.");
     }
+    try {
+      new URL(dbUrl);
+    } catch {
+      if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+        dbUrl = 'postgresql://' + dbUrl;
+        try { new URL(dbUrl); } catch { throw new Error(`DATABASE_URL is not a valid URL. Got: "${dbUrl.substring(0, 50)}..."`); }
+      } else {
+        throw new Error(`DATABASE_URL is not a valid URL. Got: "${dbUrl.substring(0, 50)}..."`);
+      }
+    }
+    console.log("[DB] PostgreSQL URL parsed successfully — connecting...");
     sql = postgres(dbUrl, {
       max: 10,
       idle_timeout: 20,

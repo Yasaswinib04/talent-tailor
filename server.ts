@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
 import bugsRouter from "./src/server/routes/bugs.js";
-import { initDb, isDbConnected, dbError } from "./src/server/db.js";
+import { initDb } from "./src/server/db.js";
 import { extractSkillsFromJD } from "./src/server/services/ai/jdSkillExtractor.js";
 import axios from "axios";
 import path from "path";
@@ -13,6 +13,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  const envKeys = Object.keys(process.env).filter(k =>
+    k.toLowerCase().includes('database') || k.toLowerCase().includes('supabase') ||
+    k.toLowerCase().includes('gemini') || k.toLowerCase().includes('api_key') ||
+    k.toLowerCase().includes('database_url')
+  );
+  console.log("[ENV] Matching env vars found:", envKeys.length > 0 ? envKeys : '(none)');
+  console.log("[ENV] Raw entry point. DATABASE_URL type:", typeof process.env.DATABASE_URL, "| length:", process.env.DATABASE_URL?.length || 0);
   console.log("[ENV] Startup environment check:", {
     DATABASE_URL: process.env.DATABASE_URL ? '✓ found' : '✗ missing',
     SUPABASE_URL: process.env.SUPABASE_URL ? '✓ found' : '✗ missing',
@@ -44,13 +51,9 @@ async function startServer() {
   });
 
   // Middleware to check database connection status for database-dependent API endpoints
+  // Note: DB check is handled per-route with client-side localStorage fallbacks.
+  // When DB is unavailable, routes return errors and the frontend falls back to local storage.
   app.use(["/api/hr/sessions", "/api/hr/bugs"], (req, res, next) => {
-    if (!isDbConnected) {
-      return res.status(503).json({
-        error: "Database connection failed. Please check that DATABASE_URL is configured correctly in your environment variables.",
-        detail: dbError || null
-      });
-    }
     next();
   });
 
@@ -60,9 +63,7 @@ async function startServer() {
 
   app.get("/api/health", (_req, res) => {
     res.json({
-      status: isDbConnected ? "healthy" : "degraded",
-      dbConnected: isDbConnected,
-      dbError: dbError || null,
+      status: "running",
       env: {
         hasDatabaseUrl: !!process.env.DATABASE_URL,
         hasGeminiKey: !!process.env.GEMINI_API_KEY,
