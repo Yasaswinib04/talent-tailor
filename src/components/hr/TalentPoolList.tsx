@@ -24,6 +24,7 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
   const [targetRoleId, setTargetRoleId] = useState('');
   const [skillSearch, setSkillSearch] = useState('');
   const [activePickerId, setActivePickerId] = useState<string | null>(null);
+  const [viewProfileId, setViewProfileId] = useState<string | null>(null);
 
   const filteredCandidates = useMemo(() => {
     const raw = externalCandidates || [];
@@ -173,7 +174,7 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
                       <td className="p-4 pr-5 text-right relative">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => alert(`Viewing profile: ${c.name}`)}
+                            onClick={() => setViewProfileId(c.id)}
                             className="p-1.5 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                             title={c.isLegacy ? 'Click to extract profile (legacy data)' : 'View profile'}
                           >
@@ -257,6 +258,74 @@ export function TalentPoolList({ candidates: externalCandidates, sessions = [], 
           </div>
         )}
       </main>
+
+      {/* Profile Modal */}
+      {viewProfileId && (
+        (() => {
+          const c = externalCandidates?.find(c => c.id === viewProfileId);
+          if (!c) return null;
+          return (
+            <div className="fixed inset-0 z-[200] bg-background/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+              onClick={(e) => { if (e.target === e.currentTarget) setViewProfileId(null); }}>
+              <div className="bg-surface-container rounded-xl border border-outline-variant w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+                <div className="flex items-center justify-between p-5 border-b border-outline-variant/50">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border ${c.isLegacy ? 'bg-surface-container-low text-on-surface-variant border-outline-variant' : 'bg-secondary-container text-on-surface border-outline-variant'}`}>
+                      {(c.name || '?').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-headline font-bold text-on-surface">{c.name}</h2>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${c.globalStatusColor}`}>{c.globalStatus}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setViewProfileId(null)} className="text-on-surface-variant hover:text-on-surface p-1 rounded-full hover:bg-surface-container-highest transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-lg">close</span>
+                  </button>
+                </div>
+                <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+                  {c.skills.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Skills</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {c.skills.map(s => (
+                          <span key={s.name} className={`px-2 py-0.5 rounded text-[11px] font-medium border ${s.color}`}>{s.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {c.isLegacy && (
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-500">
+                      This candidate was uploaded as a file but hasn't been parsed yet. Run analysis on their source role to extract skills and structured data.
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Evaluation History ({c.evaluationHistory.length})</h4>
+                    <div className="space-y-2">
+                      {c.evaluationHistory.map((e, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-md bg-surface-container-low border border-outline-variant/50">
+                          <div>
+                            <p className="text-sm font-medium text-on-surface">{e.roleName}</p>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${e.statusColor} mt-1 inline-block`}>{e.status}</span>
+                          </div>
+                          {e.score > 0 && (
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-on-surface">{Math.round(e.score * 10)}<span className="text-xs text-on-surface-variant">%</span></p>
+                              <p className="text-[9px] text-on-surface-variant">Match Score</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-outline-variant/50 flex justify-end">
+                  <button onClick={() => setViewProfileId(null)} className="px-4 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Close</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
     </div>
   );
 }
