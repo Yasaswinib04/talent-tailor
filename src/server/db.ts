@@ -29,6 +29,7 @@ export const supabase = createClient(
 );
 
 export let isDbConnected = false;
+export let dbError: string | null = null;
 
 /**
  * Ensures the target PostgreSQL table schema exists.
@@ -36,7 +37,8 @@ export let isDbConnected = false;
 export async function initDb() {
   try {
     if (!process.env.DATABASE_URL) {
-      throw new Error("DATABASE_URL environment variable is missing.");
+      dbError = "DATABASE_URL environment variable is missing.";
+      throw new Error(dbError);
     }
     await getSql()`
       CREATE TABLE IF NOT EXISTS screening_sessions (
@@ -116,10 +118,12 @@ export async function initDb() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pool_profile_hash ON talent_pool_profiles(resume_text_hash)
     `;
     isDbConnected = true;
+    dbError = null;
     console.log("PostgreSQL schema validated successfully.");
-  } catch (error) {
+  } catch (error: any) {
     isDbConnected = false;
-    console.error("Failed to initialize PostgreSQL schema:", error);
+    dbError = error.message || String(error);
+    console.error("Failed to initialize PostgreSQL schema:", dbError);
   }
 }
 

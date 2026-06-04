@@ -199,7 +199,10 @@ export function HRRoleDashboard() {
   if (!session) return <div className="p-8 text-on-surface-variant">Role not found.</div>;
 
   const jp = session.job_profile || {};
-  const analysisError = session.analysis_results?.error || null;
+  const rawError = session.analysis_results?.error || null;
+  const analysisError = rawError && (
+    rawError.includes('image.png') || rawError.includes('model does not support image input')
+  ) ? 'Some uploaded files could not be processed. Image files (PNG/JPEG) are not supported as resumes. Please upload PDF or DOCX files only.' : rawError;
   const candidates = Array.isArray(session.analysis_results?.candidates)
     ? session.analysis_results.candidates
     : Array.isArray(session.analysis_results)

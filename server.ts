@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import sessionsRouter from "./src/server/routes/sessions.js";
 import uploadRouter from "./src/server/routes/upload.js";
 import bugsRouter from "./src/server/routes/bugs.js";
-import { initDb, isDbConnected } from "./src/server/db.js";
+import { initDb, isDbConnected, dbError } from "./src/server/db.js";
 import { extractSkillsFromJD } from "./src/server/services/ai/jdSkillExtractor.js";
 import axios from "axios";
 import path from "path";
@@ -38,7 +38,8 @@ async function startServer() {
   app.use(["/api/hr/sessions", "/api/hr/bugs"], (req, res, next) => {
     if (!isDbConnected) {
       return res.status(503).json({
-        error: "Database connection failed. Please check that DATABASE_URL is configured correctly in your environment variables."
+        error: "Database connection failed. Please check that DATABASE_URL is configured correctly in your environment variables.",
+        detail: dbError || null
       });
     }
     next();
@@ -52,6 +53,13 @@ async function startServer() {
     res.json({
       status: isDbConnected ? "healthy" : "degraded",
       dbConnected: isDbConnected,
+      dbError: dbError || null,
+      env: {
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        hasGeminiKey: !!process.env.GEMINI_API_KEY,
+        hasSupabaseUrl: !!process.env.SUPABASE_URL,
+        hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      },
       timestamp: new Date().toISOString()
     });
   });
