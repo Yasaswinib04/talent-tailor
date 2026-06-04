@@ -13,6 +13,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  console.log("[ENV] Startup environment check:", {
+    DATABASE_URL: process.env.DATABASE_URL ? '✓ found' : '✗ missing',
+    SUPABASE_URL: process.env.SUPABASE_URL ? '✓ found' : '✗ missing',
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ found' : '✗ missing',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '✓ found' : '✗ missing',
+    NODE_ENV: process.env.NODE_ENV || 'not set',
+    PORT: process.env.PORT || '3001 (default)',
+  });
+
   const app = express();
   const PORT = Number(process.env.PORT) || 3001;
 
