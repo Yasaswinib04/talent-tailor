@@ -22,7 +22,6 @@ interface Filters {
 }
 
 interface Props {
-  onAddTalent: () => void;
   candidates?: Candidate[];
   sessions?: any[];
   onRefresh?: () => void;
@@ -41,7 +40,7 @@ function useIsDevMode(): boolean {
   return localStorage.getItem('developer_mode') === 'true';
 }
 
-export function TalentPoolList({ onAddTalent, candidates: externalCandidates, sessions = [], onRefresh, onNavigateToRole }: Props) {
+export function TalentPoolList({ candidates: externalCandidates, sessions = [], onRefresh, onNavigateToRole }: Props) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [targetRoleId, setTargetRoleId] = useState<string>('');
@@ -243,19 +242,12 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, se
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
               </button>
             )}
-            <button
-              onClick={onAddTalent}
-              className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              Add Talent
-            </button>
-            <button className="border border-outline-variant text-on-surface hover:bg-surface-container-highest px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer">
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              Export
-            </button>
-          </div>
-        </header>
+              <button className="border border-outline-variant text-on-surface hover:bg-surface-container-highest px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2 cursor-pointer">
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                Export
+              </button>
+            </div>
+          </header>
 
         <div className="flex-1 overflow-auto custom-scrollbar px-6 pb-6">
 
@@ -281,13 +273,8 @@ export function TalentPoolList({ onAddTalent, candidates: externalCandidates, se
                     <td colSpan={8} className="p-12 text-center text-on-surface-variant">
                       <span className="material-symbols-outlined text-3xl mb-2 block opacity-30">person_off</span>
                       <p className="text-sm font-medium">
-                        {hasActiveFilters ? 'No candidates match your filters' : 'No candidates yet'}
+                        {hasActiveFilters ? 'No candidates match your filters' : 'No candidates in the talent pool yet. Process candidates through a Role Dashboard first.'}
                       </p>
-                      {!hasActiveFilters && (
-                        <button onClick={onAddTalent} className="mt-2 text-xs text-primary hover:underline cursor-pointer">
-                          Add your first talent
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ) : (

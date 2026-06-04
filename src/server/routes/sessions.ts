@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { createSession, getSessionById, updateSession, listSessionsByUser, deleteSession } from '../db.js';
 import { runScreeningAnalysis, generateQuestions } from '../services/ai.js';
+import { scanPool } from '../services/ai/poolScanner.js';
 
 const router = Router();
 
@@ -97,6 +98,28 @@ router.post('/:id/analyze', async (req: AuthRequest, res): Promise<void> => {
     res.json({ status: 'analyzing', session: updatedSession });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/:id/scan-pool', async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const session = await getSessionById(req.params.id, req.userId!);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const jp = session.jobProfile || {};
+    const prefs = jp.preferences || null;
+    const jdText = jp.jdContent || jp.jd || '';
+    const role = jp.roleType || jp.role || 'Full Stack Developer';
+    const tier = jp.experienceTier || 'Senior';
+    const targetMarket = jp.targetMarket || 'India';
+    const topN = req.body.topN || 20;
+
+    const result = await scanPool(req.params.id, jdText, role, tier, prefs, targetMarket, topN);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Pool scan failed' });
   }
 });
 

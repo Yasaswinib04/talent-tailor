@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { getSession, uploadFiles, startAnalysis, associateFilesWithSession, deleteSession } from '../../lib/api.js';
 import { FileUploadZone } from '../../components/FileUploadZone.js';
+import { PoolScannerModal } from '../../components/hr/PoolScannerModal.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
 import { RefreshCw, Zap } from 'lucide-react';
 import { getEffectiveWeights } from '../../constants/roles.js';
@@ -31,6 +32,7 @@ export function HRRoleDashboard() {
   const [resumeFiles, setResumeFiles] = useState<File[]>([]);
   const [copied, setCopied] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  const [isSourcePoolOpen, setIsSourcePoolOpen] = useState(false);
 
   const fetchSession = async () => {
     if (!id) return;
@@ -156,6 +158,30 @@ export function HRRoleDashboard() {
       }
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleAddFromPool = async (poolCandidates: any[]) => {
+    if (!id || poolCandidates.length === 0) return;
+    try {
+      const sessions = JSON.parse(localStorage.getItem('local_sessions') || '[]');
+      const idx = sessions.findIndex((s: any) => s.id === id);
+      if (idx !== -1) {
+        const existing = Array.isArray(sessions[idx].analysis_results?.candidates)
+          ? sessions[idx].analysis_results.candidates
+          : [];
+        sessions[idx].analysis_results = {
+          ...(sessions[idx].analysis_results || {}),
+          candidates: [...existing, ...poolCandidates],
+        };
+        sessions[idx].analysis_results = sessions[idx].analysisResults;
+        sessions[idx].updatedAt = new Date().toISOString();
+        sessions[idx].updated_at = new Date().toISOString();
+        localStorage.setItem('local_sessions', JSON.stringify(sessions));
+      }
+      await fetchSession();
+    } catch (err) {
+      console.error('Failed to add candidates from pool:', err);
     }
   };
 
@@ -320,6 +346,13 @@ export function HRRoleDashboard() {
                 <span className="material-symbols-outlined text-[16px]">upload</span>
                 Upload Resumes
               </button>
+              <button
+                onClick={() => setIsSourcePoolOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-surface-container-highest/60 hover:bg-outline-variant text-on-surface font-semibold text-xs rounded border border-outline-variant transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">search</span>
+                Source from Pool
+              </button>
               <button 
                 onClick={handleAnalyze}
                 disabled={analyzing || filesCount === 0}
@@ -337,12 +370,9 @@ export function HRRoleDashboard() {
       </div>
 
       {candidates.length === 0 ? (
-        /* Stunning Empty State: "Awaiting Your First Candidates" */
+        /* Empty State with Two Primary Actions */
         <div className="border-2 border-dashed border-outline-variant rounded-2xl flex-1 flex flex-col items-center justify-center p-8 md:p-12 text-center min-h-[400px] bg-surface-container/20 relative overflow-hidden">
-          {/* Subtle central glow */}
           <div className="absolute w-72 h-72 bg-primary/5 rounded-full blur-[80px] pointer-events-none"></div>
-
-          {/* Glowing Animated Circular Progress with Center Brain/Psychology Icon */}
           <div className="relative w-20 h-20 mb-6 flex items-center justify-center z-10">
             <div className="absolute inset-0 rounded-full border-[3px] border-primary/10"></div>
             <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-primary border-r-primary animate-spin-slow"></div>
@@ -350,41 +380,34 @@ export function HRRoleDashboard() {
               <span className="material-symbols-outlined text-2xl animate-pulse-slow">psychology</span>
             </div>
           </div>
-
-          {/* Heading & Subtext */}
-          <h3 className="text-xl font-headline font-bold text-on-surface mb-3 tracking-tight z-10">
+          <h3 className="text-xl font-headline font-bold text-on-surface mb-2 tracking-tight z-10">
             Awaiting Your First Candidates
           </h3>
-          <p className="text-on-surface-variant text-sm max-w-lg mb-8 leading-relaxed z-10">
-            The AI engine is currently scanning your talent pool for the best matches based on the role requirements. You can also manually accelerate the process.
+          <p className="text-on-surface-variant text-sm max-w-lg mb-6 leading-relaxed z-10">
+            Upload resumes directly to this role, or scan the global talent pool for previously parsed candidates.
           </p>
-
-          {/* Action Buttons */}
           <div className="flex flex-wrap gap-4 justify-center z-10">
             <button
-              onClick={handleShareLink}
-              className="bg-primary text-on-primary px-6 py-2.5 rounded-md font-semibold hover:opacity-95 active:scale-[0.98] transition-all flex items-center gap-2 text-xs shadow-[0_0_20px_rgba(167,139,250,0.15)] cursor-pointer min-w-[150px] justify-center"
+              onClick={() => setIsUploadOpen(true)}
+              className="bg-primary text-on-primary px-6 py-3 rounded-md font-semibold hover:opacity-95 active:scale-[0.98] transition-all flex items-center gap-2.5 text-sm shadow-[0_0_20px_rgba(167,139,250,0.15)] cursor-pointer min-w-[200px] justify-center"
             >
-              <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "share"}</span>
-              {copied ? "Link Copied!" : "Share Job Link"}
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+              Upload New Resumes
             </button>
             <button
-              onClick={() => navigate('/hr/pools')}
-              className="border border-outline-variant bg-surface-container-low/60 hover:bg-surface-container-high text-on-surface px-6 py-2.5 rounded-md font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer min-w-[150px] justify-center"
+              onClick={() => setIsSourcePoolOpen(true)}
+              className="border-2 border-outline-variant bg-surface-container-low/60 hover:bg-surface-container-high text-on-surface px-6 py-3 rounded-md font-semibold text-sm transition-all flex items-center gap-2.5 cursor-pointer min-w-[200px] justify-center"
             >
-              <span className="material-symbols-outlined text-[16px]">group_add</span>
-              Invite from Talent Pool
+              <span className="material-symbols-outlined text-[18px]">search</span>
+              Source from Talent Pool
             </button>
           </div>
-
-          {/* Bottom Settings Link */}
-          <button
-            onClick={() => navigate(`/hr/role/${id}/setup`)}
-            className="mt-8 text-xs font-semibold text-on-surface-variant hover:text-primary transition-all flex items-center gap-1.5 cursor-pointer hover:underline"
-          >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            Review Scoring Criteria
-          </button>
+          <div className="flex items-center gap-4 mt-6 z-10">
+            <button onClick={() => navigate(`/hr/role/${id}/setup`)} className="text-xs text-on-surface-variant hover:text-primary transition-all flex items-center gap-1 cursor-pointer hover:underline">
+              <span className="material-symbols-outlined text-[16px]">tune</span>
+              Review Scoring Criteria
+            </button>
+          </div>
         </div>
       ) : (
         /* Candidates Table View */
@@ -495,6 +518,13 @@ export function HRRoleDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PoolScannerModal
+        isOpen={isSourcePoolOpen}
+        sessionId={id || ''}
+        onClose={() => setIsSourcePoolOpen(false)}
+        onAddToSession={handleAddFromPool}
+      />
     </div>
   );
 }

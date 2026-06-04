@@ -335,6 +335,24 @@ export const extractJDSkills = async (jdText: string, roleType: string, experien
   }
 };
 
+export const scanPool = async (sessionId: string, topN: number = 20) => {
+  try {
+    const res = await fetchWithTimeout(`/api/hr/sessions/${sessionId}/scan-pool`, {
+      method: 'POST',
+      headers: {
+        ...(await getAuthHeaders()),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ topN })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (error) {
+    console.warn("API scanPool failed:", error);
+    return { total: 0, sievedOut: 0, passing: 0, scored: 0, matches: [] };
+  }
+};
+
 export const generateScreeningQuestions = async (sessionId: string, candidateId: string) => {
   try {
     if (sessionId === 'demo-role-123') {

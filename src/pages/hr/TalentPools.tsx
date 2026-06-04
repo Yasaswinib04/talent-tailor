@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TalentPoolEmptyState } from '../../components/hr/TalentPoolEmptyState';
 import { TalentPoolList } from '../../components/hr/TalentPoolList';
-import { AddTalentModal } from '../../components/hr/AddTalentModal';
 import { getSessions } from '../../lib/api.js';
 
 export interface PoolCandidate {
@@ -84,7 +82,6 @@ function extractCandidatesFromSessions(sessions: any[]): PoolCandidate[] {
 export function HRTalentPools() {
   const navigate = useNavigate();
   const [hasTalent, setHasTalent] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [candidates, setCandidates] = useState<PoolCandidate[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,11 +105,6 @@ export function HRTalentPools() {
 
   useEffect(() => { loadCandidates(); }, [loadCandidates]);
 
-  const handleAddTalentSuccess = () => {
-    setHasTalent(true);
-    loadCandidates();
-  };
-
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-background">
@@ -124,22 +116,23 @@ export function HRTalentPools() {
   return (
     <div className="h-full w-full flex flex-col bg-background relative overflow-hidden">
       {!hasTalent ? (
-        <TalentPoolEmptyState onAddTalent={() => setIsModalOpen(true)} />
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-background">
+          <div className="w-16 h-16 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center text-on-surface-variant mb-4">
+            <span className="material-symbols-outlined text-2xl">group</span>
+          </div>
+          <h3 className="text-lg font-headline font-bold text-on-surface mb-2">No Candidates in Pool</h3>
+          <p className="text-sm text-on-surface-variant max-w-md leading-relaxed">
+            The talent pool shows candidates from completed role analyses. Upload and analyze resumes through a Role Dashboard to populate the pool.
+          </p>
+        </div>
       ) : (
         <TalentPoolList
-          onAddTalent={() => setIsModalOpen(true)}
           candidates={candidates}
           sessions={sessions}
           onRefresh={loadCandidates}
           onNavigateToRole={(roleId) => navigate(`/hr/role/${roleId}`)}
         />
       )}
-
-      <AddTalentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAddSuccess={handleAddTalentSuccess}
-      />
     </div>
   );
 }

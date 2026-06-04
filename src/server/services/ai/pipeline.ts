@@ -1,9 +1,10 @@
-import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier, IndustryType } from "../../../types.js";
-import { getSessionById, updateSession, supabase, logPipelineEvent, getResumeText, setResumeText } from "../../db.js";
+import { AnalysisResult, RoleType, HiringPreferences, ExperienceTier, IndustryType, CandidateProfile } from "../../../types.js";
+import { getSessionById, updateSession, supabase, logPipelineEvent, getResumeText, setResumeText, findProfileByTextHash, upsertTalentProfile } from "../../db.js";
 import PQueue from 'p-queue';
 import { classifyTrack } from "./classifier.js";
 import { scoreCandidate } from "./scorer.js";
 import { generateQuestions } from "./questions.js";
+import { extractProfile } from "./extractor.js";
 import { preFilterResume, PreFilterResult } from "../preFilter.js";
 import { extractResumeText } from "../extract.js";
 
@@ -159,6 +160,13 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
         const cached = await getResumeText(file.path);
         if (cached?.extracted_text) {
           extractedCount++;
+          try {
+            const existing = await findProfileByTextHash(cached.extracted_text);
+            if (!existing) {
+              const profile = await extractProfile(cached.extracted_text);
+              await upsertTalentProfile(profile, cached.extracted_text, sessionId);
+            }
+          } catch (_) {}
           const preFilter = preferences ? preFilterResume(cached.extracted_text, preferences) : undefined;
           if (preFilter && preFilter.failedCount > (preferences?.maxFailedCriteria ?? 0)) {
             preFilteredCount++;
@@ -191,6 +199,13 @@ export async function runScreeningAnalysis(sessionId: string, hrUserId: string) 
         }
 
         if (text) {
+          try {
+            const existing = await findProfileByTextHash(text);
+            if (!existing) {
+              const profile = await extractProfile(text);
+              await upsertTalentProfile(profile, text, sessionId);
+            }
+          } catch (_) {}
           const preFilter = preferences ? preFilterResume(text, preferences) : undefined;
           if (preFilter && preFilter.failedCount > (preferences?.maxFailedCriteria ?? 0)) {
             preFilteredCount++;

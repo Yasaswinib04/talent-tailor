@@ -1,6 +1,7 @@
 import postgres from 'postgres';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -88,6 +89,31 @@ export async function initDb() {
     `;
     await getSql()`
       CREATE INDEX IF NOT EXISTS idx_resume_text_file_path ON resume_text(file_path)
+    `;
+    await getSql()`
+      CREATE TABLE IF NOT EXISTS talent_pool_profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        current_location TEXT,
+        preferred_location TEXT,
+        total_work_experience TEXT,
+        notice_period TEXT,
+        current_ctc TEXT,
+        expected_ctc TEXT,
+        strengths TEXT[],
+        weaknesses TEXT[],
+        education JSONB DEFAULT '[]'::jsonb,
+        work_history JSONB DEFAULT '[]'::jsonb,
+        resume_text TEXT NOT NULL,
+        resume_text_hash TEXT NOT NULL,
+        source_session_id UUID REFERENCES screening_sessions(id),
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
+    await getSql()`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pool_profile_hash ON talent_pool_profiles(resume_text_hash)
     `;
     isDbConnected = true;
     console.log("PostgreSQL schema validated successfully.");
@@ -270,6 +296,43 @@ export async function markResumeTextFailed(filePath: string): Promise<void> {
     INSERT INTO resume_text (file_path, extracted_text, status)
     VALUES (${filePath}, '', 'failed')
     ON CONFLICT (file_path) DO UPDATE SET status = 'failed'
+  `;
+}
+
+export function hashResumeText(text: string): string {
+  return crypto.createHash('sha256').update(text).digest('hex');
+}
+
+export async function upsertTalentProfile(profile: any, resumeText: string, sessionId: string): Promise<string> {
+  const textHash = hashResumeText(resumeText);
+  const [row] = await getSql()`
+    INSERT INTO talent_pool_profiles (name, email, phone, current_location, preferred_location, total_work_experience, notice_period, current_ctc, expected_ctc, strengths, weaknesses, education, work_history, resume_text, resume_text_hash, source_session_id)
+    VALUES (${profile.name || 'Unknown'}, ${profile.email || null}, ${profile.phone || null}, ${profile.currentLocation || null}, ${profile.preferredLocation || null}, ${profile.totalWorkExperience || null}, ${profile.noticePeriod || null}, ${profile.currentCTC || null}, ${profile.expectedCTC || null}, ${profile.strengths ? JSON.stringify(profile.strengths) : null}, ${profile.weaknesses ? JSON.stringify(profile.weaknesses) : null}, ${JSON.stringify(profile.education || [])}, ${JSON.stringify(profile.workHistory || [])}, ${resumeText}, ${textHash}, ${sessionId})
+    ON CONFLICT (resume_text_hash) DO UPDATE SET
+      source_session_id = EXCLUDED.source_session_id
+    RETURNING id
+  `;
+  return row.id;
+}
+
+export async function findProfileByTextHash(text: string): Promise<any | null> {
+  const hash = hashResumeText(text);
+  const [row] = await getSql()`SELECT * FROM talent_pool_profiles WHERE resume_text_hash = ${hash}`;
+  return row || null;
+}
+
+export async function getPoolProfilesExcludingSession(sessionId: string, limit: number = 200): Promise<any[]> {
+  return await getSql()`
+    SELECT * FROM talent_pool_profiles
+    WHERE source_session_id != ${sessionId}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+}
+
+export async function getAllPoolProfiles(): Promise<any[]> {
+  return await getSql()`
+    SELECT * FROM talent_pool_profiles ORDER BY created_at DESC
   `;
 }
 
