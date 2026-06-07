@@ -16,7 +16,7 @@ export function getAI() {
 
 export const GLOBAL_GROUNDING_RULES = `
 CRITICAL GROUNDING & VERACITY RULES:
-1. STRICT DATA ADHERENCE: Use ONLY information explicitly found in the provided 'ResumeContent' or 'CandidateAnswers'. 
+1. STRICT DATA ADHERENCE: Use ONLY information explicitly found in the provided 'ResumeContent'.
 2. NO HALLUCINATIONS: Do not invent names, degrees (CS, MBA), roles, metrics, or domain experience (Fintech, SaaS). If a metric isn't there, do not "suggest" one.
 3. REPRODUCIBILITY: Every scoring decision must be backed by a specific quote or fact from the resume.
 4. IDENTITY GUARDIAN: Ensure the 'name' extracted is exactly as it appears in the header. If no name is found, use "Unidentified Candidate".
@@ -49,11 +49,6 @@ ${JSON.stringify(ROLE_WEIGHTS, null, 2)}
 
 CONSUMER PM SPECIAL LENS:
 For 'Consumer Product Manager' roles, deprioritize deep technical engineering skills. Prioritize user psychology, A/B testing, retention metrics, and product-led growth (PLG).
-
-FOR DISCOVERY QUESTIONS:
-- If a candidate is 'Junior', ask about technical execution.
-- If 'Senior IC', ask about trade-offs and architecture.
-- If 'Senior Manager/Director', focus on business impact, P&L, and team strategy.
 `;
 
 export async function safeJsonParse(text: string) {

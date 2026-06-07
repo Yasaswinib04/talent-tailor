@@ -32,7 +32,7 @@ function getAI() {
 // UPDATED: Added Strict Anti-Hallucination rules for metrics
 const GLOBAL_GROUNDING_RULES = `
 CRITICAL GROUNDING & VERACITY RULES:
-1. STRICT DATA ADHERENCE: Use ONLY information explicitly found in the provided 'ResumeContent' or 'CandidateAnswers'. 
+1. STRICT DATA ADHERENCE: Use ONLY information explicitly found in the provided 'ResumeContent'.
 2. NO HALLUCINATIONS: Do not invent names, degrees (CS, MBA), roles, metrics, or domain experience (Fintech, SaaS). If a metric isn't there, do not "suggest" one.
 3. REPRODUCIBILITY: Every scoring decision must be backed by a specific quote or fact from the resume.
 4. IDENTITY GUARDIAN: Ensure the 'name' extracted is exactly as it appears in the header. If no name is found, use "Unidentified Candidate".
@@ -43,7 +43,6 @@ CRITICAL GROUNDING & VERACITY RULES:
 6. IF INPUT GIBBERISH/ERRORS: If the resume content contains error messages (403, 404) or system logs, return name="Invalid Document" and score=0.
 `;
 
-// UPDATED: Added Bifurcated Tracks and Experience Decay
 const SYSTEM_PROMPT = `You are TalentTailor AI, an Expert HR Lead specializing in B2B SaaS and tech hiring.
 Your goal is to analyze resumes against job descriptions (JD) and specific hiring preferences with extreme precision.
 
@@ -53,7 +52,6 @@ BIFURCATED EVALUATION LOGIC (IC vs. MANAGER):
 1. CLASSIFY TRACK: First, determine if the target JD is for an Individual Contributor (IC) or Managerial track.
 2. SENIOR IC LENS: Prioritize technical trade-offs, architecture decisions, and refactoring impact.
 3. MANAGER LENS: Prioritize team velocity, headcount growth, cross-functional strategy, and mentoring.
-
 
 EDUCATION & PEDIGREE RULES (Conditional Weighting):
 1. THE BASELINE: Evaluate based on role-specific weights. For most roles, education is secondary to impact.
@@ -67,11 +65,6 @@ ${JSON.stringify(ROLE_WEIGHTS, null, 2)}
 
 CONSUMER PM SPECIAL LENS:
 For 'Consumer Product Manager' roles, deprioritize deep technical engineering skills. Prioritize user psychology, A/B testing, retention metrics, and product-led growth (PLG).
-
-FOR DISCOVERY QUESTIONS:
-- If a candidate is 'Junior', ask about technical execution.
-- If 'Senior IC', ask about trade-offs and architecture.
-- If 'Senior Manager/Director', focus on business impact, P&L, and team strategy.
 `;
 
 export async function safeJsonParse(text: string) {
@@ -129,8 +122,7 @@ export async function scoreCandidate(
   role: RoleType,
   tier: ExperienceTier = 'Senior',
   preferences?: HiringPreferences,
-  targetMarket: string = 'India',
-  discoveryAnswers?: { question: string, answer: string }[]
+  targetMarket: string = 'India'
 ): Promise<any> {
   const jdPart = typeof jd === 'string' ? { text: jd } : { inlineData: jd };
   const resumePart = typeof resume === 'string' ? { text: resume } : { inlineData: resume };
@@ -150,11 +142,6 @@ export async function scoreCandidate(
 ` });
   }
 
-  if (discoveryAnswers && discoveryAnswers.length > 0) {
-    promptParts.push({ text: "The candidate has provided additional context via discovery questions. Use these answers to refine the scores and reduce gaps if the answers demonstrate relevant experience." });
-    promptParts.push({ text: "Discovery Answers:\n" + discoveryAnswers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n") });
-  }
-
   promptParts.push({ text: "Resume Content:" });
   promptParts.push(resumePart);
   promptParts.push({ text: "Job Description Content:" });
@@ -164,8 +151,6 @@ export async function scoreCandidate(
     name: { type: Type.STRING, description: "Full name of the candidate. If not found, use 'Candidate'." },
     score: { type: Type.NUMBER, description: "Match score from 0.0 to 10.0 based on how well the candidate matches the JD. NEVER exceed 10.0." },
     overallFeedback: { type: Type.STRING, description: "A detailed summary of the candidate's fit. Be blunt. If they lack domain experience mentioned in JD, say so." },
-    professionalSummary: { type: Type.STRING, description: "A non-hallucinated professional summary based solely on the ATS profile facts. To be used in final resume tailoring." },
-    bulletedAchievements: { type: Type.ARRAY, items: { type: Type.STRING }, description: "High-impact STAR bullets grounded ONLY in facts extracted from the resume." },
     strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
     weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
     meetsMandatoryCriteria: { type: Type.BOOLEAN },
@@ -184,7 +169,6 @@ export async function scoreCandidate(
     },
     gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
     experienceYears: { type: Type.STRING, description: "Total years of professional experience as a number or string e.g. '8.5' or '12'." },
-    atsScore: { type: Type.NUMBER, description: "ATS-style keyword match score from 0 to 10." },
     keywords: {
       type: Type.OBJECT,
       properties: {
@@ -192,12 +176,10 @@ export async function scoreCandidate(
         missing: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Must-have keywords missing from the resume." }
       },
       required: ["present", "missing"]
-    },
-    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Frontend Developer', etc." },
-    experienceTier: { type: Type.STRING, description: "Seniority level e.g. 'Junior', 'Senior', 'Executive'." }
+    }
   };
 
-  const requiredFields = ["name", "score", "professionalSummary", "bulletedAchievements", "overallFeedback", "strengths", "weaknesses", "competencies", "gaps", "meetsMandatoryCriteria", "experienceYears", "atsScore", "keywords", "roleType", "experienceTier"];
+  const requiredFields = ["name", "score", "overallFeedback", "strengths", "weaknesses", "competencies", "gaps", "meetsMandatoryCriteria", "experienceYears", "keywords"];
 
   const effectiveWeights = getEffectiveWeights(role as RoleType, tier as ExperienceTier);
   const weightInfo = `Role Analysis Context (${role} - ${tier} - Track: ${track}):
@@ -296,7 +278,7 @@ export async function analyzeResumes(
 
   const analysisPromises = resumes.map(async (resume) => {
     // Step 2: Score candidate
-    const data = await scoreCandidate(resume, jd, track, role, tier, preferences, targetMarket, discoveryAnswers);
+    const data = await scoreCandidate(resume, jd, track, role, tier, preferences, targetMarket);
     
     // Step 3: Generate questions (optionally in parallel, but here it depends on gaps)
     let questions: { question: string }[] = [];

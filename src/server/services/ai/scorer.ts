@@ -33,11 +33,6 @@ export async function scoreCandidate(
 ` });
   }
 
-  if (discoveryAnswers && discoveryAnswers.length > 0) {
-    promptParts.push({ text: "The candidate has provided additional context via discovery questions. Use these answers to refine the scores and reduce gaps if the answers demonstrate relevant experience." });
-    promptParts.push({ text: "Discovery Answers:\n" + discoveryAnswers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n") });
-  }
-
   promptParts.push({ text: "Resume Content:" });
   promptParts.push(resumePart);
   promptParts.push({ text: "Job Description Content:" });
@@ -47,8 +42,6 @@ export async function scoreCandidate(
     name: { type: Type.STRING, description: "Full name of the candidate. If not found, use 'Candidate'." },
     score: { type: Type.NUMBER, description: "Match score from 0.0 to 10.0 based on how well the candidate matches the JD. NEVER exceed 10.0." },
     overallFeedback: { type: Type.STRING, description: "A detailed summary of the candidate's fit. Be blunt. If they lack domain experience mentioned in JD, say so." },
-    professionalSummary: { type: Type.STRING, description: "A non-hallucinated professional summary based solely on the ATS profile facts. To be used in final resume tailoring." },
-    bulletedAchievements: { type: Type.ARRAY, items: { type: Type.STRING }, description: "High-impact STAR bullets grounded ONLY in facts extracted from the resume." },
     strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
     weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
     meetsMandatoryCriteria: { type: Type.BOOLEAN },
@@ -66,8 +59,7 @@ export async function scoreCandidate(
       }
     },
     gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
-    experienceYears: { type: Type.STRING, description: "Total years of professional experience as a number or string e.g. '8.5' or '12'." },
-    atsScore: { type: Type.NUMBER, description: "ATS-style keyword match score from 0 to 10." },
+    experienceYears: { type: Type.STRING, description: "Total years of professional experience as a number or string e.g. '8.5' or '12'."     },
     keywords: {
       type: Type.OBJECT,
       properties: {
@@ -75,12 +67,10 @@ export async function scoreCandidate(
         missing: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Must-have keywords missing from the resume." }
       },
       required: ["present", "missing"]
-    },
-    roleType: { type: Type.STRING, description: "One of the predefined roles e.g. 'Product Manager', 'Frontend Developer', etc." },
-    experienceTier: { type: Type.STRING, description: "Seniority level e.g. 'Junior', 'Senior', 'Executive'." }
+    }
   };
 
-  const requiredFields = ["name", "score", "professionalSummary", "bulletedAchievements", "overallFeedback", "strengths", "weaknesses", "competencies", "gaps", "meetsMandatoryCriteria", "experienceYears", "atsScore", "keywords", "roleType", "experienceTier"];
+  const requiredFields = ["name", "score", "overallFeedback", "strengths", "weaknesses", "competencies", "gaps", "meetsMandatoryCriteria", "experienceYears", "keywords"];
 
   const effectiveWeights = getEffectiveWeights(role as RoleType, tier as ExperienceTier, industry);
   const weightInfo = `Role Analysis Context (${role} - ${tier} - Track: ${track}):
