@@ -20,11 +20,14 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 - ✅ UX Report page — hero, metrics band, diagnosis/fix lists, before/after cards, principles, CTA
 - ✅ 3-step onboarding (company → first role → invite; heavily simplified from prior chaos)
 - ✅ Job setup wizard with **live skill extraction** — inline on right, no hidden button
+- ✅ **Deep advanced criteria** (progressive disclosure, optional): mandatory filters (min experience, education, notice period, must-have skills, preferred companies, locations) + scoring weights (5 sliders, system-recommended with `RECOMMENDED · APPLIED` badge, `↻ restore recommended` link)
+- ✅ **Live "will pass" counter** — as HR edits any filter, backend previews how many candidates from the current pool would clear the bar + per-filter breakdown of who fails and why
 - ✅ Command-center dashboard with keyboard nav (J/K/↵/N/X), bulk stage actions, funnel KPIs
-- ✅ Candidate profile with **multi-role assignment** (chips + toggle menu), stage, rating, notes, activity, tabs
+- ✅ Candidate profile with **multi-role assignment** (chips + toggle menu), stage, rating, notes, activity, tabs, Airbnb-style humane portrait banner
 - ✅ Public shareable job link with **auto-apply** (upload → scan animation → auto-filled form → 1-click submit + match score)
-- ✅ Mock heuristic skill extractor + salary suggestion + screening question generator
-- ✅ Backend endpoints: /jobs, /jobs/{id}, /jobs/share/{slug}, /extract-skills, /candidates, /candidates/{id}/stage, /candidates/{id}/assign-roles, /apply/{slug}, /analytics/summary
+- ✅ **Theme explorations page** (`/themes`) — 6 side-by-side previews
+- ✅ **Theme rebuild**: Linear-inspired indigo (`#5E6AD2`) analytical aesthetic across the app with Airbnb humane touch on candidate portraits; editorial serif reserved for report hero
+- ✅ Backend endpoints: /jobs (with filters + scoring_weights), /jobs/share/{slug}, /extract-skills (returns recommended_filters + recommended_weights), /candidates/preview-filter (live filter impact preview), /candidates, /candidates/{id}/stage, /candidates/{id}/assign-roles, /apply/{slug}, /analytics/summary
 - ✅ End-to-end tests: 14/14 backend pass, 100% frontend flows verified
 
 ## Prioritized backlog

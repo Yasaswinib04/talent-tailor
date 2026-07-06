@@ -61,6 +61,8 @@ export default function JobSetup() {
   const [showWeights, setShowWeights] = useState(false);
   const [usingRecommended, setUsingRecommended] = useState({ filters: true, weights: true });
   const [recommendedSnapshot, setRecommendedSnapshot] = useState({ filters: null, weights: null });
+  const [filterPreview, setFilterPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -91,6 +93,23 @@ export default function JobSetup() {
     }, 700);
     return () => clearTimeout(t);
   }, [form.jd]); // eslint-disable-line
+
+  // Live filter preview — debounced
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      setPreviewing(true);
+      try {
+        const res = await api.post("/candidates/preview-filter", {
+          filters: form.filters,
+          skills: form.skills,
+        });
+        setFilterPreview(res.data);
+      } finally {
+        setPreviewing(false);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [form.filters, form.skills]);
 
   const setSkillWeight = (idx, w) =>
     setForm((f) => ({ ...f, skills: f.skills.map((s, i) => (i === idx ? { ...s, weight: w } : s)) }));
@@ -240,7 +259,11 @@ export default function JobSetup() {
               onToggle={() => setShowCriteria((v) => !v)}
               step="step 03 · optional"
               title="Mandatory criteria & filters"
-              subtitle="Any candidate below these bars is auto-filtered out."
+              subtitle={
+                filterPreview
+                  ? `${filterPreview.passing} of ${filterPreview.total} candidates in your pool would pass these.`
+                  : "Any candidate below these bars is auto-filtered out."
+              }
               icon={<Filter size={14} />}
               testid="js-criteria-toggle"
               badge={usingRecommended.filters && extracted ? "recommended · applied" : null}
@@ -313,6 +336,37 @@ export default function JobSetup() {
                 <Info size={11} className="text-brand mt-0.5 shrink-0" />
                 <span>These are <em className="text-brand not-italic">optional</em>. Skip if you want to review everyone yourself.</span>
               </div>
+              {filterPreview && (
+                <div className="mt-3 border hairline p-3 bg-app/60">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-mono-label">impact on current pool</div>
+                    <div className="text-[11px] font-mono">
+                      <span className="text-white/60">{filterPreview.total}</span>
+                      <span className="text-white/30 mx-1">→</span>
+                      <span className={filterPreview.passing === 0 ? "text-amber-400" : "text-brand"}>
+                        {filterPreview.passing} pass
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    {[
+                      { key: "failed_experience", label: "Fail experience minimum" },
+                      { key: "failed_education", label: "Fail education preference" },
+                      { key: "failed_notice", label: "Fail notice period" },
+                      { key: "failed_must_have", label: "Missing a must-have skill" },
+                      { key: "failed_location", label: "Wrong location" },
+                    ].filter((r) => filterPreview.breakdown[r.key] > 0).map((r) => (
+                      <div key={r.key} className="flex items-center justify-between text-white/60">
+                        <span>{r.label}</span>
+                        <span className="font-mono text-white/80">−{filterPreview.breakdown[r.key]}</span>
+                      </div>
+                    ))}
+                    {Object.values(filterPreview.breakdown).every((v) => v === 0) && (
+                      <div className="text-white/40 italic">Every candidate in your pool passes.</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </CollapsibleSection>
 
             {/* Scoring Weights section */}
@@ -460,7 +514,25 @@ export default function JobSetup() {
             {/* Filter/weight preview stub */}
             {extracted && (
               <div className="border-t hairline pt-6">
-                <div className="font-mono-label mb-3">what this role will filter for</div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-mono-label">what this role will filter for</div>
+                  {filterPreview && (
+                    <div className="text-[10px] font-mono flex items-center gap-1.5">
+                      <span className={previewing ? "text-white/30" : "text-white/60"}>
+                        {filterPreview.total} candidates →
+                      </span>
+                      <span className={`px-1.5 py-0.5 border ${
+                        filterPreview.passing === 0
+                          ? "text-amber-400 border-amber-400/40 bg-amber-400/5"
+                          : filterPreview.passing < 5
+                          ? "text-amber-300 border-amber-300/40 bg-amber-300/5"
+                          : "text-brand border-brand/40 bg-brand/10"
+                      }`}>
+                        {filterPreview.passing} will pass
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2 text-[10px] font-mono">
                   <Chip>≥ {form.filters.min_experience_years}y exp</Chip>
                   <Chip>{form.filters.education_preference}</Chip>
@@ -468,6 +540,12 @@ export default function JobSetup() {
                   {form.filters.locations.map((l) => <Chip key={l}>📍 {l}</Chip>)}
                   {form.filters.must_have_skills.slice(0, 3).map((s) => <Chip key={s} strong>{s}</Chip>)}
                 </div>
+                {filterPreview && filterPreview.passing === 0 && (
+                  <div className="mt-3 text-[11px] text-amber-400/80 border border-amber-400/30 bg-amber-400/5 px-3 py-2 flex items-start gap-2">
+                    <Info size={11} className="mt-0.5 shrink-0" />
+                    <span>No candidates in your current pool pass these filters. Try relaxing must-have skills or education.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

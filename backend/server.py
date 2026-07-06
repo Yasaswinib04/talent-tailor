@@ -440,6 +440,85 @@ async def extract_skills(payload: ExtractSkillsRequest):
     }
 
 
+# --------- Filter Preview: "how many candidates will pass?" ---------
+def _parse_notice_days(s: str) -> int:
+    if not s:
+        return 999
+    s = s.lower()
+    if "immediate" in s or s == "—":
+        return 0
+    # extract first number
+    import re
+    m = re.search(r"(\d+)", s)
+    return int(m.group(1)) if m else 999
+
+
+def _matches_education(candidate_edu: str, pref: str) -> bool:
+    if not pref or pref == "No preference":
+        return True
+    edu = (candidate_edu or "").lower()
+    p = pref.lower()
+    if "tier-1" in p or "tier 1" in p:
+        tokens = ["iit", "nit", "iiit", "bits"]
+        return any(t in edu for t in tokens)
+    if "master" in p:
+        return any(t in edu for t in ["m.tech", "m.sc", "m.des", "mba", "master", "isb", "iim"])
+    if "cs" in p or "engineering" in p:
+        return any(t in edu for t in ["b.tech", "b.e.", "m.tech", "cs", "engineering", "iit", "nit", "iiit", "bits"])
+    if "bachelor" in p:
+        return any(t in edu for t in ["b.tech", "b.e.", "b.sc", "b.des", "bachelor", "b.a."])
+    return True
+
+
+@app.post("/api/candidates/preview-filter")
+async def preview_filter(payload: FilterPreviewRequest):
+    filters = payload.filters or {}
+    cands = await db.candidates.find({}).to_list(1000)
+    total = len(cands)
+    passing = 0
+    breakdown = {
+        "failed_experience": 0,
+        "failed_education": 0,
+        "failed_notice": 0,
+        "failed_must_have": 0,
+        "failed_location": 0,
+    }
+    min_exp = filters.get("min_experience_years", 0) or 0
+    edu_pref = filters.get("education_preference", "No preference")
+    max_notice = filters.get("notice_period_max_days", 999) or 999
+    must_have = set([s.lower() for s in (filters.get("must_have_skills") or [])])
+    locations = set([l.lower() for l in (filters.get("locations") or [])])
+
+    for c in cands:
+        fail = False
+        if (c.get("experience_years") or 0) < min_exp:
+            breakdown["failed_experience"] += 1
+            fail = True
+        if not _matches_education(c.get("education", ""), edu_pref):
+            breakdown["failed_education"] += 1
+            fail = True
+        if _parse_notice_days(c.get("notice_period", "")) > max_notice:
+            breakdown["failed_notice"] += 1
+            fail = True
+        if must_have:
+            cand_skills = set([s.lower() for s in (c.get("skills") or [])])
+            if not must_have.issubset(cand_skills):
+                breakdown["failed_must_have"] += 1
+                fail = True
+        if locations:
+            cloc = (c.get("location") or "").lower()
+            # "remote" acts as wildcard
+            if "remote" not in locations and not any(l in cloc for l in locations):
+                # Remote candidates pass if remote is accepted
+                if not ("remote" in locations and "remote" in cloc):
+                    breakdown["failed_location"] += 1
+                    fail = True
+        if not fail:
+            passing += 1
+
+    return {"total": total, "passing": passing, "breakdown": breakdown}
+
+
 # ---------- Candidates ----------
 @app.get("/api/candidates")
 async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None, q: Optional[str] = None):
