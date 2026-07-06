@@ -1,0 +1,164 @@
+{
+  "project_context": {
+    "domain": "HR Candidate Evaluation Platform",
+    "brand": "CRED",
+    "theme": "Dark Theme",
+    "archetype": "Archetype 5 (Luxury) + Archetype 4 (Swiss & High-Contrast)",
+    "description": "A high-end, extremely fast, B2B tool for HR professionals at CRED to evaluate 100s of candidates. Combines an expressive public UX report page with a highly disciplined, keyboard-first dashboard."
+  },
+  "design_principles": [
+    "Restrained Luxury: Use deep obsidian backgrounds with stark white text and subtle bronze/copper accents. Avoid pure black.",
+    "Editorial Tension: Combine high-end serif typography for marketing/report moments with sharp monospace elements for technical data.",
+    "Keyboard-First Speed: Visually expose affordances (e.g., ⌘K, ↓↑) using distinct monospace styling. Make power-user actions feel instantaneous.",
+    "Contextual Clarity: High density on the dashboard without feeling cluttered. Strict grids and 1px borders. Progressive disclosure of secondary info."
+  ],
+  "typography": {
+    "font_families": {
+      "editorial_heading": "Cormorant Garamond, serif",
+      "dashboard_heading": "Cabinet Grotesk, sans-serif",
+      "body": "Satoshi, sans-serif",
+      "monospace": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1_report": "text-5xl md:text-6xl+ font-light tracking-tighter font-['Cormorant_Garamond']",
+      "h1_dashboard": "text-3xl md:text-4xl font-bold tracking-tight font-['Cabinet_Grotesk']",
+      "h2": "text-2xl font-semibold tracking-tight font-['Cabinet_Grotesk']",
+      "h3": "text-lg md:text-xl font-medium font-['Cabinet_Grotesk']",
+      "body": "text-base font-normal leading-relaxed font-['Satoshi']",
+      "metadata_and_labels": "text-xs uppercase tracking-[0.2em] font-['JetBrains_Mono']",
+      "keyboard_shortcuts": "text-[10px] font-['JetBrains_Mono'] text-white/60 bg-white/10 px-1.5 py-0.5 rounded-sm"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "app": "#0A0A0A",
+      "surface": "#141414",
+      "card": "#1A1A1A",
+      "glass": "rgba(255, 255, 255, 0.03)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A3A3A3",
+      "tertiary": "#666666"
+    },
+    "border": {
+      "subtle": "#262626",
+      "focus": "#FFFFFF"
+    },
+    "accents": {
+      "brand": "#B28A5D",
+      "success": "#2E8B57",
+      "warning": "#D4AF37",
+      "danger": "#8B0000"
+    }
+  },
+  "spacing_and_layout": {
+    "system": "Tailwind standard scale, utilizing generous padding (p-6, p-8) for empty space to convey luxury.",
+    "report_page": {
+      "grid": "Asymmetric Bento Grid (grid-cols-1 md:grid-cols-12 gap-8)",
+      "alignment": "Optical alignment, text overlapping images to create editorial feel."
+    },
+    "dashboard": {
+      "grid": "Strict Control Room Grid (grid-cols-1 md:grid-cols-4 gap-4)",
+      "density": "High density, strict column widths. Content must fill vertical height (h-full)."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-white text-black hover:bg-gray-200 rounded-none px-6 py-3 text-sm font-medium transition-colors data-[testid='primary-btn']",
+      "secondary": "bg-transparent border border-white/20 text-white hover:border-white rounded-none px-6 py-3 text-sm transition-colors",
+      "ghost": "bg-transparent text-white/70 hover:text-white px-4 py-2 text-sm font-medium font-['JetBrains_Mono']"
+    },
+    "chips": {
+      "skill": "px-3 py-1 rounded-full border border-[#333] bg-[#1A1A1A] text-xs font-['JetBrains_Mono'] text-white/80 flex items-center gap-2",
+      "role": "px-3 py-1 rounded-none border-l-2 border-[#B28A5D] bg-[#141414] text-xs font-['Cabinet_Grotesk'] text-white"
+    },
+    "cards": {
+      "base": "bg-[#141414] border border-[#262626] rounded-sm p-6"
+    },
+    "inputs": {
+      "text": "bg-transparent border border-[#262626] rounded-none px-4 py-2 text-white focus:border-white focus:ring-1 focus:ring-white transition-all w-full",
+      "textarea": "bg-transparent border border-[#262626] rounded-none px-4 py-3 text-white focus:border-white min-h-[120px] w-full"
+    },
+    "table": {
+      "container": "w-full text-left border-collapse",
+      "header": "text-xs font-['JetBrains_Mono'] text-white/50 border-b border-[#262626] pb-3",
+      "row": "border-b border-[#262626]/50 hover:bg-[#141414] transition-colors group cursor-pointer",
+      "cell": "py-4 px-2"
+    }
+  },
+  "page_specific_guidelines": {
+    "ux_report_page": {
+      "vibe": "Cinematic, persuasive, expressive.",
+      "features": "Hero with parallax dark texture, large Serif typography. 'Before/After' comparison cards. The storytelling focuses on how the chaotic old design is fixed via the new strict patterns."
+    },
+    "hr_onboarding": {
+      "vibe": "Frictionless, guided.",
+      "features": "Max 3 steps. Central glassmorphism modal on a dark textured background. Focus entirely on setting preferences and importing initial JDs."
+    },
+    "job_setup_wizard": {
+      "vibe": "Intelligent, split-screen.",
+      "features": "Left column: JD text area. Right column: Sticky 'AI Skill Extraction' panel. As HR pastes text, chips populate on the right with editable weights and suggested salary ranges."
+    },
+    "candidate_dashboard": {
+      "vibe": "Command center, ultra-dense.",
+      "features": "Global ⌘K search. Funnel view at the top (metrics). Table listing 100s of candidates. Keyboard shortcuts enabled for moving down rows and triggering actions. Bulk action bar appears fixed at bottom when multiple selected."
+    },
+    "candidate_profile": {
+      "vibe": "Detailed, highly scannable.",
+      "features": "Slides out as a massive right Sheet (w-3/4). Top section features a multi-role assignment dropdown/chip system. Contains tabs for Resume, Notes, Ratings, and Activity."
+    },
+    "public_job_link": {
+      "vibe": "Minimalist, candidate-centric.",
+      "features": "Auto-apply flow. Candidate uploads PDF resume, which instantly auto-fills the sparse form fields using an animated scanning UI. 1-click submit."
+    }
+  },
+  "motion_and_interactions": {
+    "hover_states": "Use immediate, snappy color transitions. Avoid heavy translates/scaling for B2B dashboards to maintain perceived speed.",
+    "report_animations": "Smooth scroll momentum (Lenis). Staggered text reveal on scroll.",
+    "microinteractions": "When skills are extracted in Job Setup, use a subtle 1px border shimmer or 'Tracing Beam' effect on the right panel."
+  },
+  "mock_data_requirements": {
+    "context": "Indian context, professional, no stereotypes.",
+    "candidates": [
+      { "name": "Rohan Sharma", "role": "Sr. Frontend Engineer", "score": 92 },
+      { "name": "Priya Desai", "role": "Product Manager", "score": 88 },
+      { "name": "Anand Iyer", "role": "Backend Lead", "score": 95 },
+      { "name": "Kavita Rangan", "role": "UX Researcher", "score": 85 }
+    ]
+  },
+  "media": {
+    "backgrounds": [
+      {
+        "url": "https://images.pexels.com/photos/2425232/pexels-photo-2425232.jpeg",
+        "category": "report_hero_bg",
+        "description": "Dark smooth wave texture for the UX Report hero section background."
+      },
+      {
+        "url": "https://images.pexels.com/photos/4862953/pexels-photo-4862953.jpeg",
+        "category": "onboarding_bg",
+        "description": "Subtle dotted dark texture for the HR onboarding modal background."
+      }
+    ],
+    "profiles": [
+      {
+        "url": "https://images.unsplash.com/photo-1542190891-2093d38760f2",
+        "category": "candidate_avatar",
+        "description": "Grayscale portrait of male professional."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1722061666207-b75ca92f8d0f",
+        "category": "candidate_avatar",
+        "description": "Professional female portrait."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1589386417686-0d34b5903d23",
+        "category": "candidate_avatar",
+        "description": "Smiling male professional portrait."
+      }
+    ]
+  },
+  "testing_attributes": {
+    "rules": "All interactive elements (buttons, inputs, tabs, list items) MUST include data-testid attributes for automated testing. Example: data-testid='extract-skills-btn'."
+  }
+}
