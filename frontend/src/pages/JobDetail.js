@@ -97,6 +97,54 @@ export default function JobDetail() {
               ))}
             </div>
           </div>
+
+          {/* Filters */}
+          {job.filters && Object.keys(job.filters).length > 0 && (
+            <div className="border hairline p-5 bg-surface">
+              <div className="font-mono-label mb-3">mandatory filters</div>
+              <div className="space-y-2 text-xs text-white/70">
+                {job.filters.min_experience_years != null && (
+                  <div className="flex justify-between"><span>Min experience</span><span className="font-mono">{job.filters.min_experience_years}+ years</span></div>
+                )}
+                {job.filters.education_preference && (
+                  <div className="flex justify-between"><span>Education</span><span className="font-mono text-right max-w-[60%]">{job.filters.education_preference}</span></div>
+                )}
+                {job.filters.notice_period_max_days != null && (
+                  <div className="flex justify-between"><span>Notice</span><span className="font-mono">≤ {job.filters.notice_period_max_days}d</span></div>
+                )}
+                {job.filters.must_have_skills?.length > 0 && (
+                  <div>
+                    <div className="mb-1">Must-have</div>
+                    <div className="flex flex-wrap gap-1">
+                      {job.filters.must_have_skills.map((s) => (
+                        <span key={s} className="text-[10px] font-mono border border-brand/30 bg-brand/5 text-brand px-1.5 py-0.5">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Scoring weights */}
+          {job.scoring_weights && Object.keys(job.scoring_weights).length > 0 && (
+            <div className="border hairline p-5 bg-surface">
+              <div className="font-mono-label mb-3">scoring weights</div>
+              <div className="space-y-2">
+                {Object.entries(job.scoring_weights).map(([k, v]) => (
+                  <div key={k} className="text-xs">
+                    <div className="flex justify-between mb-1">
+                      <span className="capitalize">{k.replace("_", " ")}</span>
+                      <span className="font-mono">{v}%</span>
+                    </div>
+                    <div className="h-1 bg-white/10">
+                      <div className="h-full bg-brand" style={{ width: `${(v / 60) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

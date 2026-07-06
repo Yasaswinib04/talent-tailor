@@ -22,7 +22,7 @@ export default function AppShell() {
         <div className="p-3 border-t hairline">
           <button
             onClick={() => nav("/app/jobs/new")}
-            className="w-full flex items-center justify-between px-3 py-2.5 bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-brand text-white text-sm font-medium hover:bg-brand/90 transition-colors linear-glow"
             data-testid="sidebar-new-role-btn"
           >
             <span className="flex items-center gap-2"><Plus size={14} /> New role</span>

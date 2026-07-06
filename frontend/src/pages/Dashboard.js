@@ -97,7 +97,7 @@ export default function Dashboard() {
         <button
           onClick={() => nav("/app/jobs/new")}
           data-testid="dash-new-role-btn"
-          className="bg-white text-black px-5 py-2.5 text-sm hover:bg-gray-200 transition-colors inline-flex items-center gap-2"
+          className="bg-brand text-white px-5 py-2.5 text-sm hover:bg-brand/90 transition-colors inline-flex items-center gap-2 linear-glow"
         >
           <Plus size={14} /> New role
         </button>
@@ -305,7 +305,7 @@ function Kpi({ label, value, icon, testid, gold }) {
         <span className={gold ? "text-brand" : "text-white/40"}>{icon}</span>
         <span className="font-mono-label">{label}</span>
       </div>
-      <div className={cx("font-editorial text-4xl", gold && "text-brand")}>{value}</div>
+      <div className={cx("font-display text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
     </div>
   );
 }
@@ -335,7 +335,7 @@ function MatchScore({ score }) {
           style={{ width: `${score}%` }}
         />
       </div>
-      <span className={cx("font-editorial text-lg", color)}>{score}</span>
+      <span className={cx("font-display text-lg font-semibold tabular-nums", color)}>{score}</span>
     </div>
   );
 }

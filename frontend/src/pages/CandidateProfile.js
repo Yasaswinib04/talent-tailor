@@ -60,24 +60,33 @@ export default function CandidateProfile() {
       <div className="grid md:grid-cols-3 gap-8">
         {/* LEFT: Identity */}
         <div className="md:col-span-1 space-y-6">
-          <div className="border hairline p-6 bg-surface">
-            <img src={c.avatar} alt="" className="w-24 h-24 rounded-full object-cover grayscale mb-4" />
-            <div className="font-mono-label mb-1">{c.current_title}</div>
-            <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
-            <div className="text-white/50 text-sm mb-6">at {c.current_company}</div>
-
-            <div className="space-y-2 text-xs">
-              <Row icon={<Mail size={12} />} label={c.email} />
-              <Row icon={<Phone size={12} />} label={c.phone} />
-              <Row icon={<MapPin size={12} />} label={c.location} />
-              <Row icon={<Briefcase size={12} />} label={`${c.experience_years} years experience`} />
-              <Row icon={<Calendar size={12} />} label={`Notice: ${c.notice_period}`} />
-              <Row icon={<GraduationCap size={12} />} label={c.education} />
+          <div className="border hairline overflow-hidden bg-surface">
+            {/* Airbnb-style large portrait treatment */}
+            <div className="relative h-40 bg-gradient-to-br from-brand/40 via-brand/20 to-transparent">
+              <img
+                src={c.avatar}
+                alt=""
+                className="w-28 h-28 rounded-full object-cover absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
+              />
             </div>
+            <div className="pt-16 px-6 pb-6">
+              <div className="font-mono-label mb-1">{c.current_title}</div>
+              <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
+              <div className="text-white/50 text-sm mb-6">at {c.current_company}</div>
 
-            <div className="mt-6 pt-6 border-t hairline">
-              <div className="font-mono-label mb-2">expected ctc</div>
-              <div className="font-editorial text-3xl text-brand">{fmtINR(c.expected_ctc)}</div>
+              <div className="space-y-2 text-xs">
+                <Row icon={<Mail size={12} />} label={c.email} />
+                <Row icon={<Phone size={12} />} label={c.phone} />
+                <Row icon={<MapPin size={12} />} label={c.location} />
+                <Row icon={<Briefcase size={12} />} label={`${c.experience_years} years experience`} />
+                <Row icon={<Calendar size={12} />} label={`Notice: ${c.notice_period}`} />
+                <Row icon={<GraduationCap size={12} />} label={c.education} />
+              </div>
+
+              <div className="mt-6 pt-6 border-t hairline">
+                <div className="font-mono-label mb-2">expected ctc</div>
+                <div className="font-display text-3xl font-semibold text-brand">{fmtINR(c.expected_ctc)}</div>
+              </div>
             </div>
           </div>
 
@@ -110,7 +119,7 @@ export default function CandidateProfile() {
               <div>
                 <div className="font-mono-label mb-2">match score</div>
                 <div className="flex items-baseline gap-3">
-                  <span className={cx("font-editorial text-6xl", c.match_score >= 90 ? "text-brand" : "text-white")}>
+                  <span className={cx("font-display text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
                     {c.match_score}
                   </span>
                   <span className="text-white/40 text-sm">/ 100</span>

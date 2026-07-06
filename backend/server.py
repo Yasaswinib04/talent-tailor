@@ -50,6 +50,8 @@ class Job(BaseModel):
     jd: str = ""
     skills: List[dict] = []  # [{name, weight}]
     screening_questions: List[str] = []
+    filters: dict = Field(default_factory=dict)  # {min_experience, education, notice_period, must_have_skills, preferred_companies, locations}
+    scoring_weights: dict = Field(default_factory=dict)  # {skills, experience, education, notice, cultural_fit} summing ~100
     status: str = "open"
     created_at: str = Field(default_factory=now_iso)
     candidates_count: int = 0
@@ -67,6 +69,8 @@ class JobCreate(BaseModel):
     jd: Optional[str] = ""
     skills: Optional[List[dict]] = []
     screening_questions: Optional[List[str]] = []
+    filters: Optional[dict] = None
+    scoring_weights: Optional[dict] = None
 
 
 class ExtractSkillsRequest(BaseModel):
@@ -397,10 +401,37 @@ async def extract_skills(payload: ExtractSkillsRequest):
     if not suggested_questions:
         suggested_questions = ["Why are you excited about this role?"]
 
+    # Seniority detection for filter defaults
+    is_senior = any(k in text for k in ["senior", "lead", "principal", "staff"])
+    is_junior = any(k in text for k in ["junior", "entry", "intern"])
+    min_exp = 5 if is_senior else (0 if is_junior else 2)
+
+    # Recommended mandatory filters
+    must_have = [s["name"] for s in skills[:3]]
+    recommended_filters = {
+        "min_experience_years": min_exp,
+        "education_preference": "Bachelor's degree or equivalent",
+        "notice_period_max_days": 90,
+        "must_have_skills": must_have,
+        "preferred_companies": [],
+        "locations": ["Bengaluru", "Remote"],
+        "no_gaps_over_months": 6,
+    }
+
+    # Recommended scoring weights (sum to 100)
+    if is_senior:
+        recommended_weights = {"skills": 45, "experience": 30, "education": 5, "notice": 10, "cultural_fit": 10}
+    elif is_junior:
+        recommended_weights = {"skills": 35, "experience": 15, "education": 25, "notice": 10, "cultural_fit": 15}
+    else:
+        recommended_weights = {"skills": 40, "experience": 25, "education": 15, "notice": 10, "cultural_fit": 10}
+
     return {
         "skills": skills,
         "salary_suggestion": {"min": salary_min, "max": salary_max},
         "screening_questions": suggested_questions,
+        "recommended_filters": recommended_filters,
+        "recommended_weights": recommended_weights,
     }
 
 
