@@ -157,7 +157,34 @@ export default function Dashboard() {
       {/* Candidate table */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-xl font-semibold">All candidates</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-xl font-semibold">All candidates</h2>
+            {(q || filterStage || filterJob) && (
+              <span className="text-[10px] font-mono flex items-center gap-1.5">
+                <span className="text-white/60">{candidates.length} candidates</span>
+                <span className="text-white/30">→</span>
+                <span className={cx(
+                  "px-1.5 py-0.5 border",
+                  filtered.length === 0
+                    ? "text-amber-400 border-amber-400/40 bg-amber-400/5"
+                    : filtered.length < 5
+                    ? "text-amber-300 border-amber-300/40 bg-amber-300/5"
+                    : "text-brand border-brand/40 bg-brand/10"
+                )}
+                data-testid="dash-filter-pill"
+                >
+                  {filtered.length} matching
+                </span>
+                <button
+                  onClick={() => { setQ(""); setFilterStage(""); setFilterJob(""); }}
+                  data-testid="dash-clear-filters"
+                  className="text-white/40 hover:text-white transition-colors ml-1"
+                >
+                  clear
+                </button>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 border hairline px-3 py-2">
               <Search size={12} className="text-white/40" />
