@@ -1,8 +1,0 @@
-Alice Coder
-alice@email.com
-
-EXPERIENCE
-Backend Engineer
-- Reduced latency by 40% across the main microservices architecture.
-- Re-architected the database queries to improve load times.
-- Mentored junior developers on best practices.

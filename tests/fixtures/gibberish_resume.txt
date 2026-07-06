@@ -1,3 +1,0 @@
-404 Not Found
-nginx/1.14.0 (Ubuntu)
-Error: Failed to load resource
