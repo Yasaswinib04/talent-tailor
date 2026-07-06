@@ -7,6 +7,7 @@ import JobSetup from "./pages/JobSetup";
 import JobDetail from "./pages/JobDetail";
 import CandidateProfile from "./pages/CandidateProfile";
 import PublicApply from "./pages/PublicApply";
+import Themes from "./pages/Themes";
 import AppShell from "./components/AppShell";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<Report />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/apply/:slug" element={<PublicApply />} />
+        <Route path="/themes" element={<Themes />} />
         <Route element={<AppShell />}>
           <Route path="/app" element={<Dashboard />} />
           <Route path="/app/jobs/new" element={<JobSetup />} />
