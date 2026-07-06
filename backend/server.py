@@ -77,6 +77,11 @@ class ExtractSkillsRequest(BaseModel):
     jd: str
 
 
+class FilterPreviewRequest(BaseModel):
+    filters: dict
+    skills: Optional[List[dict]] = []
+
+
 class Candidate(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
