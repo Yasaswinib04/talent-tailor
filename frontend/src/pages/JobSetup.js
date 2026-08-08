@@ -159,7 +159,7 @@ export default function JobSetup() {
       {/* Header */}
       <div className="border-b hairline px-8 py-5 flex items-center justify-between sticky top-0 bg-app/90 backdrop-blur-sm z-20">
         <div className="flex items-center gap-4">
-          <button onClick={() => nav("/app")} data-testid="js-back-btn" className="text-white/50 hover:text-white transition-colors">
+          <button onClick={() => nav("/app")} data-testid="js-back-btn" className="text-white/72 hover:text-white transition-colors">
             <ChevronLeft size={18} />
           </button>
           <div>
@@ -168,12 +168,12 @@ export default function JobSetup() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+          <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/72 hover:text-white transition-colors">Cancel</button>
           <button
             onClick={publish}
             disabled={saving || !form.title}
             data-testid="js-publish-btn"
-            className="bg-brand text-white px-5 py-2.5 text-sm hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 linear-glow"
+            className="btn btn-primary"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             Publish role
@@ -245,7 +245,7 @@ export default function JobSetup() {
               placeholder="Paste or write the job description. Skills, salary, filters and scoring weights will appear on the right as you type."
               className="w-full bg-transparent border hairline p-4 focus:border-brand outline-none min-h-[280px] text-sm leading-relaxed transition-colors"
             />
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-white/65">
               <Sparkles size={10} className="text-brand" />
               <span>Everything on the right runs the moment you pause. No buttons to press.</span>
             </div>
@@ -280,7 +280,7 @@ export default function JobSetup() {
                       className="w-20 bg-transparent border hairline px-2 py-2 text-sm focus:border-brand outline-none"
                       min={0}
                     />
-                    <span className="text-white/50 text-xs">years</span>
+                    <span className="text-white/72 text-xs">years</span>
                   </div>
                 </SmallField>
                 <SmallField label={<span className="inline-flex items-center gap-1.5"><GraduationCap size={11} /> Education</span>}>
@@ -312,7 +312,7 @@ export default function JobSetup() {
                   />
                 </SmallField>
                 <div className="col-span-2">
-                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/40 lowercase">(strict filter)</span></span>}>
+                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/65 lowercase">(strict filter)</span></span>}>
                     <TagInput
                       values={form.filters.must_have_skills}
                       onChange={(v) => setFilter("must_have_skills", v)}
@@ -332,7 +332,7 @@ export default function JobSetup() {
                   </SmallField>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/40 bg-brand/5 border border-brand/20 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/65 bg-brand/5 border border-brand/20 px-3 py-2">
                 <Info size={11} className="text-brand mt-0.5 shrink-0" />
                 <span>These are <em className="text-brand not-italic">optional</em>. Skip if you want to review everyone yourself.</span>
               </div>
@@ -341,8 +341,8 @@ export default function JobSetup() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-mono-label">impact on current pool</div>
                     <div className="text-[11px] font-mono">
-                      <span className="text-white/60">{filterPreview.total}</span>
-                      <span className="text-white/30 mx-1">→</span>
+                      <span className="text-white/78">{filterPreview.total}</span>
+                      <span className="text-white/55 mx-1">→</span>
                       <span className={filterPreview.passing === 0 ? "text-amber-400" : "text-brand"}>
                         {filterPreview.passing} pass
                       </span>
@@ -356,13 +356,13 @@ export default function JobSetup() {
                       { key: "failed_must_have", label: "Missing a must-have skill" },
                       { key: "failed_location", label: "Wrong location" },
                     ].filter((r) => filterPreview.breakdown[r.key] > 0).map((r) => (
-                      <div key={r.key} className="flex items-center justify-between text-white/60">
+                      <div key={r.key} className="flex items-center justify-between text-white/78">
                         <span>{r.label}</span>
                         <span className="font-mono text-white/80">−{filterPreview.breakdown[r.key]}</span>
                       </div>
                     ))}
                     {Object.values(filterPreview.breakdown).every((v) => v === 0) && (
-                      <div className="text-white/40 italic">Every candidate in your pool passes.</div>
+                      <div className="text-white/65 italic">Every candidate in your pool passes.</div>
                     )}
                   </div>
                 </div>
@@ -393,7 +393,7 @@ export default function JobSetup() {
                   <div key={row.key} className="flex items-center gap-3">
                     <div className="w-40 shrink-0">
                       <div className="text-xs">{row.label}</div>
-                      <div className="text-[10px] text-white/40">{row.hint}</div>
+                      <div className="text-[10px] text-white/65">{row.hint}</div>
                     </div>
                     <input
                       type="range"
@@ -408,13 +408,13 @@ export default function JobSetup() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between border-t hairline pt-3 mt-3">
-                  <span className="text-xs text-white/50">Total</span>
+                  <span className="text-xs text-white/72">Total</span>
                   <span className={`font-mono text-sm ${weightsTotal === 100 ? "text-brand" : "text-amber-400"}`}>
                     {weightsTotal}% {weightsTotal !== 100 && `(should be 100%)`}
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/40 bg-brand/5 border border-brand/20 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/65 bg-brand/5 border border-brand/20 px-3 py-2">
                 <Info size={11} className="text-brand mt-0.5 shrink-0" />
                 <span>System recommends weights based on the seniority in your JD. Edit only what matters to you.</span>
               </div>
@@ -444,7 +444,7 @@ export default function JobSetup() {
               </div>
               <h3 className="font-display text-xl font-medium mb-4">Skills detected</h3>
               {form.skills.length === 0 && (
-                <div className="border border-dashed hairline p-8 text-center text-white/40 text-sm">
+                <div className="border border-dashed hairline p-8 text-center text-white/65 text-sm">
                   Paste a job description to see skills, salary, filters and scoring weights appear here — live.
                 </div>
               )}
@@ -469,7 +469,7 @@ export default function JobSetup() {
                         />
                       ))}
                     </div>
-                    <button onClick={() => removeSkill(idx)} className="text-white/30 hover:text-red-400 p-1" data-testid={`js-remove-skill-${idx}`}>
+                    <button onClick={() => removeSkill(idx)} className="text-white/55 hover:text-red-400 p-1" data-testid={`js-remove-skill-${idx}`}>
                       <X size={12} />
                     </button>
                   </motion.div>
@@ -483,9 +483,9 @@ export default function JobSetup() {
                 <div className="font-mono-label mb-3">salary suggestion · based on JD</div>
                 <div className="border hairline p-4 bg-app flex items-baseline gap-3">
                   <span className="font-display text-2xl font-semibold text-brand">{fmtINR(form.salary_min)}</span>
-                  <span className="text-white/40">→</span>
+                  <span className="text-white/65">→</span>
                   <span className="font-display text-2xl font-semibold text-brand">{fmtINR(form.salary_max)}</span>
-                  <span className="ml-auto text-[10px] font-mono text-white/40">per annum</span>
+                  <span className="ml-auto text-[10px] font-mono text-white/65">per annum</span>
                 </div>
               </div>
             )}
@@ -500,7 +500,7 @@ export default function JobSetup() {
                       <span className="flex-1 text-white/80">{q}</span>
                       <button
                         onClick={() => setForm({ ...form, screening_questions: form.screening_questions.filter((_, j) => j !== i) })}
-                        className="text-white/30 hover:text-red-400"
+                        className="text-white/55 hover:text-red-400"
                         data-testid={`js-remove-q-${i}`}
                       >
                         <X size={12} />
@@ -518,7 +518,7 @@ export default function JobSetup() {
                   <div className="font-mono-label">what this role will filter for</div>
                   {filterPreview && (
                     <div className="text-[10px] font-mono flex items-center gap-1.5">
-                      <span className={previewing ? "text-white/30" : "text-white/60"}>
+                      <span className={previewing ? "text-white/55" : "text-white/78"}>
                         {filterPreview.total} candidates →
                       </span>
                       <span className={`px-1.5 py-0.5 border ${
@@ -577,7 +577,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
           <div>
             <div className="font-mono-label mb-1">{step}</div>
             <div className="font-display text-base font-medium">{title}</div>
-            <div className="text-[11px] text-white/50 mt-0.5">{subtitle}</div>
+            <div className="text-[11px] text-white/72 mt-0.5">{subtitle}</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -592,7 +592,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
               {badge}
             </span>
           )}
-          {open ? <ChevronUp size={14} className="text-white/50" /> : <ChevronDown size={14} className="text-white/50" />}
+          {open ? <ChevronUp size={14} className="text-white/72" /> : <ChevronDown size={14} className="text-white/72" />}
         </div>
       </button>
       <AnimatePresence initial={false}>
@@ -610,7 +610,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
                   <button
                     onClick={onRestore}
                     data-testid={`${testid}-restore`}
-                    className="text-[10px] font-mono text-white/40 hover:text-brand inline-flex items-center gap-1 transition-colors"
+                    className="text-[10px] font-mono text-white/65 hover:text-brand inline-flex items-center gap-1 transition-colors"
                   >
                     <RotateCcw size={10} /> restore recommended
                   </button>
@@ -629,7 +629,7 @@ function AddSkillInput({ onAdd }) {
   const [v, setV] = useState("");
   return (
     <div className="flex items-center gap-2 border border-dashed hairline p-2 pl-3">
-      <Plus size={12} className="text-white/40" />
+      <Plus size={12} className="text-white/65" />
       <input
         value={v}
         onChange={(e) => setV(e.target.value)}

@@ -8,6 +8,7 @@ through a shareable auto-apply link.
 - **Backend** — FastAPI + MongoDB (motor)
 - **Product context** — `memory/PRD.md`
 - **QA** — test plan and latest report in `specs/`
+- **Deploy** — [DEPLOY.md](DEPLOY.md) (free: Render + MongoDB Atlas)
 
 ## Prerequisites
 

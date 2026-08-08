@@ -45,22 +45,77 @@ body {
 .font-mono-label {
   font-family: "JetBrains Mono", monospace;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 10px;
-  color: rgba(255,255,255,0.55);
+  /* Was 10px at 55% with 0.2em tracking — too small and too faint at once.
+     Labels are wayfinding; they have to be readable at a glance. */
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.72);
 }
 
 .kbd {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
   background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.16);
   padding: 2px 6px;
   border-radius: 3px;
 }
 
+/* Cormorant is a light-feeling serif; at display sizes weight 400 reads as thin
+   and washes out on a dark background. 500 keeps the editorial character with
+   enough weight to hold. Set once here rather than at 20-plus call sites. */
+.font-editorial { font-weight: 500; }
+
 .hairline { border-color: #262626; }
+
+/* ---- Call to action ----
+   CTAs previously inherited regular weight at 14px, so they read as flat labels
+   rather than buttons. Weight, size and a real pressed state make the primary
+   action unmistakable, and give secondary actions somewhere lower to sit. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 12px 22px;
+  border-radius: 4px;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .05s ease;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
+
+/* Primary — the one action we want taken on the screen. */
+.btn-primary {
+  background: #5E6AD2;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(94,106,210,.55), 0 6px 20px -6px rgba(94,106,210,.6);
+}
+.btn-primary:hover { background: #6E79DD; }
+
+/* Light primary — same emphasis, for use on the dark editorial pages. */
+.btn-light {
+  background: #fff;
+  color: #0A0A0A;
+  box-shadow: 0 6px 20px -8px rgba(255,255,255,.35);
+}
+.btn-light:hover { background: #E8E8E8; }
+
+/* Secondary — clearly recessive next to either primary. */
+.btn-secondary {
+  background: transparent;
+  color: rgba(255,255,255,.88);
+  border: 1px solid #333;
+  font-weight: 500;
+}
+.btn-secondary:hover { background: rgba(255,255,255,.06); border-color: #4a4a4a; }
 
 /* Focus ring */
 *:focus-visible {

@@ -26,7 +26,7 @@ export default function CandidateProfile() {
     load();
   }, [cid]);
 
-  if (!c) return <div className="p-8 text-white/40">Loading…</div>;
+  if (!c) return <div className="p-8 text-white/65">Loading…</div>;
 
   const toggleRole = async (roleId) => {
     const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
@@ -53,7 +53,7 @@ export default function CandidateProfile() {
 
   return (
     <div className="max-w-[1200px] mx-auto p-8">
-      <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
+      <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/72 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back
       </button>
 
@@ -72,7 +72,7 @@ export default function CandidateProfile() {
             <div className="pt-16 px-6 pb-6">
               <div className="font-mono-label mb-1">{c.current_title}</div>
               <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
-              <div className="text-white/50 text-sm mb-6">at {c.current_company}</div>
+              <div className="text-white/72 text-sm mb-6">at {c.current_company}</div>
 
               <div className="space-y-2 text-xs">
                 <Row icon={<Mail size={12} />} label={c.email} />
@@ -101,7 +101,7 @@ export default function CandidateProfile() {
                   data-testid={`cp-rating-${n}`}
                   className={cx(
                     "w-9 h-9 border transition-all",
-                    n <= c.rating ? "bg-brand border-brand text-black" : "border-white/20 text-white/40 hover:border-white/50"
+                    n <= c.rating ? "bg-brand border-brand text-black" : "border-white/20 text-white/65 hover:border-white/50"
                   )}
                 >
                   <Star size={14} className="mx-auto" fill={n <= c.rating ? "currentColor" : "none"} />
@@ -122,7 +122,7 @@ export default function CandidateProfile() {
                   <span className={cx("font-display text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
                     {c.match_score}
                   </span>
-                  <span className="text-white/40 text-sm">/ 100</span>
+                  <span className="text-white/65 text-sm">/ 100</span>
                 </div>
               </div>
               <div>
@@ -137,7 +137,7 @@ export default function CandidateProfile() {
                         "text-[10px] font-mono uppercase tracking-widest px-2 py-1 border transition-all",
                         c.stage === s
                           ? "bg-brand text-black border-brand"
-                          : "border-white/15 text-white/50 hover:border-white/60 hover:text-white"
+                          : "border-white/15 text-white/72 hover:border-white/60 hover:text-white"
                       )}
                     >
                       {s}
@@ -152,7 +152,7 @@ export default function CandidateProfile() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="font-mono-label">assigned to roles</div>
-                  <div className="text-xs text-white/40 mt-1">One profile, many roles. No duplication.</div>
+                  <div className="text-xs text-white/65 mt-1">One profile, many roles. No duplication.</div>
                 </div>
                 <button
                   onClick={() => setShowRoleMenu((v) => !v)}
@@ -164,7 +164,7 @@ export default function CandidateProfile() {
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {assignedJobs.length === 0 && (
-                  <span className="text-xs text-white/40 italic">Not assigned to any role yet.</span>
+                  <span className="text-xs text-white/65 italic">Not assigned to any role yet.</span>
                 )}
                 {assignedJobs.map((j) => (
                   <motion.span
@@ -175,7 +175,7 @@ export default function CandidateProfile() {
                     data-testid={`cp-role-chip-${j.id}`}
                   >
                     {j.title}
-                    <button onClick={() => toggleRole(j.id)} className="text-white/40 hover:text-danger">
+                    <button onClick={() => toggleRole(j.id)} className="text-white/65 hover:text-danger">
                       <X size={10} />
                     </button>
                   </motion.span>
@@ -207,7 +207,7 @@ export default function CandidateProfile() {
                           </span>
                           <span className="flex-1">
                             <span className="font-medium">{j.title}</span>
-                            <span className="text-white/40 text-xs ml-2">{j.department} · {j.location}</span>
+                            <span className="text-white/65 text-xs ml-2">{j.department} · {j.location}</span>
                           </span>
                           <span className="font-mono text-[10px] text-brand">{fmtINR(j.salary_min).replace("₹", "")}+</span>
                         </button>
@@ -234,7 +234,7 @@ export default function CandidateProfile() {
                   data-testid={`cp-tab-${t.id}`}
                   className={cx(
                     "px-5 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2",
-                    tab === t.id ? "border-brand text-white" : "border-transparent text-white/40 hover:text-white/70"
+                    tab === t.id ? "border-brand text-white" : "border-transparent text-white/65 hover:text-white/70"
                   )}
                 >
                   {t.label}
@@ -264,7 +264,7 @@ export default function CandidateProfile() {
                     placeholder="Interview notes, follow-ups, red flags…"
                     className="w-full bg-transparent border hairline p-3 min-h-[180px] text-sm focus:border-white outline-none"
                   />
-                  <div className="mt-2 text-[10px] text-white/40">Auto-saves on blur.</div>
+                  <div className="mt-2 text-[10px] text-white/65">Auto-saves on blur.</div>
                 </div>
               )}
               {tab === "activity" && (
@@ -285,7 +285,7 @@ export default function CandidateProfile() {
 function Row({ icon, label }) {
   return (
     <div className="flex items-center gap-2 text-white/70">
-      <span className="text-white/40 shrink-0">{icon}</span>
+      <span className="text-white/65 shrink-0">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
   );

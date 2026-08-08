@@ -27,16 +27,16 @@ export default function Themes() {
       <div className="border-b border-white/10 sticky top-0 bg-neutral-950/90 backdrop-blur z-20">
         <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
           <Link to="/" className="font-editorial text-xl">cred<span className="text-brand">.</span>hr</Link>
-          <div className="text-xs font-mono uppercase tracking-widest text-white/50">theme explorations</div>
-          <Link to="/app" className="text-xs text-white/60 hover:text-white">Back to app →</Link>
+          <div className="text-xs font-mono uppercase tracking-widest text-white/72">theme explorations</div>
+          <Link to="/app" className="text-xs text-white/78 hover:text-white">Back to app →</Link>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-12">
         <div className="mb-12">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-white/50 mb-3">pick a direction</div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-white/72 mb-3">pick a direction</div>
           <h1 className="font-editorial text-5xl md:text-6xl leading-none">Six ways this could feel.</h1>
-          <p className="text-white/50 max-w-xl mt-4 text-sm leading-relaxed">
+          <p className="text-white/72 max-w-xl mt-4 text-sm leading-relaxed">
             Same slice of the dashboard, six aesthetics. Scroll through, tell me which one clicks — I'll rebuild the whole app in it.
           </p>
         </div>
@@ -97,7 +97,7 @@ export default function Themes() {
           </ThemeBlock>
         </div>
 
-        <div className="mt-20 border-t border-white/10 pt-8 text-sm text-white/50 text-center">
+        <div className="mt-20 border-t border-white/10 pt-8 text-sm text-white/72 text-center">
           Which one? Tell me the number and I'll rebuild the whole app in it — or a hybrid (e.g. "03 for the dashboard, 04 for the report page").
         </div>
       </div>
@@ -112,8 +112,8 @@ function ThemeBlock({ n, name, desc, bestFor, children }) {
         <div className="md:col-span-4">
           <div className="font-mono text-brand text-xs mb-2">theme · {n}</div>
           <h2 className="font-editorial text-3xl leading-tight mb-2">{name}</h2>
-          <p className="text-white/60 text-sm leading-relaxed mb-3">{desc}</p>
-          <div className="text-[11px] font-mono uppercase tracking-widest text-white/40">
+          <p className="text-white/78 text-sm leading-relaxed mb-3">{desc}</p>
+          <div className="text-[11px] font-mono uppercase tracking-widest text-white/65">
             best for: <span className="text-brand">{bestFor}</span>
           </div>
         </div>

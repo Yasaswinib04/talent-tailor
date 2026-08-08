@@ -50,7 +50,7 @@ function SideLink({ to, icon, label, testid }) {
       data-testid={testid}
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
-          isActive ? "bg-white/5 text-white border-l-2 border-brand" : "text-white/60 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
+          isActive ? "bg-white/5 text-white border-l-2 border-brand" : "text-white/78 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
         }`
       }
     >
@@ -63,12 +63,12 @@ function SideLink({ to, icon, label, testid }) {
 function TopBar() {
   return (
     <div className="h-14 border-b hairline flex items-center px-6 gap-4">
-      <div className="flex items-center gap-2 text-white/40">
+      <div className="flex items-center gap-2 text-white/65">
         <Search size={14} />
         <input
           type="text"
           placeholder="Search candidates, roles, skills…"
-          className="bg-transparent placeholder:text-white/30 focus:outline-none text-sm w-96"
+          className="bg-transparent placeholder:text-white/55 focus:outline-none text-sm w-96"
           data-testid="global-search-input"
         />
         {/* ⌘K badge removed until the command palette is actually wired up —

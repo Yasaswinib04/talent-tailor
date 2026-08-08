@@ -1,0 +1,53 @@
+# Render Blueprint — Talent Tailor
+#
+# Two services, both on Render's free tier:
+#   talent-tailor-api  — FastAPI backend (free web service, sleeps after 15 min idle)
+#   talent-tailor-web  — React build served as a static site (free, never sleeps, CDN)
+#
+# The database is NOT here: MongoDB Atlas M0 is free forever and lives outside Render.
+# Set MONGO_URL manually in the Render dashboard (sync: false = "ask me, don't commit it").
+#
+# Deploy order matters: the API must exist before the web build, because CRA bakes
+# REACT_APP_BACKEND_URL into the bundle at build time. See DEPLOY.md.
+
+services:
+  - type: web
+    name: talent-tailor-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # Matches the local venv this app was built and tested against.
+      - key: PYTHON_VERSION
+        value: "3.13.2"
+      # Atlas SRV string, e.g. mongodb+srv://user:pass@cluster.mongodb.net
+      # Never commit this — paste it in the Render dashboard.
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: talent_tailor
+
+  - type: web
+    name: talent-tailor-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: build
+    envVars:
+      # Render sets CI=true, which makes react-scripts treat ESLint warnings as
+      # build failures. Without this the build dies on a stray unused import.
+      - key: CI
+        value: "false"
+      # Set to the API service's URL, e.g. https://talent-tailor-api.onrender.com
+      # No trailing slash — src/lib/api.js appends "/api".
+      - key: REACT_APP_BACKEND_URL
+        sync: false
+    routes:
+      # SPA fallback. Without this, hard-refreshing /app/jobs/new returns a 404
+      # because no such file exists on disk — React Router handles it client-side.
+      - type: rewrite
+        source: /*
+        destination: /index.html

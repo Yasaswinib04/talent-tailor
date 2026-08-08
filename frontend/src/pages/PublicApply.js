@@ -92,12 +92,12 @@ export default function PublicApply() {
 
   if (job === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-app text-white/60">
+      <div className="min-h-screen flex items-center justify-center bg-app text-white/78">
         This job link is no longer active.
       </div>
     );
   }
-  if (!job) return <div className="min-h-screen flex items-center justify-center text-white/40">Loading…</div>;
+  if (!job) return <div className="min-h-screen flex items-center justify-center text-white/65">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-app text-white">
@@ -129,7 +129,7 @@ export default function PublicApply() {
             <motion.div key="u" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="border-2 border-dashed hairline p-12 text-center bg-surface/30 hover:border-brand/50 transition-colors">
               <Upload size={28} className="text-brand mx-auto mb-4" />
               <h2 className="font-display text-2xl font-medium mb-2">Drop your resume — we do the rest</h2>
-              <p className="text-white/50 text-sm mb-6 max-w-sm mx-auto">
+              <p className="text-white/72 text-sm mb-6 max-w-sm mx-auto">
                 No forms. No typing your job history twice. Upload once, we extract everything.
               </p>
               <label className="inline-block cursor-pointer">
@@ -140,11 +140,11 @@ export default function PublicApply() {
                   className="hidden"
                   data-testid="pa-file-input"
                 />
-                <span className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 transition-colors">
+                <span className="btn btn-light">
                   <Upload size={14} /> Upload resume
                 </span>
               </label>
-              <div className="mt-6 text-[11px] text-white/40">
+              <div className="mt-6 text-[11px] text-white/65">
                 or{" "}
                 <button onClick={onDemoParse} data-testid="pa-demo-btn" className="text-brand hover:text-white underline underline-offset-2">
                   try with a demo resume
@@ -205,14 +205,14 @@ export default function PublicApply() {
                 </div>
               )}
               <div className="mt-8 flex items-center justify-between">
-                <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/50 hover:text-white transition-colors">
+                <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/72 hover:text-white transition-colors">
                   ← Upload a different resume
                 </button>
                 <button
                   onClick={submit}
                   disabled={submitting}
                   data-testid="pa-submit-btn"
-                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-light disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? "Submitting…" : "Submit application"} <ArrowRight size={14} />
                 </button>
@@ -226,12 +226,12 @@ export default function PublicApply() {
                 <Check size={22} className="text-brand" />
               </div>
               <h2 className="font-editorial text-4xl mb-3">Applied.</h2>
-              <p className="text-white/60 max-w-md mx-auto mb-8">
+              <p className="text-white/78 max-w-md mx-auto mb-8">
                 Our team will review your profile. Your match score for this role is:
               </p>
               <div className="font-editorial text-8xl text-brand mb-2">{result.match_score}</div>
               <div className="font-mono-label">match / 100</div>
-              <div className="mt-10 text-xs text-white/40">You may safely close this tab.</div>
+              <div className="mt-10 text-xs text-white/65">You may safely close this tab.</div>
             </motion.div>
           )}
         </AnimatePresence>

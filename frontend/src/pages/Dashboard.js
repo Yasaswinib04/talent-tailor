@@ -109,7 +109,7 @@ export default function Dashboard() {
         <button
           onClick={() => nav("/app/jobs/new")}
           data-testid="dash-new-role-btn"
-          className="bg-brand text-white px-5 py-2.5 text-sm hover:bg-brand/90 transition-colors inline-flex items-center gap-2 linear-glow"
+          className="btn btn-primary"
         >
           <Plus size={14} /> New role
         </button>
@@ -123,7 +123,7 @@ export default function Dashboard() {
           <X size={16} className="text-red-400 mt-0.5 shrink-0" />
           <div>
             <div className="text-sm mb-1">Couldn't load your pipeline</div>
-            <div className="text-sm text-white/50">{loadError}</div>
+            <div className="text-sm text-white/72">{loadError}</div>
           </div>
           <button
             onClick={load}
@@ -161,12 +161,12 @@ export default function Dashboard() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="font-mono-label">{j.department}</div>
-                <ChevronRight size={14} className="text-white/30 group-hover:text-brand group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={14} className="text-white/55 group-hover:text-brand group-hover:translate-x-0.5 transition-all" />
               </div>
               <div className="text-lg font-medium mb-1 leading-snug">{j.title}</div>
-              <div className="text-xs text-white/50 mb-4">{j.location} · {j.seniority}</div>
+              <div className="text-xs text-white/72 mb-4">{j.location} · {j.seniority}</div>
               <div className="flex items-center justify-between text-xs pt-3 border-t hairline">
-                <span className="text-white/50">{j.candidates_count} candidates</span>
+                <span className="text-white/72">{j.candidates_count} candidates</span>
                 <span className="font-mono text-brand">{fmtINR(j.salary_min)}–{fmtINR(j.salary_max)}</span>
               </div>
             </div>
@@ -177,8 +177,8 @@ export default function Dashboard() {
               data-testid="empty-new-role-btn"
               className="border border-dashed hairline p-5 hover:border-brand/40 hover:bg-brand/5 transition-all flex flex-col items-center justify-center min-h-[168px]"
             >
-              <Plus size={20} className="text-white/40 mb-2" />
-              <div className="text-sm text-white/60">Create a new role</div>
+              <Plus size={20} className="text-white/65 mb-2" />
+              <div className="text-sm text-white/78">Create a new role</div>
               <div className="font-mono-label mt-2">press N</div>
             </button>
           )}
@@ -192,8 +192,8 @@ export default function Dashboard() {
             <h2 className="font-display text-xl font-semibold">All candidates</h2>
             {(q || filterStage || filterJob) && (
               <span className="text-[10px] font-mono flex items-center gap-1.5">
-                <span className="text-white/60">{candidates.length} candidates</span>
-                <span className="text-white/30">→</span>
+                <span className="text-white/78">{candidates.length} candidates</span>
+                <span className="text-white/55">→</span>
                 <span className={cx(
                   "px-1.5 py-0.5 border",
                   filtered.length === 0
@@ -209,7 +209,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => { setQ(""); setFilterStage(""); setFilterJob(""); }}
                   data-testid="dash-clear-filters"
-                  className="text-white/40 hover:text-white transition-colors ml-1"
+                  className="text-white/65 hover:text-white transition-colors ml-1"
                 >
                   clear
                 </button>
@@ -218,7 +218,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 border hairline px-3 py-2">
-              <Search size={12} className="text-white/40" />
+              <Search size={12} className="text-white/65" />
               <input
                 data-testid="candidates-search"
                 value={q}
@@ -291,13 +291,13 @@ export default function Dashboard() {
                       <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
                       <div>
                         <div className="font-medium">{c.name}</div>
-                        <div className="text-[11px] text-white/40">{c.location}</div>
+                        <div className="text-[11px] text-white/65">{c.location}</div>
                       </div>
                     </div>
                   </td>
                   <td className="py-3 px-3">
                     <div className="text-white/80">{c.current_title}</div>
-                    <div className="text-[11px] text-white/40">{c.current_company}</div>
+                    <div className="text-[11px] text-white/65">{c.current_company}</div>
                   </td>
                   <td className="py-3 px-3 font-mono text-xs">{c.experience_years}y</td>
                   <td className="py-3 px-3 font-mono text-xs">{fmtINR(c.expected_ctc)}</td>
@@ -312,7 +312,7 @@ export default function Dashboard() {
                         ) : null;
                       })}
                       {c.role_ids.length > 2 && (
-                        <span className="text-[10px] font-mono text-white/50">+{c.role_ids.length - 2}</span>
+                        <span className="text-[10px] font-mono text-white/72">+{c.role_ids.length - 2}</span>
                       )}
                     </div>
                   </td>
@@ -325,7 +325,7 @@ export default function Dashboard() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">
+                <tr><td colSpan="8" className="py-16 text-center text-white/65 text-sm">
                   {loadError ? "Couldn't load candidates — see the error above." : "No candidates match these filters."}
                 </td></tr>
               )}
@@ -334,7 +334,7 @@ export default function Dashboard() {
         </div>
 
         {/* Keyboard hint */}
-        <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/40">
+        <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/65">
           <span><span className="kbd">J</span> <span className="kbd">K</span> row nav</span>
           <span><span className="kbd">↵</span> open profile</span>
           <span><span className="kbd">X</span> select</span>
@@ -349,7 +349,7 @@ export default function Dashboard() {
           <BulkBtn label="Shortlist" onClick={() => bulkStage("Shortlisted")} testid="bulk-shortlist" />
           <BulkBtn label="Interview" onClick={() => bulkStage("Interview")} testid="bulk-interview" />
           <BulkBtn label="Reject" onClick={() => bulkStage("Rejected")} testid="bulk-reject" danger />
-          <button onClick={() => setSelected(new Set())} className="text-white/40 hover:text-white p-1 ml-1" data-testid="bulk-clear">
+          <button onClick={() => setSelected(new Set())} className="text-white/65 hover:text-white p-1 ml-1" data-testid="bulk-clear">
             <X size={14} />
           </button>
         </div>
@@ -362,7 +362,7 @@ function Kpi({ label, value, icon, testid, gold }) {
   return (
     <div className="p-5 border-r hairline last:border-r-0" data-testid={testid}>
       <div className="flex items-center gap-2 mb-2">
-        <span className={gold ? "text-brand" : "text-white/40"}>{icon}</span>
+        <span className={gold ? "text-brand" : "text-white/65"}>{icon}</span>
         <span className="font-mono-label">{label}</span>
       </div>
       <div className={cx("font-display text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
@@ -372,11 +372,11 @@ function Kpi({ label, value, icon, testid, gold }) {
 
 function StageBadge({ stage }) {
   const map = {
-    New: "text-white/60 border-white/20",
+    New: "text-white/78 border-white/20",
     Shortlisted: "text-brand border-brand/40",
     Interview: "text-gold border-gold/40",
     Offer: "text-success border-success/40",
-    Rejected: "text-white/30 border-white/10 line-through",
+    Rejected: "text-white/55 border-white/10 line-through",
   };
   return (
     <span className={cx("text-[10px] font-mono uppercase tracking-widest px-2 py-1 border", map[stage] || map.New)}>
@@ -386,7 +386,7 @@ function StageBadge({ stage }) {
 }
 
 function MatchScore({ score }) {
-  const color = score >= 90 ? "text-brand" : score >= 75 ? "text-white" : "text-white/50";
+  const color = score >= 90 ? "text-brand" : score >= 75 ? "text-white" : "text-white/72";
   return (
     <div className="inline-flex items-center gap-2">
       <div className="w-16 h-1 bg-white/10 relative overflow-hidden">

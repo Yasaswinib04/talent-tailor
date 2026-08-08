@@ -4,3 +4,9 @@ pydantic==2.10.4
 python-dotenv==1.0.1
 motor==3.6.0
 pymongo==4.9.2
+# Required to resolve MongoDB Atlas "mongodb+srv://" URLs. pymongo does not pull
+# this in on its own, and the failure only shows up in prod: the app starts, then
+# every request hangs on DNS. Local "mongodb://localhost" never needs it.
+dnspython==2.7.0
+# CA bundle for the TLS handshake with Atlas.
+certifi==2024.12.14

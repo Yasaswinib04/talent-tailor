@@ -40,7 +40,7 @@ export default function Report() {
             <Link
               to="/app"
               data-testid="report-enter-app-btn"
-              className="text-sm bg-white text-black px-4 py-2 hover:bg-gray-200 transition-colors"
+              className="btn btn-light !text-sm !px-4 !py-2"
             >
               Enter the app →
             </Link>
@@ -68,7 +68,7 @@ export default function Report() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7 }}
-                className="font-editorial text-6xl md:text-8xl leading-[0.9] tracking-tight font-light"
+                className="font-editorial text-6xl md:text-8xl leading-[0.9] tracking-tight"
               >
                 We rebuilt the
                 <br />
@@ -84,10 +84,10 @@ export default function Report() {
                 This report documents every change — with a working prototype.
               </p>
               <div className="mt-6 flex items-center gap-3">
-                <Link to="/app" data-testid="hero-open-app-btn" className="inline-flex items-center gap-2 bg-white text-black px-5 py-3 text-sm hover:bg-gray-200 transition-colors">
+                <Link to="/app" data-testid="hero-open-app-btn" className="btn btn-light">
                   Open the new app <ArrowRight size={14} />
                 </Link>
-                <a href="#changes" className="text-sm text-white/60 hover:text-white transition-colors">Read the changelog ↓</a>
+                <a href="#changes" className="text-sm text-white/78 hover:text-white transition-colors">Read the changelog ↓</a>
               </div>
             </div>
           </div>
@@ -101,7 +101,7 @@ export default function Report() {
             <div key={m.k} className="px-8 py-8">
               <div className="font-mono-label mb-3">{m.k}</div>
               <div className="flex items-baseline gap-3">
-                <span className="line-through text-white/30 font-mono text-sm">{m.old}</span>
+                <span className="line-through text-white/55 font-mono text-sm">{m.old}</span>
                 <span className="font-editorial text-4xl text-brand">{m.now}</span>
               </div>
             </div>
@@ -131,7 +131,7 @@ export default function Report() {
                     <X size={14} className="text-danger mt-1.5 shrink-0" />
                     <div>
                       <div className="text-lg font-medium">{p.title}</div>
-                      <div className="text-white/60 text-sm mt-1 leading-relaxed">{p.detail}</div>
+                      <div className="text-white/78 text-sm mt-1 leading-relaxed">{p.detail}</div>
                     </div>
                   </div>
                 </motion.div>
@@ -143,7 +143,7 @@ export default function Report() {
             <div className="md:col-span-4">
               <div className="font-mono-label mb-4">02 · redesign</div>
               <h2 className="font-editorial text-5xl leading-tight">What we <em className="text-brand not-italic">changed</em>.</h2>
-              <p className="text-white/60 text-sm mt-4 leading-relaxed">Every fix maps to a specific pain point. No feature was added for its own sake. Speed and clarity above all.</p>
+              <p className="text-white/78 text-sm mt-4 leading-relaxed">Every fix maps to a specific pain point. No feature was added for its own sake. Speed and clarity above all.</p>
             </div>
             <div className="md:col-span-8 space-y-6">
               {fixes.map((f, i) => (
@@ -159,7 +159,7 @@ export default function Report() {
                     <Check size={14} className="text-brand mt-1.5 shrink-0" />
                     <div>
                       <div className="text-lg font-medium">{f.title}</div>
-                      <div className="text-white/60 text-sm mt-1 leading-relaxed">{f.detail}</div>
+                      <div className="text-white/78 text-sm mt-1 leading-relaxed">{f.detail}</div>
                     </div>
                   </div>
                 </motion.div>
@@ -196,7 +196,7 @@ export default function Report() {
               <div key={p.n} className="border hairline p-6">
                 <div className="font-mono text-brand text-xs mb-4">{p.n}</div>
                 <div className="text-lg font-medium mb-2">{p.t}</div>
-                <div className="text-white/50 text-sm">{p.d}</div>
+                <div className="text-white/72 text-sm">{p.d}</div>
               </div>
             ))}
           </div>
@@ -213,12 +213,12 @@ export default function Report() {
           <h2 className="font-editorial text-6xl leading-tight mb-6">
             Ready to see it in action?
           </h2>
-          <p className="text-white/60 text-lg mb-10 max-w-xl mx-auto">
+          <p className="text-white/78 text-lg mb-10 max-w-xl mx-auto">
             A live, working prototype of every flow — onboarding, job setup, the dashboard, candidate profile, and the public apply link.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link to="/onboarding" data-testid="cta-onboarding-btn" className="border border-white/30 hover:border-white text-white px-6 py-3 text-sm transition-colors">Start with onboarding</Link>
-            <Link to="/app" data-testid="cta-app-btn" className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 transition-colors inline-flex items-center gap-2">
+            <Link to="/onboarding" data-testid="cta-onboarding-btn" className="btn btn-secondary">Start with onboarding</Link>
+            <Link to="/app" data-testid="cta-app-btn" className="btn btn-light">
               Jump into the dashboard <ArrowRight size={14} />
             </Link>
           </div>
@@ -226,7 +226,7 @@ export default function Report() {
       </section>
 
       <footer className="border-t hairline py-8 px-8">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-white/40">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-white/65">
           <div>© 2026 cred.hr — principal design review</div>
           <div className="font-mono-label">crafted for the CRED talent org.</div>
         </div>
@@ -260,7 +260,7 @@ function BeforeCard() {
           <div className="h-8 w-24 bg-white/10" />
         </div>
       </div>
-      <div className="mt-4 text-xs text-white/50 leading-relaxed">
+      <div className="mt-4 text-xs text-white/72 leading-relaxed">
         Every field weighs the same. The most useful action lives inside an overflow menu. No visual hierarchy — the HR has to scan the whole page every time.
       </div>
     </div>
@@ -299,7 +299,7 @@ function AfterCard() {
         <div className="font-mono-label">salary suggested · ₹35L – ₹65L</div>
         <div className="text-xs bg-white text-black px-3 py-1.5">Publish role →</div>
       </div>
-      <div className="mt-4 text-xs text-white/60 leading-relaxed">
+      <div className="mt-4 text-xs text-white/78 leading-relaxed">
         JD on the left. Extraction on the right — running the moment you paste. One button that does the obvious thing: <em className="text-brand not-italic">publish</em>.
       </div>
     </div>

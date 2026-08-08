@@ -20,7 +20,7 @@ export default function JobDetail() {
     load();
   }, [jobId]);
 
-  if (!job) return <div className="p-8 text-white/40">Loading…</div>;
+  if (!job) return <div className="p-8 text-white/65">Loading…</div>;
 
   const shareUrl = `${window.location.origin}/apply/${job.share_slug}`;
 
@@ -32,7 +32,7 @@ export default function JobDetail() {
 
   return (
     <div className="max-w-[1200px] mx-auto p-8">
-      <button onClick={() => nav("/app")} data-testid="jd-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
+      <button onClick={() => nav("/app")} data-testid="jd-back-btn" className="text-white/72 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back to overview
       </button>
 
@@ -77,7 +77,7 @@ export default function JobDetail() {
                 <ExternalLink size={12} /> Preview
               </a>
             </div>
-            <div className="mt-3 text-[10px] text-white/40 leading-relaxed">
+            <div className="mt-3 text-[10px] text-white/65 leading-relaxed">
               Candidates upload a resume and apply in one click. Their profile is auto-scored against this role.
             </div>
           </div>
@@ -168,9 +168,9 @@ export default function JobDetail() {
               <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium">{c.name}</div>
-                <div className="text-xs text-white/50">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
+                <div className="text-xs text-white/72">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
               </div>
-              <div className="text-xs text-white/50 hidden md:block">
+              <div className="text-xs text-white/72 hidden md:block">
                 {c.skills.slice(0, 3).join(" · ")}
               </div>
               <div className="w-20 text-right">
@@ -181,7 +181,7 @@ export default function JobDetail() {
             </div>
           ))}
           {cands.length === 0 && (
-            <div className="p-12 text-center text-white/40 text-sm">
+            <div className="p-12 text-center text-white/65 text-sm">
               No candidates yet. Share the public apply link →
             </div>
           )}

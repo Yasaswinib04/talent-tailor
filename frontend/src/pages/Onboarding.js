@@ -31,7 +31,7 @@ export default function Onboarding() {
           <button
             onClick={() => nav("/app")}
             data-testid="skip-onboarding-btn"
-            className="text-xs text-white/40 hover:text-white transition-colors"
+            className="text-xs text-white/65 hover:text-white transition-colors"
           >
             Skip →
           </button>
@@ -44,12 +44,12 @@ export default function Onboarding() {
               <div className="flex items-center gap-3">
                 <div
                   className={`w-8 h-8 flex items-center justify-center border transition-colors ${
-                    step >= s.id ? "border-brand bg-brand text-black" : "border-white/20 text-white/40"
+                    step >= s.id ? "border-brand bg-brand text-black" : "border-white/20 text-white/65"
                   }`}
                 >
                   {step > s.id ? <Check size={14} /> : <span className="font-mono text-xs">0{s.id}</span>}
                 </div>
-                <div className={`text-sm ${step >= s.id ? "text-white" : "text-white/40"}`}>{s.title}</div>
+                <div className={`text-sm ${step >= s.id ? "text-white" : "text-white/65"}`}>{s.title}</div>
               </div>
               {i < steps.length - 1 && <div className={`flex-1 h-px ${step > s.id ? "bg-brand" : "bg-white/10"}`} />}
             </React.Fragment>
@@ -63,7 +63,7 @@ export default function Onboarding() {
               <motion.div key="s1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 01 · takes 30 seconds</div>
                 <h2 className="font-editorial text-4xl mb-2">Tell us where you work.</h2>
-                <p className="text-white/50 mb-8">We use this to shape the templates for your team.</p>
+                <p className="text-white/72 mb-8">We use this to shape the templates for your team.</p>
                 <div className="space-y-5">
                   <Field label="Company name">
                     <input
@@ -109,7 +109,7 @@ export default function Onboarding() {
               <motion.div key="s2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 02 · we'll set the rest for you</div>
                 <h2 className="font-editorial text-4xl mb-2">What's your first hire?</h2>
-                <p className="text-white/50 mb-8">Just a title. You'll add the JD & skills next — it's fast.</p>
+                <p className="text-white/72 mb-8">Just a title. You'll add the JD & skills next — it's fast.</p>
                 <div className="space-y-5">
                   <Field label="Role title">
                     <input
@@ -151,7 +151,7 @@ export default function Onboarding() {
               <motion.div key="s3" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 03 · optional</div>
                 <h2 className="font-editorial text-4xl mb-2">Bring the crew.</h2>
-                <p className="text-white/50 mb-8">Add teammate emails to collaborate. Skip if it's just you.</p>
+                <p className="text-white/72 mb-8">Add teammate emails to collaborate. Skip if it's just you.</p>
                 <Field label="Team emails (comma separated)">
                   <textarea
                     data-testid="onb-invite-emails"
@@ -171,7 +171,7 @@ export default function Onboarding() {
           <button
             onClick={() => (step === 1 ? nav("/") : setStep(step - 1))}
             data-testid="onb-back-btn"
-            className="text-sm text-white/50 hover:text-white transition-colors"
+            className="text-sm text-white/72 hover:text-white transition-colors"
           >
             ← Back
           </button>
@@ -183,7 +183,7 @@ export default function Onboarding() {
                 if (step < 3) setStep(step + 1);
                 else nav("/app/jobs/new");
               }}
-              className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors"
+              className="btn btn-light"
             >
               {step === 3 ? "Finish & set up first role" : "Continue"} <ArrowRight size={14} />
             </button>
