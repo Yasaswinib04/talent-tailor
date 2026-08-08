@@ -4,20 +4,43 @@ Mock-first API for the redesigned HR candidate evaluation platform.
 All data is in-memory + persisted to MongoDB for a light experience.
 """
 import os
+import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
+
+def _required_env(name: str, hint: str) -> str:
+    """Fail with an actionable message instead of a bare KeyError traceback."""
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(
+            f"Missing required environment variable {name}.\n  {hint}\n"
+            f"  See .env.example for the full list."
+        )
+    return value
+
+
+MONGO_URL = _required_env("MONGO_URL", "MongoDB connection string, e.g. mongodb://localhost:27017")
+DB_NAME = _required_env("DB_NAME", "Database name, e.g. cred_hr")
+# Shared access code that gates every recruiter-facing endpoint. Candidate-facing
+# endpoints (viewing a shared job, applying) stay public by design.
+HR_ACCESS_CODE = _required_env(
+    "HR_ACCESS_CODE",
+    "Access code recruiters type to open the app. Use a long random string.",
+)
+# Comma-separated list of browser origins allowed to call this API.
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()
+]
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -26,11 +49,20 @@ app = FastAPI(title="CRED HR API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+async def require_recruiter(x_access_code: Optional[str] = Header(default=None)):
+    """Gate for recruiter endpoints. Candidate PII must never be world-readable."""
+    if x_access_code != HR_ACCESS_CODE:
+        raise HTTPException(401, "Invalid or missing access code")
+
+
+recruiter_only = [Depends(require_recruiter)]
 
 
 # ---------- Models ----------
@@ -82,6 +114,12 @@ class FilterPreviewRequest(BaseModel):
     skills: Optional[List[dict]] = []
 
 
+STAGES = ("New", "Shortlisted", "Interview", "Offer", "Rejected")
+Stage = Literal["New", "Shortlisted", "Interview", "Offer", "Rejected"]
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+\.[^@\s]+$")
+
+
 class Candidate(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -98,7 +136,7 @@ class Candidate(BaseModel):
     resume_summary: str
     avatar: str = ""
     match_score: int = 0
-    stage: str = "New"  # New, Shortlisted, Interview, Offer, Rejected
+    stage: Stage = "New"
     role_ids: List[str] = []  # multiple roles!
     tags: List[str] = []
     rating: int = 0
@@ -108,14 +146,34 @@ class Candidate(BaseModel):
 
 
 class CandidateApply(BaseModel):
-    name: str
-    email: str
-    phone: str
-    current_title: str
-    current_company: str
-    experience_years: float
-    expected_ctc: int
-    resume_text: Optional[str] = ""
+    """Public payload — this endpoint is unauthenticated, so validate strictly."""
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(max_length=254)
+    phone: str = Field(min_length=6, max_length=20)
+    current_title: str = Field(min_length=2, max_length=120)
+    current_company: str = Field(min_length=1, max_length=120)
+    experience_years: float = Field(ge=0, le=60)
+    expected_ctc: int = Field(ge=0, le=1_000_000_000)
+    location: Optional[str] = Field(default="", max_length=120)
+    education: Optional[str] = Field(default="", max_length=200)
+    notice_period: Optional[str] = Field(default="", max_length=60)
+    resume_text: Optional[str] = Field(default="", max_length=20000)
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address")
+        return v.lower()
+
+    @field_validator("name", "current_title", "current_company")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("This field is required")
+        return v
 
 
 class RoleAssignment(BaseModel):
@@ -123,7 +181,18 @@ class RoleAssignment(BaseModel):
 
 
 class StageUpdate(BaseModel):
-    stage: str
+    stage: Stage
+
+
+class CandidateUpdate(BaseModel):
+    """Only recruiter-editable fields; unknown keys are rejected outright."""
+    model_config = {"extra": "forbid"}
+
+    stage: Optional[Stage] = None
+    rating: Optional[int] = Field(default=None, ge=0, le=5)
+    notes: Optional[str] = Field(default=None, max_length=20000)
+    tags: Optional[List[str]] = None
+    role_ids: Optional[List[str]] = None
 
 
 # ---------- Seed Data ----------
@@ -304,20 +373,25 @@ async def health():
     return {"status": "ok", "time": now_iso()}
 
 
-@app.get("/api/jobs")
+@app.get("/api/jobs", dependencies=recruiter_only)
 async def list_jobs():
     jobs = await db.jobs.find({}).to_list(1000)
     return [strip_mongo(j) for j in jobs]
 
 
-@app.post("/api/jobs")
+@app.post("/api/jobs", dependencies=recruiter_only)
 async def create_job(payload: JobCreate):
-    job = Job(**payload.model_dump())
+    data = payload.model_dump()
+    # JobCreate allows these to be omitted (None); Job requires real dicts.
+    for optional_dict in ("filters", "scoring_weights"):
+        if data.get(optional_dict) is None:
+            data[optional_dict] = {}
+    job = Job(**data)
     await db.jobs.insert_one(job.model_dump())
     return job.model_dump()
 
 
-@app.get("/api/jobs/{job_id}")
+@app.get("/api/jobs/{job_id}", dependencies=recruiter_only)
 async def get_job(job_id: str):
     job = await db.jobs.find_one({"id": job_id})
     if not job:
@@ -333,8 +407,11 @@ async def get_job_by_slug(slug: str):
     return strip_mongo(job)
 
 
-@app.patch("/api/jobs/{job_id}")
+@app.patch("/api/jobs/{job_id}", dependencies=recruiter_only)
 async def update_job(job_id: str, payload: dict):
+    payload = {k: v for k, v in (payload or {}).items() if k not in ("id", "share_slug", "created_at")}
+    if not payload:
+        raise HTTPException(400, "No editable fields supplied")
     result = await db.jobs.update_one({"id": job_id}, {"$set": payload})
     if result.matched_count == 0:
         raise HTTPException(404, "Job not found")
@@ -342,9 +419,13 @@ async def update_job(job_id: str, payload: dict):
     return strip_mongo(job)
 
 
-@app.delete("/api/jobs/{job_id}")
+@app.delete("/api/jobs/{job_id}", dependencies=recruiter_only)
 async def delete_job(job_id: str):
-    await db.jobs.delete_one({"id": job_id})
+    result = await db.jobs.delete_one({"id": job_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Job not found")
+    # Don't leave candidates pointing at a role that no longer exists.
+    await db.candidates.update_many({"role_ids": job_id}, {"$pull": {"role_ids": job_id}})
     return {"ok": True}
 
 
@@ -369,7 +450,7 @@ SKILL_DICTIONARY = {
 }
 
 
-@app.post("/api/extract-skills")
+@app.post("/api/extract-skills", dependencies=recruiter_only)
 async def extract_skills(payload: ExtractSkillsRequest):
     text = (payload.jd or "").lower()
     found = {}
@@ -411,17 +492,20 @@ async def extract_skills(payload: ExtractSkillsRequest):
     is_junior = any(k in text for k in ["junior", "entry", "intern"])
     min_exp = 5 if is_senior else (0 if is_junior else 2)
 
-    # Recommended mandatory filters
-    must_have = [s["name"] for s in skills[:3]]
+    # Recommended mandatory filters.
+    # must_have_skills is a strict AND filter — requiring all top skills wipes out
+    # almost any real pool, so we surface them as suggestions and leave the hard
+    # filter empty for the recruiter to opt into.
     recommended_filters = {
         "min_experience_years": min_exp,
         "education_preference": "Bachelor's degree or equivalent",
         "notice_period_max_days": 90,
-        "must_have_skills": must_have,
+        "must_have_skills": [],
         "preferred_companies": [],
         "locations": ["Bengaluru", "Remote"],
         "no_gaps_over_months": 6,
     }
+    suggested_must_have = [s["name"] for s in skills[:3]]
 
     # Recommended scoring weights (sum to 100)
     if is_senior:
@@ -436,6 +520,7 @@ async def extract_skills(payload: ExtractSkillsRequest):
         "salary_suggestion": {"min": salary_min, "max": salary_max},
         "screening_questions": suggested_questions,
         "recommended_filters": recommended_filters,
+        "suggested_must_have_skills": suggested_must_have,
         "recommended_weights": recommended_weights,
     }
 
@@ -453,10 +538,17 @@ def _parse_notice_days(s: str) -> int:
     return int(m.group(1)) if m else 999
 
 
+UNKNOWN_VALUES = {"", "—", "-", "not specified", "n/a", "na", "unknown"}
+
+
 def _matches_education(candidate_edu: str, pref: str) -> bool:
     if not pref or pref == "No preference":
         return True
-    edu = (candidate_edu or "").lower()
+    edu = (candidate_edu or "").lower().strip()
+    # Never silently drop someone just because we don't have their education on
+    # file — surface them and let the recruiter decide.
+    if edu in UNKNOWN_VALUES:
+        return True
     p = pref.lower()
     if "tier-1" in p or "tier 1" in p:
         tokens = ["iit", "nit", "iiit", "bits"]
@@ -470,7 +562,7 @@ def _matches_education(candidate_edu: str, pref: str) -> bool:
     return True
 
 
-@app.post("/api/candidates/preview-filter")
+@app.post("/api/candidates/preview-filter", dependencies=recruiter_only)
 async def preview_filter(payload: FilterPreviewRequest):
     filters = payload.filters or {}
     cands = await db.candidates.find({}).to_list(1000)
@@ -520,7 +612,20 @@ async def preview_filter(payload: FilterPreviewRequest):
 
 
 # ---------- Candidates ----------
-@app.get("/api/candidates")
+async def _refresh_candidate_counts():
+    jobs = await db.jobs.find({}).to_list(1000)
+    for j in jobs:
+        count = await db.candidates.count_documents({"role_ids": j["id"]})
+        await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
+
+
+async def _assert_roles_exist(role_ids: List[str]):
+    for rid in role_ids:
+        if not await db.jobs.find_one({"id": rid}):
+            raise HTTPException(400, f"Role {rid} does not exist")
+
+
+@app.get("/api/candidates", dependencies=recruiter_only)
 async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None, q: Optional[str] = None):
     query = {}
     if job_id:
@@ -535,7 +640,7 @@ async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = N
     return result
 
 
-@app.get("/api/candidates/{cid}")
+@app.get("/api/candidates/{cid}", dependencies=recruiter_only)
 async def get_candidate(cid: str):
     c = await db.candidates.find_one({"id": cid})
     if not c:
@@ -543,35 +648,35 @@ async def get_candidate(cid: str):
     return strip_mongo(c)
 
 
-@app.patch("/api/candidates/{cid}")
-async def update_candidate(cid: str, payload: dict):
-    result = await db.candidates.update_one({"id": cid}, {"$set": payload})
+@app.patch("/api/candidates/{cid}", dependencies=recruiter_only)
+async def update_candidate(cid: str, payload: CandidateUpdate):
+    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "No editable fields supplied")
+    if "role_ids" in updates:
+        await _assert_roles_exist(updates["role_ids"])
+    result = await db.candidates.update_one({"id": cid}, {"$set": updates})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
+    if "role_ids" in updates:
+        await _refresh_candidate_counts()
     c = await db.candidates.find_one({"id": cid})
-    # update job candidate counts if role_ids changed
-    if "role_ids" in payload:
-        jobs = await db.jobs.find({}).to_list(1000)
-        for j in jobs:
-            count = await db.candidates.count_documents({"role_ids": j["id"]})
-            await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
     return strip_mongo(c)
 
 
-@app.post("/api/candidates/{cid}/assign-roles")
+@app.post("/api/candidates/{cid}/assign-roles", dependencies=recruiter_only)
 async def assign_roles(cid: str, payload: RoleAssignment):
-    result = await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": payload.role_ids}})
+    role_ids = list(dict.fromkeys(payload.role_ids))
+    await _assert_roles_exist(role_ids)
+    result = await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": role_ids}})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
-    jobs = await db.jobs.find({}).to_list(1000)
-    for j in jobs:
-        count = await db.candidates.count_documents({"role_ids": j["id"]})
-        await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
+    await _refresh_candidate_counts()
     c = await db.candidates.find_one({"id": cid})
     return strip_mongo(c)
 
 
-@app.post("/api/candidates/{cid}/stage")
+@app.post("/api/candidates/{cid}/stage", dependencies=recruiter_only)
 async def set_stage(cid: str, payload: StageUpdate):
     result = await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
     if result.matched_count == 0:
@@ -599,38 +704,52 @@ async def apply_to_job(slug: str, payload: CandidateApply):
         score = min(100, 40 + int(overlap / max(1, len(job_skill_names)) * 60))
     else:
         score = 60
-    c = Candidate(
+
+    # Re-applying with the same email updates the existing profile instead of
+    # creating a duplicate row in the recruiter's pool.
+    existing = await db.candidates.find_one({"email": payload.email})
+    fields = dict(
         name=payload.name,
-        email=payload.email,
         phone=payload.phone,
         current_title=payload.current_title,
         current_company=payload.current_company,
-        location="—",
+        location=payload.location or "Not specified",
         experience_years=payload.experience_years,
         expected_ctc=payload.expected_ctc,
-        notice_period="—",
-        skills=list(matched_skills) if matched_skills else ["General"],
-        education="—",
+        notice_period=payload.notice_period or "Not specified",
+        skills=sorted(matched_skills) if matched_skills else ["General"],
+        education=payload.education or "Not specified",
         resume_summary=(payload.resume_text or "")[:400] or f"{payload.current_title} at {payload.current_company}",
-        avatar=AVATAR_POOL[hash(payload.email) % len(AVATAR_POOL)],
         match_score=score,
+        auto_applied=True,
+    )
+    if existing:
+        role_ids = list(dict.fromkeys(list(existing.get("role_ids") or []) + [job["id"]]))
+        await db.candidates.update_one(
+            {"id": existing["id"]}, {"$set": {**fields, "role_ids": role_ids}}
+        )
+        await _refresh_candidate_counts()
+        return {"ok": True, "candidate_id": existing["id"], "match_score": score, "updated": True}
+
+    c = Candidate(
+        **fields,
+        email=payload.email,
+        avatar=AVATAR_POOL[hash(payload.email) % len(AVATAR_POOL)],
         stage="New",
         role_ids=[job["id"]],
-        auto_applied=True,
     )
     await db.candidates.insert_one(c.model_dump())
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})
-    return {"ok": True, "candidate_id": c.id, "match_score": score}
+    return {"ok": True, "candidate_id": c.id, "match_score": score, "updated": False}
 
 
 # ---------- Analytics ----------
-@app.get("/api/analytics/summary")
+@app.get("/api/analytics/summary", dependencies=recruiter_only)
 async def analytics_summary():
     total_jobs = await db.jobs.count_documents({})
     total_candidates = await db.candidates.count_documents({})
-    stages = ["New", "Shortlisted", "Interview", "Offer", "Rejected"]
     funnel = {}
-    for s in stages:
+    for s in STAGES:
         funnel[s] = await db.candidates.count_documents({"stage": s})
     return {
         "total_jobs": total_jobs,

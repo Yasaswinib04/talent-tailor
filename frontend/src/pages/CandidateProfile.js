@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, fmtINR, cx } from "../lib/api";
-import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Star, Check, X, Plus, GraduationCap } from "lucide-react";
+import { api, fmtINR, cx, errMsg } from "../lib/api";
+import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Star, Check, X, Plus, GraduationCap, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
+
+/** "12 Feb 2026, 4:05 pm" — or a dash when the timestamp is missing. */
+const fmtWhen = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  return d.toLocaleString("en-IN", {
+    day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+};
 
 export default function CandidateProfile() {
   const { cid } = useParams();
@@ -14,40 +24,70 @@ export default function CandidateProfile() {
   const [tab, setTab] = useState("resume");
   const [note, setNote] = useState("");
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => {
-    const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
-    setC(cr.data);
-    setJobs(jr.data);
-    setNote(cr.data.notes || "");
+    try {
+      const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
+      setC(cr.data);
+      setJobs(jr.data);
+      setNote(cr.data.notes || "");
+      setLoadError("");
+    } catch (e) {
+      setLoadError(errMsg(e, "Couldn't load this candidate."));
+    }
   };
 
   useEffect(() => {
     load();
   }, [cid]);
 
+  /** Run a write, surface anything that goes wrong, then refresh. */
+  const withFeedback = async (fn, fallback) => {
+    setError("");
+    try {
+      await fn();
+      await load();
+    } catch (e) {
+      setError(errMsg(e, fallback));
+    }
+  };
+
+  if (loadError) {
+    return (
+      <div className="p-8 max-w-[1200px] mx-auto">
+        <div className="border border-red-400/30 bg-red-400/5 p-8 text-center" data-testid="cp-load-error">
+          <AlertCircle size={20} className="text-red-400 mx-auto mb-3" />
+          <div className="font-display text-lg mb-4">{loadError}</div>
+          <button onClick={load} className="border hairline hover:border-brand hover:text-brand text-sm px-4 py-2 transition-colors">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!c) return <div className="p-8 text-white/40">Loading…</div>;
 
-  const toggleRole = async (roleId) => {
+  const toggleRole = (roleId) => {
     const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
-    await api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds });
-    load();
+    return withFeedback(
+      () => api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds }),
+      "Couldn't update this candidate's roles."
+    );
   };
 
-  const setStage = async (stage) => {
-    await api.post(`/candidates/${cid}/stage`, { stage });
-    load();
+  const setStage = (stage) =>
+    withFeedback(() => api.post(`/candidates/${cid}/stage`, { stage }), "Couldn't move this candidate.");
+
+  const saveNote = () => {
+    if ((c.notes || "") === note) return;
+    return withFeedback(() => api.patch(`/candidates/${cid}`, { notes: note }), "Your note wasn't saved.");
   };
 
-  const saveNote = async () => {
-    await api.patch(`/candidates/${cid}`, { notes: note });
-    load();
-  };
-
-  const setRating = async (rating) => {
-    await api.patch(`/candidates/${cid}`, { rating });
-    load();
-  };
+  const setRating = (rating) =>
+    withFeedback(() => api.patch(`/candidates/${cid}`, { rating }), "Couldn't save that rating.");
 
   const assignedJobs = jobs.filter((j) => c.role_ids.includes(j.id));
 
@@ -56,6 +96,18 @@ export default function CandidateProfile() {
       <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back
       </button>
+
+      {error && (
+        <div
+          className="mb-6 border border-red-400/30 bg-red-400/5 px-4 py-3 text-xs text-red-400 flex items-center gap-2"
+          data-testid="cp-error"
+        >
+          <AlertCircle size={12} className="shrink-0" /> {error}
+          <button onClick={() => setError("")} className="ml-auto hover:text-white">
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-8">
         {/* LEFT: Identity */}
@@ -268,10 +320,23 @@ export default function CandidateProfile() {
                 </div>
               )}
               {tab === "activity" && (
-                <div className="space-y-3 text-sm">
-                  <ActivityItem when="Just now" text={`Assigned to ${assignedJobs.length} role(s).`} />
-                  <ActivityItem when="Yesterday" text={`Stage moved to ${c.stage}.`} />
-                  <ActivityItem when="3 days ago" text={c.auto_applied ? "Auto-applied via shareable link." : "Added to pipeline by recruiter."} />
+                <div className="space-y-3 text-sm" data-testid="cp-activity">
+                  <ActivityItem
+                    when={fmtWhen(c.applied_at)}
+                    text={c.auto_applied ? "Applied via the shareable link." : "Added to the pipeline by a recruiter."}
+                  />
+                  <ActivityItem when="Current" text={`Stage: ${c.stage}.`} />
+                  <ActivityItem
+                    when="Current"
+                    text={
+                      assignedJobs.length
+                        ? `Assigned to ${assignedJobs.map((j) => j.title).join(", ")}.`
+                        : "Not assigned to any role."
+                    }
+                  />
+                  <div className="text-[10px] text-white/30 pt-2">
+                    A full audit trail of stage changes isn't recorded yet.
+                  </div>
                 </div>
               )}
             </div>

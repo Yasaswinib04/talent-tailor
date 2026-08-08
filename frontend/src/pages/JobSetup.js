@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { api, fmtINR } from "../lib/api";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { api, fmtINR, errMsg } from "../lib/api";
 import {
   Sparkles, X, Plus, ChevronLeft, Loader2, Check, ChevronDown, ChevronUp,
-  Filter, Scale, Info, RotateCcw, GraduationCap, Briefcase, Clock, MapPin
+  Filter, Scale, Info, RotateCcw, GraduationCap, Briefcase, Clock, MapPin, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -34,10 +34,12 @@ const DEFAULT_WEIGHTS = { skills: 40, experience: 25, education: 15, notice: 10,
 
 export default function JobSetup() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const [form, setForm] = useState({
-    title: "",
-    department: "Engineering",
-    location: "Bengaluru",
+    // Prefilled from onboarding when the recruiter has just come through it.
+    title: params.get("title") || "",
+    department: params.get("department") || "Engineering",
+    location: params.get("location") || "Bengaluru",
     seniority: "Senior",
     jd: "",
     skills: [],
@@ -63,6 +65,8 @@ export default function JobSetup() {
   const [recommendedSnapshot, setRecommendedSnapshot] = useState({ filters: null, weights: null });
   const [filterPreview, setFilterPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const [suggestedSkills, setSuggestedSkills] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -86,7 +90,11 @@ export default function JobSetup() {
           filters: res.data.recommended_filters,
           weights: res.data.recommended_weights,
         });
+        setSuggestedSkills(res.data.suggested_must_have_skills || []);
         setExtracted(true);
+        setError("");
+      } catch (e) {
+        setError(errMsg(e, "Couldn't read that job description. Your text is safe — try again."));
       } finally {
         setExtracting(false);
       }
@@ -104,6 +112,9 @@ export default function JobSetup() {
           skills: form.skills,
         });
         setFilterPreview(res.data);
+      } catch {
+        // A failed preview shouldn't block editing — just stop showing a stale count.
+        setFilterPreview(null);
       } finally {
         setPreviewing(false);
       }
@@ -144,11 +155,17 @@ export default function JobSetup() {
   const weightsTotal = Object.values(form.scoring_weights).reduce((a, b) => a + b, 0);
 
   const publish = async () => {
-    if (!form.title.trim()) return alert("Add a role title first");
+    if (!form.title.trim()) {
+      setError("Give the role a title before publishing.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
       const res = await api.post("/jobs", form);
       nav(`/app/jobs/${res.data.id}`);
+    } catch (e) {
+      setError(errMsg(e, "Couldn't publish this role. Nothing was lost — try again."));
     } finally {
       setSaving(false);
     }
@@ -180,6 +197,18 @@ export default function JobSetup() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div
+          className="mx-8 mt-4 border border-red-400/30 bg-red-400/5 px-4 py-3 text-xs text-red-400 flex items-center gap-2"
+          data-testid="js-error"
+        >
+          <AlertCircle size={12} className="shrink-0" /> {error}
+          <button onClick={() => setError("")} className="ml-auto hover:text-white">
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       {/* Split layout */}
       <div className="grid md:grid-cols-2 gap-0 min-h-[calc(100vh-8rem)]">
@@ -312,7 +341,7 @@ export default function JobSetup() {
                   />
                 </SmallField>
                 <div className="col-span-2">
-                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/40 lowercase">(strict filter)</span></span>}>
+                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/40 lowercase">(candidates need every one of these)</span></span>}>
                     <TagInput
                       values={form.filters.must_have_skills}
                       onChange={(v) => setFilter("must_have_skills", v)}
@@ -320,6 +349,23 @@ export default function JobSetup() {
                       testid="js-filter-must-have"
                     />
                   </SmallField>
+                  {suggestedSkills.filter((s) => !form.filters.must_have_skills.includes(s)).length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                      <span className="text-white/40">suggested:</span>
+                      {suggestedSkills
+                        .filter((s) => !form.filters.must_have_skills.includes(s))
+                        .map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setFilter("must_have_skills", [...form.filters.must_have_skills, s])}
+                            data-testid={`js-suggest-must-have-${s}`}
+                            className="border border-white/15 bg-white/[0.02] text-white/70 px-2 py-0.5 hover:border-brand hover:text-brand transition-colors"
+                          >
+                            + {s}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <SmallField label="Preferred previous companies (soft boost)">

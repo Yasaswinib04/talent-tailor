@@ -1,37 +1,50 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, fmtINR, cx } from "../lib/api";
-import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
+import { api, fmtINR, cx, errMsg } from "../lib/api";
+import { Plus, Briefcase, Users, TrendingUp, Search, ChevronRight, Zap, Star, X, Check, AlertCircle, RotateCcw } from "lucide-react";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
 export default function Dashboard() {
   const [params] = useSearchParams();
-  const tab = params.get("tab") || "overview";
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(params.get("q") || "");
   const [filterStage, setFilterStage] = useState("");
   const [filterJob, setFilterJob] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
   const nav = useNavigate();
 
   const load = async () => {
-    const [j, c, s] = await Promise.all([
-      api.get("/jobs"),
-      api.get("/candidates"),
-      api.get("/analytics/summary"),
-    ]);
-    setJobs(j.data);
-    setCandidates(c.data);
-    setSummary(s.data);
+    setLoadError("");
+    try {
+      const [j, c, s] = await Promise.all([
+        api.get("/jobs"),
+        api.get("/candidates"),
+        api.get("/analytics/summary"),
+      ]);
+      setJobs(j.data);
+      setCandidates(c.data);
+      setSummary(s.data);
+    } catch (e) {
+      setLoadError(errMsg(e, "Couldn't load your pipeline."));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  // Keep the table in sync with the top-bar search.
+  useEffect(() => {
+    setQ(params.get("q") || "");
+  }, [params]);
 
   const filtered = useMemo(() => {
     return candidates.filter((c) => {
@@ -81,13 +94,54 @@ export default function Dashboard() {
   }, [cursor, filtered, nav]);
 
   const bulkStage = async (stage) => {
-    await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
-    setSelected(new Set());
+    try {
+      await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
+      setSelected(new Set());
+    } catch (e) {
+      setLoadError(errMsg(e, "Couldn't move those candidates."));
+    }
     load();
   };
 
+  if (loadError && !summary) {
+    return (
+      <div className="p-8 max-w-[1400px] mx-auto">
+        <div
+          className="border border-red-400/30 bg-red-400/5 p-8 text-center"
+          data-testid="dash-load-error"
+        >
+          <AlertCircle size={22} className="text-red-400 mx-auto mb-4" />
+          <div className="font-display text-lg font-medium mb-2">{loadError}</div>
+          <p className="text-white/50 text-sm mb-6">
+            Nothing has been lost — this is a connection problem, not your data.
+          </p>
+          <button
+            onClick={load}
+            data-testid="dash-retry-btn"
+            className="border hairline hover:border-brand hover:text-brand text-sm px-5 py-2.5 inline-flex items-center gap-2 transition-colors"
+          >
+            <RotateCcw size={13} /> Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="p-8 text-white/40 text-sm">Loading your pipeline…</div>;
+  }
+
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
+      {loadError && (
+        <div
+          className="mb-6 border border-red-400/30 bg-red-400/5 px-4 py-3 text-xs text-red-400 flex items-center gap-2"
+          data-testid="dash-inline-error"
+        >
+          <AlertCircle size={12} /> {loadError}
+          <button onClick={load} className="ml-auto underline hover:text-white">retry</button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>

@@ -180,8 +180,16 @@ export default function Onboarding() {
             <button
               data-testid="onb-continue-btn"
               onClick={() => {
-                if (step < 3) setStep(step + 1);
-                else nav("/app/jobs/new");
+                if (step < 3) return setStep(step + 1);
+                // Carry the wizard's answers into job setup so nothing is retyped.
+                const params = new URLSearchParams();
+                if (role.title.trim()) params.set("title", role.title.trim());
+                if (role.department) params.set("department", role.department);
+                if (role.location.trim()) params.set("location", role.location.trim());
+                if (company.name.trim()) {
+                  localStorage.setItem("cred_hr_company", company.name.trim());
+                }
+                nav(`/app/jobs/new${params.toString() ? `?${params}` : ""}`);
               }}
               className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors"
             >
