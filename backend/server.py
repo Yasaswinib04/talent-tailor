@@ -10,6 +10,7 @@ import zlib
 from datetime import datetime, timezone
 from typing import List, Optional
 
+import certifi
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,12 @@ load_dotenv()
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 
-client = AsyncIOMotorClient(MONGO_URL)
+# For Atlas (mongodb+srv) pin the CA bundle explicitly. Without it, hosts whose
+# system trust store isn't wired up for Python throw CERTIFICATE_VERIFY_FAILED;
+# certifi ships a known-good bundle so TLS verifies everywhere. Harmless for a
+# plain local mongodb:// connection (tlsCAFile is ignored when TLS is off).
+_client_opts = {"tlsCAFile": certifi.where()} if "mongodb+srv" in MONGO_URL else {}
+client = AsyncIOMotorClient(MONGO_URL, **_client_opts)
 db = client[DB_NAME]
 
 app = FastAPI(title="CRED HR API")
