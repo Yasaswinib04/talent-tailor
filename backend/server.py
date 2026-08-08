@@ -146,6 +146,35 @@ class CandidateApply(BaseModel):
         return v
 
 
+class Visitor(BaseModel):
+    """Someone who identified themselves at the sign-in gate.
+
+    Identification, not authentication — no password, no session. The point is
+    to know who tried the product, so the bar is one honest email, not security.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    email: str
+    company: Optional[str] = ""
+    first_seen: str = Field(default_factory=now_iso)
+    last_seen: str = Field(default_factory=now_iso)
+    visits: int = 1
+
+    @field_validator("name")
+    @classmethod
+    def visitor_name_not_blank(cls, v: str):
+        if not (v or "").strip():
+            raise ValueError("name is required")
+        return v.strip()
+
+    @field_validator("email")
+    @classmethod
+    def visitor_valid_email(cls, v: str):
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$", (v or "").strip()):
+            raise ValueError("a valid email address is required")
+        return v.strip().lower()
+
+
 class RoleAssignment(BaseModel):
     role_ids: List[str]
 
@@ -782,6 +811,31 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     await db.candidates.insert_one(c.model_dump())
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})
     return {"ok": True, "candidate_id": c.id, "match_score": c.match_score}
+
+
+# ---------- Sign-in gate (identification, not authentication) ----------
+@app.post("/api/visitors")
+async def register_visitor(payload: Visitor):
+    """Called when someone passes the gate. Same email twice = a return visit."""
+    existing = await db.visitors.find_one({"email": payload.email})
+    if existing:
+        await db.visitors.update_one(
+            {"email": payload.email},
+            {"$set": {"last_seen": now_iso(), "name": payload.name, "company": payload.company or existing.get("company", "")},
+             "$inc": {"visits": 1}},
+        )
+        updated = await db.visitors.find_one({"email": payload.email})
+        return strip_mongo(updated)
+    doc = payload.model_dump()
+    await db.visitors.insert_one(doc)
+    return payload.model_dump()
+
+
+@app.get("/api/visitors")
+async def list_visitors():
+    """Who has used the product — newest first. This is the answer to 'who used?'"""
+    visitors = await db.visitors.find({}).sort("last_seen", -1).to_list(1000)
+    return [strip_mongo(v) for v in visitors]
 
 
 # ---------- Analytics ----------

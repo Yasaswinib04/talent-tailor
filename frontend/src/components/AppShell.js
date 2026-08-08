@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { LayoutGrid, Briefcase, Users, Plus, Search } from "lucide-react";
+import { getVisitor } from "./SignInGate";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -75,7 +76,7 @@ function TopBar() {
             advertising a shortcut that does nothing is worse than not showing one. */}
       </div>
       <div className="ml-auto flex items-center gap-4">
-        <span className="font-mono-label">recruiter · maya n.</span>
+        <span className="font-mono-label">{getVisitor()?.name || "recruiter"}</span>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-gold" />
       </div>
     </div>
