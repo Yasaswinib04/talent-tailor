@@ -122,8 +122,27 @@ Static sites don't consume instance-hours. Only backends do.
 git push origin main
 ```
 
-Render auto-deploys both services on push. Rollback is **Deploys → pick an older
-deploy → Rollback** in the dashboard.
+That's the whole pipeline. There is no GitHub Action and nothing to run locally — Render
+watches `main` and rebuilds on push.
+
+**Which service rebuilds depends on which folder you touched.** Because each service declares
+a `rootDir`, Render only auto-deploys a service when the push changes files under that folder:
+
+| You changed | `talent-tailor-api` | `talent-tailor-web` |
+|---|---|---|
+| `backend/**` | rebuilds | untouched |
+| `frontend/**` | untouched | rebuilds |
+| both | rebuilds | rebuilds, in parallel |
+| root files (`README.md`, `DEPLOY.md`) | untouched | untouched |
+
+So a backend fix does not take your frontend offline, and vice versa. Roughly 2–4 min for the
+API, 2–3 min for the web build.
+
+**One exception worth remembering:** editing `render.yaml` itself doesn't apply on push.
+Blueprint changes need **Blueprint → Sync** in the Render dashboard.
+
+Rollback is **the service → Deploys → pick an older deploy → Rollback**. Instant for the
+static site, ~2 min for the API.
 
 ---
 

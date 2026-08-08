@@ -1,0 +1,78 @@
+name: Smoke test deployed API
+
+# Runs after Render finishes deploying a backend change, and tells you if the
+# deploy silently broke something. Render's own health check only proves the
+# process booted — this proves the data is actually there.
+#
+# Setup: repo Settings → Secrets and variables → Actions → Variables → New,
+#   name  API_URL
+#   value https://talent-tailor-api.onrender.com   (no trailing slash)
+# Until that variable exists this workflow skips itself instead of failing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check API_URL is configured
+        id: guard
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "::notice::API_URL variable not set — skipping smoke test."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.run == 'true'
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependencies
+        if: steps.guard.outputs.run == 'true'
+        run: pip install pytest requests
+
+      - name: Wait for the deploy to go live
+        if: steps.guard.outputs.run == 'true'
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          # Up to 10 min: Render builds for ~2-4 min, and a free instance that
+          # was asleep adds ~50s of cold start on top. --max-time 70 keeps a
+          # single slow wake-up from being counted as a failure.
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 70 "$API_URL/api/health" || true)
+            if [ "$code" = "200" ]; then
+              echo "API is live after ${i} attempt(s)."
+              exit 0
+            fi
+            echo "attempt $i: got HTTP $code — retrying in 15s"
+            sleep 15
+          done
+          echo "::error::$API_URL/api/health never returned 200. Check the Render logs."
+          exit 1
+
+      - name: Run read-only checks against production
+        if: steps.guard.outputs.run == 'true'
+        env:
+          REACT_APP_BACKEND_URL: ${{ vars.API_URL }}
+        run: |
+          # Deliberately excluded: these four tests write to the database.
+          # create_job, stage_update and assign_multiple_roles clean up after
+          # themselves, but public_apply does not — running it on every push
+          # would drip fake applicants into the demo data. The remaining ten
+          # cover health, seeding, lookups, filtering, extraction and analytics,
+          # which is what actually catches a broken deploy.
+          pytest backend/tests/backend_test.py -q \
+            -k "not create_job and not stage_update and not assign_multiple_roles and not public_apply"
