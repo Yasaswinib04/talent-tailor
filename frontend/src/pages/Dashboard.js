@@ -16,17 +16,29 @@ export default function Dashboard() {
   const [filterJob, setFilterJob] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
+  const [loadError, setLoadError] = useState(null);
   const nav = useNavigate();
 
   const load = async () => {
-    const [j, c, s] = await Promise.all([
-      api.get("/jobs"),
-      api.get("/candidates"),
-      api.get("/analytics/summary"),
-    ]);
-    setJobs(j.data);
-    setCandidates(c.data);
-    setSummary(s.data);
+    try {
+      const [j, c, s] = await Promise.all([
+        api.get("/jobs"),
+        api.get("/candidates"),
+        api.get("/analytics/summary"),
+      ]);
+      setJobs(j.data);
+      setCandidates(c.data);
+      setSummary(s.data);
+      setLoadError(null);
+    } catch (e) {
+      // Distinguish "the server is unreachable" from "your filters matched nobody" —
+      // showing an empty table for a network failure misleads the recruiter.
+      setLoadError(
+        e?.response
+          ? `The server returned an error (${e.response.status}).`
+          : "Can't reach the server. Check that the backend is running."
+      );
+    }
   };
 
   useEffect(() => {
@@ -102,6 +114,25 @@ export default function Dashboard() {
           <Plus size={14} /> New role
         </button>
       </div>
+
+      {loadError && (
+        <div
+          data-testid="dash-load-error"
+          className="border border-red-500/40 bg-red-500/5 px-5 py-4 mb-8 flex items-start gap-3"
+        >
+          <X size={16} className="text-red-400 mt-0.5 shrink-0" />
+          <div>
+            <div className="text-sm mb-1">Couldn't load your pipeline</div>
+            <div className="text-sm text-white/50">{loadError}</div>
+          </div>
+          <button
+            onClick={load}
+            className="ml-auto text-sm border hairline px-3 py-1.5 hover:bg-white/5 transition-colors shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* KPI band */}
       {summary && (
@@ -294,7 +325,9 @@ export default function Dashboard() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">No candidates match these filters.</td></tr>
+                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">
+                  {loadError ? "Couldn't load candidates — see the error above." : "No candidates match these filters."}
+                </td></tr>
               )}
             </tbody>
           </table>

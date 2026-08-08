@@ -2,6 +2,10 @@ node_modules/
 build/
 dist/
 coverage/
+__pycache__/
+*.pyc
+venv/
+.pytest_cache/
 .DS_Store
 *.log
 credentials.json
@@ -11,3 +15,4 @@ credentials.json
 .env
 .env.*
 *.env
+!.env.example

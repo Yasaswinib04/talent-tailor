@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutGrid, Briefcase, Users, Plus, Search, Command } from "lucide-react";
+import { LayoutGrid, Briefcase, Users, Plus, Search } from "lucide-react";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -71,7 +71,8 @@ function TopBar() {
           className="bg-transparent placeholder:text-white/30 focus:outline-none text-sm w-96"
           data-testid="global-search-input"
         />
-        <span className="kbd flex items-center gap-1"><Command size={10} /> K</span>
+        {/* ⌘K badge removed until the command palette is actually wired up —
+            advertising a shortcut that does nothing is worse than not showing one. */}
       </div>
       <div className="ml-auto flex items-center gap-4">
         <span className="font-mono-label">recruiter · maya n.</span>

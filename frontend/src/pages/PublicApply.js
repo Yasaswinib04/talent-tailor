@@ -22,9 +22,16 @@ export default function PublicApply() {
     experience_years: 0,
     expected_ctc: 0,
     resume_text: "",
+    // Sent through so auto-applied candidates are filterable on the same fields
+    // the role's mandatory criteria screen on.
+    location: "",
+    education: "",
+    notice_period: "",
   });
   const [result, setResult] = useState(null);
   const [scanText, setScanText] = useState("");
+  const [submitError, setSubmitError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
@@ -43,6 +50,9 @@ export default function PublicApply() {
       current_company: "Razorpay",
       experience_years: 5.5,
       expected_ctc: 4000000,
+      location: "Bengaluru",
+      education: "B.Tech, IIT Roorkee",
+      notice_period: "30 days",
       resume_text:
         text ||
         "Senior Frontend Engineer at Razorpay. 5.5 years of production React, TypeScript, Next.js. Built the design system used across all consumer surfaces. Previously at Freshworks working on performance optimization. B.Tech from IIT Roorkee.",
@@ -61,9 +71,23 @@ export default function PublicApply() {
   const onDemoParse = () => simulateParse("");
 
   const submit = async () => {
-    const res = await api.post(`/apply/${slug}`, form);
-    setResult(res.data);
-    setStage("submitted");
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const res = await api.post(`/apply/${slug}`, form);
+      setResult(res.data);
+      setStage("submitted");
+    } catch (e) {
+      // FastAPI returns 422 with per-field messages; surface the first one plainly.
+      const detail = e?.response?.data?.detail;
+      setSubmitError(
+        Array.isArray(detail)
+          ? detail[0]?.msg?.replace(/^Value error, /, "") || "Please check your details."
+          : "Couldn't submit your application. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (job === false) {
@@ -171,17 +195,26 @@ export default function PublicApply() {
                 <FieldPA label="Current company" value={form.current_company} onChange={(v) => setForm({ ...form, current_company: v })} testid="pa-company" />
                 <FieldPA label="Experience (years)" value={form.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
                 <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} type="number" onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} testid="pa-ctc" />
+                <FieldPA label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} testid="pa-location" />
+                <FieldPA label="Highest qualification" value={form.education} onChange={(v) => setForm({ ...form, education: v })} testid="pa-education" />
+                <FieldPA label="Notice period" value={form.notice_period} onChange={(v) => setForm({ ...form, notice_period: v })} testid="pa-notice" />
               </div>
+              {submitError && (
+                <div data-testid="pa-submit-error" className="mt-6 border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+                  {submitError}
+                </div>
+              )}
               <div className="mt-8 flex items-center justify-between">
                 <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/50 hover:text-white transition-colors">
                   ← Upload a different resume
                 </button>
                 <button
                   onClick={submit}
+                  disabled={submitting}
                   data-testid="pa-submit-btn"
-                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors"
+                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit application <ArrowRight size={14} />
+                  {submitting ? "Submitting…" : "Submit application"} <ArrowRight size={14} />
                 </button>
               </div>
             </motion.div>
