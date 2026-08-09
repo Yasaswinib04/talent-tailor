@@ -1,5 +1,6 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
+import Landing from "./pages/Landing";
 import Report from "./pages/Report";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
@@ -15,7 +16,10 @@ export default function App() {
   return (
     <div className="min-h-screen grain">
       <Routes>
-        <Route path="/" element={<Report />} />
+        {/* The front door is the product, not the design case study. The report
+            is good work for a different audience — it lives at /report. */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/report" element={<Report />} />
         <Route path="/onboarding" element={<Onboarding />} />
         {/* Candidates applying via the share link are never gated — the gate is
             for identifying HRs trying the product, not applicants. */}
