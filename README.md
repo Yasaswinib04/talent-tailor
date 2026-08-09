@@ -53,6 +53,35 @@ cd frontend && npm install && npm start
 Open http://localhost:3000/app and enter your `HR_ACCESS_CODE`. On first boot the
 backend seeds 4 roles and 20 candidates.
 
+## Deploy to Render
+
+`render.yaml` is a blueprint for two services — `cred-hr-api` (FastAPI) and
+`cred-hr-web` (static frontend). Render has no managed MongoDB, so create a free
+[MongoDB Atlas](https://www.mongodb.com/atlas) cluster first and allow access
+from anywhere (or from Render's egress IPs).
+
+In Render: **New → Blueprint**, point it at this repo, and apply. Then, because
+each service needs the other's URL:
+
+1. Copy both service URLs from the dashboard.
+2. On `cred-hr-api` → Environment, set:
+   - `MONGO_URL` — your Atlas connection string
+   - `ALLOWED_ORIGINS` — the frontend URL, e.g. `https://cred-hr-web.onrender.com`
+3. On `cred-hr-web` → Environment, set `REACT_APP_BACKEND_URL` to the backend
+   URL, e.g. `https://cred-hr-api.onrender.com` (no trailing `/api`).
+4. Redeploy both. The frontend bakes its API URL in at build time, so it needs a
+   rebuild after any change to that value.
+5. Read the generated `HR_ACCESS_CODE` from `cred-hr-api` → Environment. That's
+   what recruiters type at `/app`. Share it out of band; rotate it by replacing
+   the value and redeploying.
+
+The blueprint sets a catch-all rewrite to `index.html`. Without it, a candidate
+opening `/apply/:slug` directly gets a 404 — that route only exists client-side.
+
+On Render's `starter` plan the API sleeps when idle, so the first request after a
+quiet spell takes a few seconds. Worth knowing before you send the link to
+candidates.
+
 ## Access model
 
 | Surface | Who can reach it |

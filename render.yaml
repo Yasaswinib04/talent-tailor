@@ -1,0 +1,71 @@
+# Render blueprint for the CRED HR talent engine.
+#
+# Two services: a FastAPI backend and a static frontend. MongoDB is NOT included
+# — Render has no managed MongoDB, so create a free cluster on MongoDB Atlas and
+# paste its connection string into MONGO_URL in the Render dashboard.
+#
+# First deploy is a two-pass job, because each service needs the other's URL:
+#   1. Deploy the blueprint. Both services build; the frontend build will fail
+#      or produce a broken bundle until step 3.
+#   2. Copy each service's URL from the dashboard.
+#   3. Set cred-hr-api → ALLOWED_ORIGINS to the frontend URL, and
+#      cred-hr-web → REACT_APP_BACKEND_URL to the backend URL. Redeploy both.
+#   4. Read the generated HR_ACCESS_CODE from cred-hr-api → Environment. That is
+#      what recruiters type at /app. Share it out of band.
+
+services:
+  # ---------------------------------------------------------------- backend ---
+  - type: web
+    name: cred-hr-api
+    runtime: python
+    plan: starter
+    region: singapore
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DB_NAME
+        value: cred_hr
+      # Access code recruiters type to open the workspace. Render generates it;
+      # read the value from the Environment tab and share it with your team.
+      # Rotating it is as simple as replacing the value and redeploying.
+      - key: HR_ACCESS_CODE
+        generateValue: true
+      # MongoDB Atlas connection string, e.g.
+      #   mongodb+srv://user:pass@cluster.mongodb.net
+      - key: MONGO_URL
+        sync: false
+      # The frontend's origin, e.g. https://cred-hr-web.onrender.com
+      # Comma-separate if you add a custom domain. Never use "*" — candidate
+      # contact details are behind this.
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # --------------------------------------------------------------- frontend ---
+  - type: web
+    name: cred-hr-web
+    runtime: static
+    branch: main
+    rootDir: frontend
+    # npm install, not npm ci: frontend/ has no committed lockfile. Committing one
+    # would make builds reproducible, but the current dependency set resolves a
+    # conflicting transitive typescript, so that is a cleanup for after launch.
+    buildCommand: npm install --no-audit --no-fund && npm run build
+    staticPublishPath: build
+    autoDeploy: true
+    # Single-page app: /app, /apply/:slug and every other route must fall back to
+    # index.html, or a candidate opening a share link directly gets a 404.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Baked into the bundle at build time, so a change needs a rebuild.
+      # The backend's URL, e.g. https://cred-hr-api.onrender.com — no trailing /api.
+      - key: REACT_APP_BACKEND_URL
+        sync: false
