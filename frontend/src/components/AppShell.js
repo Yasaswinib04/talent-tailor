@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { LayoutGrid, Briefcase, Users, Plus, Search } from "lucide-react";
-import { getVisitor } from "./SignInGate";
+import { getVisitor } from "./ActivationCapture";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -11,7 +11,7 @@ export default function AppShell() {
       <aside className="w-56 border-r hairline flex flex-col shrink-0">
         <div className="px-5 py-6 border-b hairline">
           <div className="font-editorial text-2xl leading-none tracking-tight">
-            cred<span className="text-brand">.</span>hr
+            talent<span className="text-brand">.</span>tailor
           </div>
           <div className="font-mono-label mt-2">talent · engine</div>
         </div>

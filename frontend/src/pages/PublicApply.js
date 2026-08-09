@@ -104,7 +104,7 @@ export default function PublicApply() {
       {/* Header */}
       <div className="border-b hairline">
         <div className="max-w-4xl mx-auto px-8 py-5 flex items-center justify-between">
-          <Link to="/" className="font-editorial text-xl">cred<span className="text-brand">.</span>hr</Link>
+          <Link to="/" className="font-editorial text-xl">talent<span className="text-brand">.</span>tailor</Link>
           <div className="font-mono-label">apply · in 30 seconds</div>
         </div>
       </div>

@@ -153,15 +153,18 @@ class CandidateApply(BaseModel):
 
 
 class Visitor(BaseModel):
-    """Someone who identified themselves at the sign-in gate.
+    """Someone who left their details after reaching a result.
 
-    Identification, not authentication — no password, no session. The point is
-    to know who tried the product, so the bar is one honest email, not security.
+    Identification, not authentication — no password, no session. Captured at
+    the activation moment (they have a shortlist on screen), never as a gate in
+    front of the product. `source` records which moment converted them, so it's
+    possible to tell what actually earns an email.
     """
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     email: str
     company: Optional[str] = ""
+    source: Optional[str] = "unknown"
     first_seen: str = Field(default_factory=now_iso)
     last_seen: str = Field(default_factory=now_iso)
     visits: int = 1
@@ -822,7 +825,11 @@ async def apply_to_job(slug: str, payload: CandidateApply):
 # ---------- Sign-in gate (identification, not authentication) ----------
 @app.post("/api/visitors")
 async def register_visitor(payload: Visitor):
-    """Called when someone passes the gate. Same email twice = a return visit."""
+    """Called when someone leaves details at an activation moment.
+
+    Same email twice = a return visit; the original `source` is kept so the
+    moment that first converted them isn't overwritten by a later one.
+    """
     existing = await db.visitors.find_one({"email": payload.email})
     if existing:
         await db.visitors.update_one(
@@ -839,7 +846,7 @@ async def register_visitor(payload: Visitor):
 
 @app.get("/api/visitors")
 async def list_visitors():
-    """Who has used the product — newest first. This is the answer to 'who used?'"""
+    """Who reached a result and left details — newest first, with what converted them."""
     visitors = await db.visitors.find({}).sort("last_seen", -1).to_list(1000)
     return [strip_mongo(v) for v in visitors]
 

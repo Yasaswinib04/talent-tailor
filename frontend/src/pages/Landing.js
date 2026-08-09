@@ -33,14 +33,10 @@ export default function Landing() {
       <header className="border-b hairline">
         <div className="max-w-5xl mx-auto px-8 py-5 flex items-center justify-between">
           <div className="font-editorial text-xl leading-none tracking-tight">
-            cred<span className="text-brand">.</span>hr
+            talent<span className="text-brand">.</span>tailor
           </div>
-          <Link
-            to="/report"
-            data-testid="landing-report-link"
-            className="text-sm text-white/72 hover:text-white transition-colors"
-          >
-            How we designed it
+          <Link to="/app" className="text-sm text-white/72 hover:text-white transition-colors">
+            Sign in
           </Link>
         </div>
       </header>
@@ -82,11 +78,8 @@ export default function Landing() {
       </main>
 
       <footer className="border-t hairline">
-        <div className="max-w-5xl mx-auto px-8 py-5 flex items-center justify-between">
-          <div className="font-mono-label">cred.hr · talent engine</div>
-          <Link to="/report" className="font-mono-label hover:text-white transition-colors">
-            design review ↗
-          </Link>
+        <div className="max-w-5xl mx-auto px-8 py-5">
+          <div className="font-mono-label">talent tailor</div>
         </div>
       </footer>
     </div>

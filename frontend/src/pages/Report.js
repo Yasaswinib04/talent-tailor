@@ -33,7 +33,7 @@ export default function Report() {
       <div className="fixed top-0 inset-x-0 z-30 border-b hairline bg-app/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-8 py-4">
           <div className="font-editorial text-xl leading-none tracking-tight">
-            cred<span className="text-brand">.</span>hr
+            talent<span className="text-brand">.</span>tailor
           </div>
           <div className="flex items-center gap-3">
             <Link to="/onboarding" data-testid="report-onboarding-link" className="text-sm text-white/70 hover:text-white transition-colors">Try onboarding</Link>

@@ -26,7 +26,7 @@ export default function Themes() {
       {/* Header */}
       <div className="border-b border-white/10 sticky top-0 bg-neutral-950/90 backdrop-blur z-20">
         <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-          <Link to="/" className="font-editorial text-xl">cred<span className="text-brand">.</span>hr</Link>
+          <Link to="/" className="font-editorial text-xl">talent<span className="text-brand">.</span>tailor</Link>
           <div className="text-xs font-mono uppercase tracking-widest text-white/72">theme explorations</div>
           <Link to="/app" className="text-xs text-white/78 hover:text-white">Back to app →</Link>
         </div>

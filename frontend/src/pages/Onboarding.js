@@ -11,7 +11,7 @@ const steps = [
 
 export default function Onboarding() {
   const [step, setStep] = useState(1);
-  const [company, setCompany] = useState({ name: "CRED", size: "500-1000", industry: "Fintech" });
+  const [company, setCompany] = useState({ name: "", size: "500-1000", industry: "Fintech" });
   const [role, setRole] = useState({ title: "", department: "Engineering", location: "Bengaluru" });
   const [invites, setInvites] = useState("");
   const nav = useNavigate();
@@ -26,7 +26,7 @@ export default function Onboarding() {
         {/* Brand */}
         <div className="flex items-center justify-between mb-16">
           <div className="font-editorial text-2xl leading-none">
-            cred<span className="text-brand">.</span>hr
+            talent<span className="text-brand">.</span>tailor
           </div>
           <button
             onClick={() => nav("/app")}

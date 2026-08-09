@@ -10,7 +10,6 @@ import CandidateProfile from "./pages/CandidateProfile";
 import PublicApply from "./pages/PublicApply";
 import Themes from "./pages/Themes";
 import AppShell from "./components/AppShell";
-import SignInGate from "./components/SignInGate";
 
 export default function App() {
   return (
@@ -25,13 +24,10 @@ export default function App() {
             for identifying HRs trying the product, not applicants. */}
         <Route path="/apply/:slug" element={<PublicApply />} />
         <Route path="/themes" element={<Themes />} />
-        <Route
-          element={
-            <SignInGate>
-              <AppShell />
-            </SignInGate>
-          }
-        >
+        {/* No gate in front of the product. Nobody hands over an email before
+            they've seen it work — let them run the whole discovery, reach a real
+            shortlist, and ask only at that point (see ActivationCapture). */}
+        <Route element={<AppShell />}>
           <Route path="/app" element={<Dashboard />} />
           <Route path="/app/jobs/new" element={<JobSetup />} />
           <Route path="/app/jobs/:jobId" element={<JobDetail />} />

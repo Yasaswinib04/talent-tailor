@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
 import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users } from "lucide-react";
+import ActivationCapture from "../components/ActivationCapture";
 
 export default function JobDetail() {
   const { jobId } = useParams();
@@ -185,6 +186,12 @@ export default function JobDetail() {
               No candidates yet. Share the public apply link →
             </div>
           )}
+        </div>
+
+        {/* The ask sits here and nowhere earlier: they have a ranked shortlist
+            on screen, so there is something real to take away. */}
+        <div className="mt-6">
+          <ActivationCapture context="shortlist" count={cands.length} />
         </div>
       </div>
     </div>
