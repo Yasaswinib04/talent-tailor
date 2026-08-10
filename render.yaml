@@ -37,7 +37,7 @@ services:
       # Resume parsing = candidate-facing, fast tier. JD extraction = recruiter-
       # facing, bigger model. OPENROUTER_MODEL (unset here) overrides both.
       - key: OPENROUTER_MODEL_RESUME
-        value: google/gemini-2.5-flash
+        value: google/gemini-3.5-flash
       - key: OPENROUTER_MODEL_JD
         value: google/gemini-2.5-pro
       # Signs auth tokens. Rotating it signs everyone out.

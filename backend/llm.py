@@ -27,7 +27,7 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 # runs once per role with a recruiter watching a spinner, so it can afford a
 # bigger model. OPENROUTER_MODEL overrides both; the specific vars win over it.
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "")
-RESUME_MODEL = os.environ.get("OPENROUTER_MODEL_RESUME") or OPENROUTER_MODEL or "google/gemini-2.5-flash"
+RESUME_MODEL = os.environ.get("OPENROUTER_MODEL_RESUME") or OPENROUTER_MODEL or "google/gemini-3.5-flash"
 JD_MODEL = os.environ.get("OPENROUTER_MODEL_JD") or OPENROUTER_MODEL or "google/gemini-2.5-pro"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
