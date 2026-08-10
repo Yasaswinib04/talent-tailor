@@ -3,6 +3,7 @@ Talent Tailor - Backend API
 Candidate shortlisting: LLM-parsed resumes, deterministic scoring, per-account
 workspaces, and a per-role paywall (top-3 free preview, unlock for the rest).
 """
+import asyncio
 import csv
 import io
 import os
@@ -1027,6 +1028,99 @@ async def set_stage(cid: str, payload: StageUpdate, user: dict = Depends(current
     await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
     c = await db.candidates.find_one({"id": cid})
     return strip_mongo(c)
+
+
+# ---------- Bulk resume upload (recruiter-side) ----------
+# The activation feature: a recruiter already has a pile of resumes; this turns
+# that pile into a ranked shortlist in one request, instead of waiting for
+# candidates to arrive through the apply link.
+MAX_BULK_FILES = 20
+
+
+async def _ingest_resume_file(file: UploadFile, job: dict) -> dict:
+    """One uploaded resume → one ranked candidate. Per-file status, never raises."""
+    filename = file.filename or "resume"
+    try:
+        data = await file.read()
+    except Exception:
+        return {"filename": filename, "ok": False, "error": "Could not read the file"}
+    if len(data) > 5 * 1024 * 1024:
+        return {"filename": filename, "ok": False, "error": "Larger than 5 MB"}
+    text = llm.extract_text_from_file(filename, data)
+    if not text:
+        return {"filename": filename, "ok": False, "error": "No readable text (scanned image?)"}
+
+    fields = await llm.parse_resume(text)
+    needs_review = False
+    if not fields:
+        # LLM off or down: keep the pile moving with a stub the recruiter can
+        # fix by hand, rather than dropping the file on the floor.
+        stem = re.sub(r"\.[A-Za-z0-9]+$", "", filename).replace("_", " ").replace("-", " ").strip() or "Unknown"
+        fields = {
+            "name": stem[:60].title(),
+            "email": "", "phone": "", "current_title": "", "current_company": "",
+            "experience_years": 0.0, "location": "", "education": "", "notice_period": "",
+            "expected_ctc": 0, "skills": _dictionary_skills(text), "summary": text[:300],
+        }
+        needs_review = True
+
+    email = (fields.get("email") or "").strip().lower()
+    # Same person, second role: attach, don't duplicate.
+    if email:
+        existing = await db.candidates.find_one({"owner_id": job["owner_id"], "email": email})
+        if existing:
+            await db.candidates.update_one({"id": existing["id"]}, {"$addToSet": {"role_ids": job["id"]}})
+            return {
+                "filename": filename, "ok": True, "candidate_id": existing["id"],
+                "name": existing["name"], "duplicate": True,
+                "match_score": _score_candidate(existing, job),
+            }
+
+    c = Candidate(
+        owner_id=job["owner_id"],
+        name=fields["name"] or "Unknown",
+        email=email or f"unknown-{uuid.uuid4().hex[:8]}@needs-review.local",
+        phone=fields.get("phone") or "",
+        current_title=fields.get("current_title") or "Not extracted",
+        current_company=fields.get("current_company") or "Not extracted",
+        location=fields.get("location") or "",
+        experience_years=fields.get("experience_years") or 0.0,
+        expected_ctc=fields.get("expected_ctc") or 0,
+        notice_period=fields.get("notice_period") or "",
+        skills=fields.get("skills") or ["General"],
+        education=fields.get("education") or "",
+        resume_summary=fields.get("summary") or text[:400],
+        avatar="",
+        stage="New",
+        role_ids=[job["id"]],
+        tags=["uploaded"] + (["needs-review"] if needs_review else []),
+        auto_applied=False,
+    )
+    c.match_score = _score_candidate(c.model_dump(), job)
+    await db.candidates.insert_one(c.model_dump())
+    return {
+        "filename": filename, "ok": True, "candidate_id": c.id, "name": c.name,
+        "match_score": c.match_score, "needs_review": needs_review,
+    }
+
+
+@app.post("/api/jobs/{job_id}/upload-resumes")
+async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user: dict = Depends(current_user)):
+    job = await _owned_job(job_id, user)
+    if len(files) > MAX_BULK_FILES:
+        raise HTTPException(413, f"Up to {MAX_BULK_FILES} resumes per batch")
+    results = await asyncio.gather(*[_ingest_resume_file(f, job) for f in files])
+    created = [r for r in results if r.get("ok")]
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"candidates_count": await db.candidates.count_documents({"role_ids": job_id})}},
+    )
+    return {
+        "total": len(files),
+        "ranked": len(created),
+        "failed": [r for r in results if not r.get("ok")],
+        "results": list(results),
+    }
 
 
 # ---------- Shortlist export (paid) ----------
