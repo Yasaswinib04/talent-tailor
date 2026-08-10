@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
-import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users } from "lucide-react";
-import ActivationCapture from "../components/ActivationCapture";
+import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X } from "lucide-react";
 
 export default function JobDetail() {
   const { jobId } = useParams();
@@ -10,6 +9,10 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockCode, setUnlockCode] = useState("");
+  const [unlockError, setUnlockError] = useState(null);
+  const [unlockBusy, setUnlockBusy] = useState(false);
 
   const load = async () => {
     const [j, c] = await Promise.all([api.get(`/jobs/${jobId}`), api.get(`/candidates?job_id=${jobId}`)]);
@@ -30,6 +33,35 @@ export default function JobDetail() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const submitUnlock = async (e) => {
+    e.preventDefault();
+    setUnlockError(null);
+    setUnlockBusy(true);
+    try {
+      await api.post(`/jobs/${jobId}/unlock`, { code: unlockCode });
+      setUnlockOpen(false);
+      setUnlockCode("");
+      await load();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setUnlockError(typeof detail === "string" ? detail : "Couldn't unlock. Please try again.");
+    } finally {
+      setUnlockBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    const res = await api.get(`/jobs/${jobId}/export`, { responseType: "blob" });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${job.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-shortlist.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const lockedCount = cands.filter((c) => c.locked).length;
 
   return (
     <div className="max-w-[1200px] mx-auto p-8">
@@ -157,6 +189,30 @@ export default function JobDetail() {
             <h2 className="font-display text-xl font-semibold">Candidates for this role</h2>
             <span className="font-mono-label">{cands.length} total</span>
           </div>
+          {job.unlocked ? (
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-mono text-success flex items-center gap-1.5" data-testid="jd-unlocked-badge">
+                <Unlock size={12} /> full shortlist unlocked
+              </span>
+              <button
+                onClick={exportCsv}
+                data-testid="jd-export-btn"
+                className="btn btn-light !py-2 text-xs"
+              >
+                <Download size={12} /> Export CSV
+              </button>
+            </div>
+          ) : (
+            lockedCount > 0 && (
+              <button
+                onClick={() => setUnlockOpen(true)}
+                data-testid="jd-unlock-btn"
+                className="btn btn-primary !py-2 text-xs"
+              >
+                <Lock size={12} /> Unlock all {cands.length} — ₹1,999
+              </button>
+            )
+          )}
         </div>
         <div className="border hairline">
           {cands.map((c) => (
@@ -166,9 +222,15 @@ export default function JobDetail() {
               data-testid={`jd-cand-${c.id}`}
               className="flex items-center gap-4 p-4 border-b hairline last:border-b-0 hover:bg-white/[0.02] cursor-pointer transition-colors group"
             >
-              <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+              {c.locked ? (
+                <div className="w-10 h-10 rounded-full bg-white/5 border hairline flex items-center justify-center shrink-0">
+                  <Lock size={14} className="text-white/40" />
+                </div>
+              ) : (
+                <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+              )}
               <div className="flex-1 min-w-0">
-                <div className="font-medium">{c.name}</div>
+                <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
                 <div className="text-xs text-white/72">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
               </div>
               <div className="text-xs text-white/72 hidden md:block">
@@ -188,12 +250,64 @@ export default function JobDetail() {
           )}
         </div>
 
-        {/* The ask sits here and nowhere earlier: they have a ranked shortlist
-            on screen, so there is something real to take away. */}
-        <div className="mt-6">
-          <ActivationCapture context="shortlist" count={cands.length} />
-        </div>
+        {/* The ask sits here and nowhere earlier: the full ranked list is on
+            screen with the top of it revealed, so what's being bought is
+            visible before it's paid for. */}
+        {!job.unlocked && lockedCount > 0 && (
+          <div data-testid="jd-paywall-banner" className="mt-6 border border-brand/40 bg-brand/5 p-6 flex flex-wrap items-center gap-4">
+            <Lock size={16} className="text-brand shrink-0" />
+            <div className="flex-1 min-w-[240px]">
+              <div className="font-display text-lg font-semibold mb-1">
+                Top {cands.length - lockedCount} revealed free — {lockedCount} more ranked candidate{lockedCount > 1 ? "s" : ""} hidden
+              </div>
+              <p className="text-sm text-white/72">
+                Unlock the full shortlist for this role: every name, contact detail, and the CSV export. ₹1,999, one-time, per role.
+              </p>
+            </div>
+            <button onClick={() => setUnlockOpen(true)} data-testid="jd-paywall-unlock-btn" className="btn btn-primary">
+              <Unlock size={14} /> Unlock full shortlist
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Unlock modal */}
+      {unlockOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setUnlockOpen(false)}>
+          <div className="bg-surface border hairline max-w-md w-full p-8 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setUnlockOpen(false)} data-testid="unlock-close" className="absolute top-4 right-4 text-white/55 hover:text-white">
+              <X size={16} />
+            </button>
+            <div className="font-mono-label mb-2">unlock this shortlist</div>
+            <div className="font-editorial text-3xl mb-1">₹1,999 <span className="text-base text-white/55">· one-time · this role</span></div>
+            <p className="text-sm text-white/72 mt-3 mb-6">
+              You get every ranked candidate's name and contact details, plus the CSV export —
+              for all current and future applicants to this role.
+            </p>
+            <div className="border hairline bg-app p-4 text-sm text-white/78 mb-6 leading-relaxed">
+              {/* TODO(owner): put your real payment contact (WhatsApp / UPI / email) here
+                  before sending this to buyers. */}
+              To pay: contact the Talent Tailor team with this role's name. You'll get a
+              payment link and an unlock code within minutes.
+            </div>
+            <form onSubmit={submitUnlock} className="flex gap-3">
+              <input
+                value={unlockCode}
+                onChange={(e) => setUnlockCode(e.target.value)}
+                placeholder="Unlock code"
+                data-testid="unlock-code-input"
+                className="flex-1 bg-app border hairline px-4 py-2.5 text-sm placeholder:text-white/40 focus:border-brand focus:outline-none"
+              />
+              <button type="submit" disabled={unlockBusy || !unlockCode.trim()} data-testid="unlock-submit" className="btn btn-light disabled:opacity-50">
+                {unlockBusy ? "Unlocking…" : "Unlock"}
+              </button>
+            </form>
+            {unlockError && (
+              <div data-testid="unlock-error" className="mt-3 text-sm text-red-300">{unlockError}</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

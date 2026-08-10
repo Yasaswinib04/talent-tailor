@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutGrid, Briefcase, Users, Plus, Search } from "lucide-react";
-import { getVisitor } from "./ActivationCapture";
+import { LayoutGrid, Briefcase, Users, Plus, Search, LogOut } from "lucide-react";
+import { getUser, clearSession } from "../lib/api";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -62,6 +62,12 @@ function SideLink({ to, icon, label, testid }) {
 }
 
 function TopBar() {
+  const nav = useNavigate();
+  const user = getUser();
+  const logout = () => {
+    clearSession();
+    nav("/login");
+  };
   return (
     <div className="h-14 border-b hairline flex items-center px-6 gap-4">
       <div className="flex items-center gap-2 text-white/65">
@@ -76,8 +82,16 @@ function TopBar() {
             advertising a shortcut that does nothing is worse than not showing one. */}
       </div>
       <div className="ml-auto flex items-center gap-4">
-        <span className="font-mono-label">{getVisitor()?.name || "recruiter"}</span>
+        <span className="font-mono-label" data-testid="topbar-user">{user?.name || "recruiter"}</span>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-gold" />
+        <button
+          onClick={logout}
+          data-testid="topbar-logout"
+          title="Sign out"
+          className="text-white/55 hover:text-white transition-colors"
+        >
+          <LogOut size={14} />
+        </button>
       </div>
     </div>
   );

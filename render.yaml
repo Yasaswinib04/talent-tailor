@@ -29,6 +29,24 @@ services:
         sync: false
       - key: DB_NAME
         value: talent_tailor
+      # OpenRouter key for LLM resume/JD extraction. Without it the app still
+      # runs, falling back to the keyword heuristic (visibly worse shortlists).
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Swap tiers here without a deploy; see .env.example for the trade-off.
+      - key: OPENROUTER_MODEL
+        value: anthropic/claude-haiku-4.5
+      # Signs auth tokens. Rotating it signs everyone out.
+      - key: SECRET_KEY
+        sync: false
+      # The manual-payment bridge: share this code with a buyer once they pay,
+      # they enter it on the job page, the shortlist unlocks.
+      - key: UNLOCK_CODE
+        sync: false
+      # Lock CORS to the web service's origin once both URLs are known,
+      # e.g. https://talent-tailor-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
 
   - type: web
     name: talent-tailor-web

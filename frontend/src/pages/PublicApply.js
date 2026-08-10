@@ -4,32 +4,36 @@ import { api, fmtINR } from "../lib/api";
 import { Upload, Check, Loader2, ArrowRight, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  phone: "",
+  current_title: "",
+  current_company: "",
+  experience_years: 0,
+  expected_ctc: 0,
+  resume_text: "",
+  skills: [],
+  // Sent through so auto-applied candidates are filterable on the same fields
+  // the role's mandatory criteria screen on.
+  location: "",
+  education: "",
+  notice_period: "",
+};
+
 /**
  * Public apply flow — the "auto-apply" experience.
- * Candidate uploads a resume (text/file, we simulate parsing), form auto-fills,
- * they hit submit. Response shows their match score.
+ * Candidate uploads a resume, the backend reads it and an LLM extracts the
+ * fields, the form auto-fills, they hit submit. Response shows their match score.
  */
 export default function PublicApply() {
   const { slug } = useParams();
   const [job, setJob] = useState(null);
   const [stage, setStage] = useState("upload"); // upload -> scanning -> review -> submitted
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    current_title: "",
-    current_company: "",
-    experience_years: 0,
-    expected_ctc: 0,
-    resume_text: "",
-    // Sent through so auto-applied candidates are filterable on the same fields
-    // the role's mandatory criteria screen on.
-    location: "",
-    education: "",
-    notice_period: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [result, setResult] = useState(null);
   const [scanText, setScanText] = useState("");
+  const [parseNotice, setParseNotice] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,12 +41,41 @@ export default function PublicApply() {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
   }, [slug]);
 
-  const simulateParse = async (text, filename) => {
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParseNotice(null);
     setStage("scanning");
-    setScanText(filename || "resume.pdf");
-    await new Promise((r) => setTimeout(r, 1600));
-    // Mock parse: pull "name" / "title" from text if provided, otherwise use sample
-    const sample = {
+    setScanText(file.name);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post(`/apply/${slug}/parse-resume`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const { parsed, fields, message } = res.data;
+      setForm({ ...EMPTY_FORM, ...(fields || {}) });
+      if (!parsed) setParseNotice(message || "We couldn't fully read that file — please fill in the rest.");
+    } catch (err) {
+      setForm(EMPTY_FORM);
+      setParseNotice(
+        err?.response?.status === 413
+          ? "That file is over 5 MB — please fill in your details instead."
+          : "We couldn't read that file — please fill in your details below."
+      );
+    }
+    setStage("review");
+  };
+
+  // Kept for people without a resume at hand: fills the form with a labelled
+  // sample so the flow can still be walked end-to-end.
+  const onDemoParse = async () => {
+    setParseNotice("This is sample data — replace it with your own details before submitting.");
+    setStage("scanning");
+    setScanText("sample-resume.txt");
+    await new Promise((r) => setTimeout(r, 900));
+    setForm({
+      ...EMPTY_FORM,
       name: "Aarav Menon",
       email: "aarav.menon@email.in",
       phone: "+91 98450 22118",
@@ -53,22 +86,12 @@ export default function PublicApply() {
       location: "Bengaluru",
       education: "B.Tech, IIT Roorkee",
       notice_period: "30 days",
+      skills: ["React", "TypeScript", "Next.js", "Design Systems", "Performance Optimization"],
       resume_text:
-        text ||
         "Senior Frontend Engineer at Razorpay. 5.5 years of production React, TypeScript, Next.js. Built the design system used across all consumer surfaces. Previously at Freshworks working on performance optimization. B.Tech from IIT Roorkee.",
-    };
-    setForm(sample);
+    });
     setStage("review");
   };
-
-  const onFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // We can't truly parse PDF here; simulate.
-    simulateParse("", file.name);
-  };
-
-  const onDemoParse = () => simulateParse("");
 
   const submit = async () => {
     setSubmitError(null);
@@ -174,7 +197,7 @@ export default function PublicApply() {
                     className="flex items-center gap-3 text-xs text-white/70"
                   >
                     <Check size={12} className="text-success" />
-                    <span>Extracted {s.toLowerCase()}</span>
+                    <span>Extracting {s.toLowerCase()}</span>
                   </motion.div>
                 ))}
               </div>
@@ -185,8 +208,23 @@ export default function PublicApply() {
             <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-8 bg-surface/30">
               <div className="flex items-center gap-2 mb-6">
                 <Sparkles size={14} className="text-brand" />
-                <div className="font-mono-label">auto-filled · confirm and submit</div>
+                <div className="font-mono-label">auto-filled from your resume · confirm and submit</div>
               </div>
+              {parseNotice && (
+                <div data-testid="pa-parse-notice" className="mb-6 border border-gold/40 bg-gold/5 px-4 py-3 text-sm text-white/80">
+                  {parseNotice}
+                </div>
+              )}
+              {form.skills?.length > 0 && (
+                <div className="mb-6">
+                  <div className="font-mono-label mb-2">skills we found</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {form.skills.map((s) => (
+                      <span key={s} className="text-[11px] font-mono border border-brand/30 bg-brand/5 text-brand px-2 py-0.5">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid md:grid-cols-2 gap-6">
                 <FieldPA label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
                 <FieldPA label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />

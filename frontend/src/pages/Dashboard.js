@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
-import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
+import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check, Lock, Sparkles } from "lucide-react";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -17,7 +17,18 @@ export default function Dashboard() {
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
   const [loadError, setLoadError] = useState(null);
+  const [sampleBusy, setSampleBusy] = useState(false);
   const nav = useNavigate();
+
+  const loadSample = async () => {
+    setSampleBusy(true);
+    try {
+      await api.post("/sample-data");
+      await load();
+    } finally {
+      setSampleBusy(false);
+    }
+  };
 
   const load = async () => {
     try {
@@ -182,6 +193,18 @@ export default function Dashboard() {
               <div className="font-mono-label mt-2">press N</div>
             </button>
           )}
+          {jobs.length === 0 && !loadError && (
+            <button
+              onClick={loadSample}
+              disabled={sampleBusy}
+              data-testid="load-sample-btn"
+              className="border border-dashed border-brand/40 bg-brand/5 p-5 hover:bg-brand/10 transition-all flex flex-col items-center justify-center min-h-[168px] disabled:opacity-50"
+            >
+              <Sparkles size={20} className="text-brand mb-2" />
+              <div className="text-sm text-white/78">{sampleBusy ? "Loading…" : "Explore with sample data"}</div>
+              <div className="font-mono-label mt-2">4 roles · 20 candidates</div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -288,9 +311,15 @@ export default function Dashboard() {
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-3">
-                      <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                      {c.locked ? (
+                        <div className="w-8 h-8 rounded-full bg-white/5 border hairline flex items-center justify-center shrink-0">
+                          <Lock size={12} className="text-white/40" />
+                        </div>
+                      ) : (
+                        <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                      )}
                       <div>
-                        <div className="font-medium">{c.name}</div>
+                        <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
                         <div className="text-[11px] text-white/65">{c.location}</div>
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Report from "./pages/Report";
 import Onboarding from "./pages/Onboarding";
@@ -8,8 +8,18 @@ import JobSetup from "./pages/JobSetup";
 import JobDetail from "./pages/JobDetail";
 import CandidateProfile from "./pages/CandidateProfile";
 import PublicApply from "./pages/PublicApply";
+import Auth from "./pages/Auth";
 import Themes from "./pages/Themes";
 import AppShell from "./components/AppShell";
+import { getToken } from "./lib/api";
+
+function RequireAuth({ children }) {
+  const location = useLocation();
+  if (!getToken()) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+  return children;
+}
 
 export default function App() {
   return (
@@ -20,14 +30,22 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/report" element={<Report />} />
         <Route path="/onboarding" element={<Onboarding />} />
-        {/* Candidates applying via the share link are never gated — the gate is
-            for identifying HRs trying the product, not applicants. */}
+        <Route path="/login" element={<Auth mode="login" />} />
+        <Route path="/signup" element={<Auth mode="signup" />} />
+        {/* Candidates applying via the share link are never gated — accounts are
+            for recruiters, not applicants. */}
         <Route path="/apply/:slug" element={<PublicApply />} />
         <Route path="/themes" element={<Themes />} />
-        {/* No gate in front of the product. Nobody hands over an email before
-            they've seen it work — let them run the whole discovery, reach a real
-            shortlist, and ask only at that point (see ActivationCapture). */}
-        <Route element={<AppShell />}>
+        {/* Workspaces are per-account now that real hiring data lives here, so
+            the app itself sits behind sign-in. Discovery still comes before any
+            payment: a new account can load sample data and run the whole flow free. */}
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell />
+            </RequireAuth>
+          }
+        >
           <Route path="/app" element={<Dashboard />} />
           <Route path="/app/jobs/new" element={<JobSetup />} />
           <Route path="/app/jobs/:jobId" element={<JobDetail />} />
