@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
 import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
+import Avatar from "../components/Avatar";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -257,7 +258,7 @@ export default function Dashboard() {
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-3">
-                      <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                      <Avatar src={c.avatar} name={c.name} size={32} className="grayscale group-hover:grayscale-0 transition-all" />
                       <div>
                         <div className="font-medium">{c.name}</div>
                         <div className="text-[11px] text-white/40">{c.location}</div>

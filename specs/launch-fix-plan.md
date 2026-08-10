@@ -23,6 +23,23 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ---
 
+## Done since this plan was written
+
+**Recruiter bulk resume upload** — `POST /api/jobs/{id}/bulk-upload` plus a
+drag-and-drop panel on the role page. Up to 10 resumes per batch, capped both
+client-side and server-side (413), with a 12-batch/minute rate limit. Real
+PDF/DOCX/TXT parsing extracts name, email, phone, title, company, years, CTC,
+notice and skills; each candidate is scored against the role. Per-file results
+mean one unreadable resume never fails a batch, and re-uploading someone already
+in the system attaches them to the role instead of duplicating. Covered by 18
+local tests in `backend/tests/test_bulk_upload.py`.
+
+This also closes **P2-6** (upload theatre) for the recruiter path and adds an
+initials-avatar fallback, since uploaded candidates have no portrait URL. The
+candidate-side `PublicApply` upload still discards the file — A.6 below.
+
+---
+
 ## Track 0 — Required for any launch (~2–3 hours)
 
 Without these the deployed app is dead on arrival.

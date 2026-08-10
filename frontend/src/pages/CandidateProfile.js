@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Star, Check, X, Plus, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
+import Avatar from "../components/Avatar";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -63,10 +64,11 @@ export default function CandidateProfile() {
           <div className="border hairline overflow-hidden bg-surface">
             {/* Airbnb-style large portrait treatment */}
             <div className="relative h-40 bg-gradient-to-br from-brand/40 via-brand/20 to-transparent">
-              <img
+              <Avatar
                 src={c.avatar}
-                alt=""
-                className="w-28 h-28 rounded-full object-cover absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
+                name={c.name}
+                size={112}
+                className="absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
               />
             </div>
             <div className="pt-16 px-6 pb-6">

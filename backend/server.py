@@ -3,13 +3,16 @@ CRED HR - Backend API
 Mock-first API for the redesigned HR candidate evaluation platform.
 All data is in-memory + persisted to MongoDB for a light experience.
 """
+import io
 import os
+import re
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -105,6 +108,8 @@ class Candidate(BaseModel):
     notes: str = ""
     applied_at: str = Field(default_factory=now_iso)
     auto_applied: bool = False
+    source: str = "seed"  # seed | public_apply | bulk_upload
+    source_filename: str = ""
 
 
 class CandidateApply(BaseModel):
@@ -440,6 +445,311 @@ async def extract_skills(payload: ExtractSkillsRequest):
     }
 
 
+# --------- Bulk resume upload (recruiter side) ---------
+# The recruiter drops a batch of resumes against one role. We cap the batch so a
+# single upload can never spike parsing cost or flood the pipeline.
+MAX_BULK_FILES = 10
+MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per resume
+ALLOWED_RESUME_EXTS = {".pdf", ".docx", ".txt", ".md"}
+
+# Batches per client per window. Deliberately in-memory: single-process
+# deployment today, and a shared store would be the right call once it isn't.
+RATE_LIMIT_BATCHES = 12  # 12 batches x 10 files = 120 resumes per minute
+RATE_LIMIT_WINDOW_SECONDS = 60
+_upload_history: dict = {}
+
+
+def _rate_limit_check(client_key: str):
+    """Sliding window over recent batches. Raises 429 when the window is full."""
+    now = time.time()
+    recent = [t for t in _upload_history.get(client_key, []) if now - t < RATE_LIMIT_WINDOW_SECONDS]
+    if len(recent) >= RATE_LIMIT_BATCHES:
+        retry_after = int(RATE_LIMIT_WINDOW_SECONDS - (now - recent[0])) + 1
+        raise HTTPException(
+            429,
+            detail=f"Too many uploads. Limit is {RATE_LIMIT_BATCHES} batches per minute — try again in {retry_after}s.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    recent.append(now)
+    _upload_history[client_key] = recent
+
+
+def _extract_text(filename: str, data: bytes) -> str:
+    """Pull plain text out of a resume. Raises ValueError with a human reason."""
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext in (".txt", ".md"):
+        return data.decode("utf-8", errors="ignore")
+    if ext == ".pdf":
+        try:
+            from pypdf import PdfReader
+
+            reader = PdfReader(io.BytesIO(data))
+            pages = [(p.extract_text() or "") for p in reader.pages[:10]]
+            text = "\n".join(pages).strip()
+        except Exception as exc:
+            raise ValueError(f"Could not read the PDF ({type(exc).__name__})")
+        if not text:
+            raise ValueError("PDF has no extractable text — it may be a scan")
+        return text
+    if ext == ".docx":
+        try:
+            import docx
+
+            doc = docx.Document(io.BytesIO(data))
+            return "\n".join(p.text for p in doc.paragraphs).strip()
+        except Exception as exc:
+            raise ValueError(f"Could not read the Word file ({type(exc).__name__})")
+    raise ValueError(f"Unsupported file type '{ext or filename}'")
+
+
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+PHONE_RE = re.compile(r"(?:\+91[\s-]?)?(?:\d[\s-]?){9,12}\d")
+EXP_RE = re.compile(r"(\d{1,2}(?:\.\d)?)\s*\+?\s*(?:years?|yrs?)", re.I)
+CTC_RE = re.compile(r"(?:expected|ctc|salary)[^\n]{0,40}?(\d{1,3}(?:\.\d+)?)\s*(lpa|lakh|l\b|cr)", re.I)
+TITLE_AT_RE = re.compile(r"^(.{3,60}?)\s+(?:at|@|,)\s+([A-Z][\w&.\- ]{1,40})\s*$", re.M)
+# The single-letter forms must keep their trailing dot, otherwise "B.E." happily
+# matches the "Be" in "Bengaluru".
+DEGREE_RE = re.compile(
+    r"\b((?:B\.?Tech|B\.?E\.|B\.?Sc|B\.?Des|B\.?A\.|M\.?Tech|M\.?Sc|M\.?Des|MBA|Ph\.?D|Bachelor|Master)"
+    r"[^\n]{0,60})",
+    re.I,
+)
+NOTICE_RE = re.compile(r"notice[^\n]{0,20}?(immediate|\d{1,3})", re.I)
+NAME_STOPWORDS = {"resume", "curriculum", "vitae", "cv", "profile", "summary", "contact"}
+
+
+def _guess_name(text: str, email: str) -> str:
+    """Resumes almost always lead with the name. Fall back to the email local part."""
+    for line in [l.strip() for l in text.splitlines()[:12] if l.strip()]:
+        if len(line) > 50 or any(ch.isdigit() for ch in line) or "@" in line:
+            continue
+        words = line.replace(",", " ").split()
+        if not 2 <= len(words) <= 4:
+            continue
+        if any(w.lower().strip(".:") in NAME_STOPWORDS for w in words):
+            continue
+        if all(w[:1].isupper() for w in words):
+            return " ".join(words)
+    if email:
+        local = email.split("@")[0]
+        return " ".join(p.capitalize() for p in re.split(r"[._-]+", local) if p)
+    return ""
+
+
+def _parse_resume(text: str) -> dict:
+    """Best-effort structured fields from resume text. Never raises."""
+    email_m = EMAIL_RE.search(text)
+    email = email_m.group(0) if email_m else ""
+
+    phone = ""
+    for m in PHONE_RE.finditer(text):
+        digits = re.sub(r"\D", "", m.group(0))
+        if 10 <= len(digits) <= 12:
+            phone = m.group(0).strip()
+            break
+
+    exp = 0.0
+    exp_m = EXP_RE.search(text)
+    if exp_m:
+        try:
+            exp = min(60.0, float(exp_m.group(1)))
+        except ValueError:
+            exp = 0.0
+
+    title, company = "", ""
+    t_m = TITLE_AT_RE.search(text)
+    if t_m:
+        title, company = t_m.group(1).strip(), t_m.group(2).strip()
+
+    ctc = 0
+    ctc_m = CTC_RE.search(text)
+    if ctc_m:
+        try:
+            amount = float(ctc_m.group(1))
+            ctc = int(amount * (10000000 if ctc_m.group(2).lower() == "cr" else 100000))
+        except ValueError:
+            ctc = 0
+
+    edu_m = DEGREE_RE.search(text)
+    education = edu_m.group(1).strip() if edu_m else ""
+
+    notice = ""
+    n_m = NOTICE_RE.search(text)
+    if n_m:
+        token = n_m.group(1).lower()
+        notice = "Immediate" if token == "immediate" else f"{token} days"
+
+    lower = text.lower()
+    skills = sorted({v for k, v in SKILL_DICTIONARY.items() if k in lower})
+
+    return {
+        "name": _guess_name(text, email),
+        "email": email,
+        "phone": phone,
+        "current_title": title,
+        "current_company": company,
+        "experience_years": exp,
+        "expected_ctc": ctc,
+        "education": education,
+        "notice_period": notice,
+        "skills": skills,
+    }
+
+
+def _score_against_job(candidate_skills: List[str], job: dict) -> int:
+    """Shared by bulk upload and public apply so both score identically."""
+    job_skill_names = [s["name"] for s in job.get("skills", [])]
+    if not job_skill_names:
+        return 60
+    overlap = len(set(candidate_skills) & set(job_skill_names))
+    return min(100, 40 + int(overlap / max(1, len(job_skill_names)) * 60))
+
+
+@app.post("/api/jobs/{job_id}/bulk-upload")
+async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadFile] = File(...)):
+    """Recruiter drops up to MAX_BULK_FILES resumes against one role.
+
+    Every file is reported on individually — one unreadable resume never fails
+    the batch. Candidates already in this role (matched on email) are skipped
+    rather than duplicated.
+    """
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    if not files:
+        raise HTTPException(400, "No files were uploaded.")
+    if len(files) > MAX_BULK_FILES:
+        raise HTTPException(
+            413,
+            f"You can upload {MAX_BULK_FILES} resumes at a time — you selected {len(files)}. "
+            f"Please split the batch.",
+        )
+
+    _rate_limit_check(request.client.host if request.client else "unknown")
+
+    results = []
+    created = skipped = failed = 0
+
+    for upload in files:
+        filename = upload.filename or "resume"
+        try:
+            data = await upload.read()
+        except Exception:
+            data = b""
+
+        if not data:
+            failed += 1
+            results.append({"filename": filename, "status": "failed", "reason": "File is empty"})
+            continue
+        if len(data) > MAX_FILE_BYTES:
+            failed += 1
+            results.append({
+                "filename": filename,
+                "status": "failed",
+                "reason": f"Larger than {MAX_FILE_BYTES // (1024 * 1024)} MB",
+            })
+            continue
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_RESUME_EXTS:
+            failed += 1
+            results.append({
+                "filename": filename,
+                "status": "failed",
+                "reason": f"Unsupported type — accepts {', '.join(sorted(ALLOWED_RESUME_EXTS))}",
+            })
+            continue
+
+        try:
+            text = _extract_text(filename, data)
+        except ValueError as exc:
+            failed += 1
+            results.append({"filename": filename, "status": "failed", "reason": str(exc)})
+            continue
+
+        parsed = _parse_resume(text)
+        if not parsed["name"] and not parsed["email"]:
+            failed += 1
+            results.append({
+                "filename": filename,
+                "status": "failed",
+                "reason": "Could not find a name or email in this resume",
+            })
+            continue
+
+        # Same person, same role — attach the role instead of duplicating.
+        if parsed["email"]:
+            existing = await db.candidates.find_one({"email": parsed["email"]})
+            if existing:
+                skipped += 1
+                if job_id not in (existing.get("role_ids") or []):
+                    await db.candidates.update_one(
+                        {"id": existing["id"]}, {"$addToSet": {"role_ids": job_id}}
+                    )
+                    reason = "Already in the system — added to this role"
+                else:
+                    reason = "Already a candidate for this role"
+                results.append({
+                    "filename": filename,
+                    "status": "duplicate",
+                    "candidate_id": existing["id"],
+                    "name": existing["name"],
+                    "email": existing["email"],
+                    "reason": reason,
+                })
+                continue
+
+        skills = parsed["skills"] or ["General"]
+        score = _score_against_job(skills, job)
+        candidate = Candidate(
+            name=parsed["name"] or parsed["email"].split("@")[0],
+            email=parsed["email"],
+            phone=parsed["phone"],
+            current_title=parsed["current_title"],
+            current_company=parsed["current_company"],
+            location="",
+            experience_years=parsed["experience_years"],
+            expected_ctc=parsed["expected_ctc"],
+            notice_period=parsed["notice_period"],
+            skills=skills,
+            education=parsed["education"],
+            resume_summary=text.strip()[:600],
+            avatar="",
+            match_score=score,
+            stage="New",
+            role_ids=[job_id],
+            source="bulk_upload",
+            source_filename=filename,
+        )
+        await db.candidates.insert_one(candidate.model_dump())
+        created += 1
+        results.append({
+            "filename": filename,
+            "status": "created",
+            "candidate_id": candidate.id,
+            "name": candidate.name,
+            "email": candidate.email,
+            "match_score": score,
+            "skills": skills[:6],
+        })
+
+    # Duplicates can still attach an existing candidate to this role, so the
+    # count has to be recomputed for those too — not just for new records.
+    if created or skipped:
+        count = await db.candidates.count_documents({"role_ids": job_id})
+        await db.jobs.update_one({"id": job_id}, {"$set": {"candidates_count": count}})
+
+    return {
+        "job_id": job_id,
+        "received": len(files),
+        "created": created,
+        "duplicates": skipped,
+        "failed": failed,
+        "limit": MAX_BULK_FILES,
+        "results": results,
+    }
+
+
 # --------- Filter Preview: "how many candidates will pass?" ---------
 def _parse_notice_days(s: str) -> int:
     if not s:
@@ -593,12 +903,7 @@ async def apply_to_job(slug: str, payload: CandidateApply):
         if k in text:
             matched_skills.add(v)
     # score against job skills
-    job_skill_names = [s["name"] for s in job.get("skills", [])]
-    if job_skill_names:
-        overlap = len(matched_skills & set(job_skill_names))
-        score = min(100, 40 + int(overlap / max(1, len(job_skill_names)) * 60))
-    else:
-        score = 60
+    score = _score_against_job(list(matched_skills), job)
     c = Candidate(
         name=payload.name,
         email=payload.email,
@@ -617,6 +922,7 @@ async def apply_to_job(slug: str, payload: CandidateApply):
         stage="New",
         role_ids=[job["id"]],
         auto_applied=True,
+        source="public_apply",
     )
     await db.candidates.insert_one(c.model_dump())
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})

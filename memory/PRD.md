@@ -25,10 +25,20 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 - ✅ Command-center dashboard with keyboard nav (J/K/↵/N/X), bulk stage actions, funnel KPIs
 - ✅ Candidate profile with **multi-role assignment** (chips + toggle menu), stage, rating, notes, activity, tabs, Airbnb-style humane portrait banner
 - ✅ Public shareable job link with **auto-apply** (upload → scan animation → auto-filled form → 1-click submit + match score)
+- ✅ **Recruiter bulk resume upload** (Aug 2026) — drag/drop up to **10 resumes per batch** against a role. Real parsing of PDF/DOCX/TXT (pypdf + python-docx): name, email, phone, title, company, years, CTC, notice, education, skills. Each file reported individually so one bad resume never fails the batch; existing candidates are attached to the role rather than duplicated. Batch cap and a 12-batch/minute rate limit are enforced server-side, not just in the UI.
 - ✅ **Theme explorations page** (`/themes`) — 6 side-by-side previews
 - ✅ **Theme rebuild**: Linear-inspired indigo (`#5E6AD2`) analytical aesthetic across the app with Airbnb humane touch on candidate portraits; editorial serif reserved for report hero
-- ✅ Backend endpoints: /jobs (with filters + scoring_weights), /jobs/share/{slug}, /extract-skills (returns recommended_filters + recommended_weights), /candidates/preview-filter (live filter impact preview), /candidates, /candidates/{id}/stage, /candidates/{id}/assign-roles, /apply/{slug}, /analytics/summary
-- ✅ End-to-end tests: 14/14 backend pass, 100% frontend flows verified
+- ✅ Backend endpoints: /jobs (with filters + scoring_weights), /jobs/share/{slug}, /jobs/{id}/bulk-upload (recruiter batch intake), /extract-skills (returns recommended_filters + recommended_weights), /candidates/preview-filter (live filter impact preview), /candidates, /candidates/{id}/stage, /candidates/{id}/assign-roles, /apply/{slug}, /analytics/summary
+- ✅ Bulk upload tests: 18/18 pass locally (`backend/tests/test_bulk_upload.py`, no server needed)
+
+## Known state (UAT, Aug 2026)
+A full UAT found 5 P0 and 8 P1 issues — see `specs/uat-report-2026-08-08.md` and
+`specs/launch-fix-plan.md`. The two hard launch blockers are config, not logic:
+the frontend bundle builds with `baseURL:"undefined/api"` because
+`REACT_APP_BACKEND_URL` is unset, and `.env.example` documents four variables no
+code reads while omitting the three that are required. The earlier "14/14 backend
+pass, 100% frontend flows verified" claim was happy-path only, against a hosted
+preview URL hardcoded in `backend_test.py`.
 
 ## Prioritized backlog
 - **P1** — Persist onboarding to backend (currently client-only; skip button jumps directly to app)

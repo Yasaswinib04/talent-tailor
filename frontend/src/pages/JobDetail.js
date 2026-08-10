@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
-import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users } from "lucide-react";
+import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, AlertTriangle } from "lucide-react";
+import BulkResumeUpload from "../components/BulkResumeUpload";
+import Avatar from "../components/Avatar";
 
 export default function JobDetail() {
   const { jobId } = useParams();
@@ -9,16 +11,43 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const load = async () => {
-    const [j, c] = await Promise.all([api.get(`/jobs/${jobId}`), api.get(`/candidates?job_id=${jobId}`)]);
-    setJob(j.data);
-    setCands(c.data);
+    try {
+      const [j, c] = await Promise.all([api.get(`/jobs/${jobId}`), api.get(`/candidates?job_id=${jobId}`)]);
+      setJob(j.data);
+      setCands(c.data);
+      setLoadError("");
+    } catch (err) {
+      setLoadError(
+        err.response?.status === 404 ? "This role doesn't exist or has been deleted." : "Couldn't load this role."
+      );
+    }
   };
 
   useEffect(() => {
     load();
   }, [jobId]);
+
+  if (loadError) {
+    return (
+      <div className="max-w-[1200px] mx-auto p-8">
+        <div className="border border-danger/50 bg-danger/10 p-8 text-center" data-testid="jd-load-error">
+          <AlertTriangle size={20} className="text-danger mx-auto mb-3" />
+          <div className="text-sm mb-4">{loadError}</div>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={load} data-testid="jd-retry-btn" className="border hairline hover:border-white text-xs px-4 py-2 transition-colors">
+              Retry
+            </button>
+            <button onClick={() => nav("/app")} className="text-xs text-white/50 hover:text-white transition-colors">
+              Back to overview
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!job) return <div className="p-8 text-white/40">Loading…</div>;
 
@@ -148,6 +177,11 @@ export default function JobDetail() {
         </div>
       </div>
 
+      {/* Bulk resume intake */}
+      <div className="mb-10">
+        <BulkResumeUpload jobId={job.id} jobTitle={job.title} onComplete={load} />
+      </div>
+
       {/* Candidates for this role */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -165,7 +199,7 @@ export default function JobDetail() {
               data-testid={`jd-cand-${c.id}`}
               className="flex items-center gap-4 p-4 border-b hairline last:border-b-0 hover:bg-white/[0.02] cursor-pointer transition-colors group"
             >
-              <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+              <Avatar src={c.avatar} name={c.name} size={40} className="grayscale group-hover:grayscale-0 transition-all" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium">{c.name}</div>
                 <div className="text-xs text-white/50">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
