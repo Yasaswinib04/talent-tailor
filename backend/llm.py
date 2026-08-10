@@ -22,7 +22,13 @@ import httpx
 log = logging.getLogger("llm")
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+# Two jobs, two latency budgets. Resume parsing is candidate-facing — a slow
+# parse is a bounced applicant — so it gets a fast-tier model. JD extraction
+# runs once per role with a recruiter watching a spinner, so it can afford a
+# bigger model. OPENROUTER_MODEL overrides both; the specific vars win over it.
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "")
+RESUME_MODEL = os.environ.get("OPENROUTER_MODEL_RESUME") or OPENROUTER_MODEL or "google/gemini-2.5-flash"
+JD_MODEL = os.environ.get("OPENROUTER_MODEL_JD") or OPENROUTER_MODEL or "google/gemini-2.5-pro"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # A resume needs only the first few pages of text; unbounded input is an
@@ -64,7 +70,7 @@ def extract_text_from_file(filename: str, data: bytes) -> str:
 
 
 # ---------- OpenRouter ----------
-async def _chat_json(system: str, user: str, max_tokens: int = 1600):
+async def _chat_json(model: str, system: str, user: str, max_tokens: int = 1600):
     """One JSON-mode completion. Dict on success, None on any failure."""
     if not enabled():
         return None
@@ -78,7 +84,7 @@ async def _chat_json(system: str, user: str, max_tokens: int = 1600):
                     "X-Title": "Talent Tailor",
                 },
                 json={
-                    "model": OPENROUTER_MODEL,
+                    "model": model,
                     "temperature": 0,
                     "max_tokens": max_tokens,
                     "response_format": {"type": "json_object"},
@@ -94,7 +100,7 @@ async def _chat_json(system: str, user: str, max_tokens: int = 1600):
         content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
         return json.loads(content)
     except Exception:
-        log.exception("OpenRouter call failed (model=%s)", OPENROUTER_MODEL)
+        log.exception("OpenRouter call failed (model=%s)", model)
         return None
 
 
@@ -142,7 +148,7 @@ async def parse_resume(text: str):
     """Structured fields from resume text, or None (caller falls back)."""
     if not text.strip():
         return None
-    out = await _chat_json(RESUME_SYSTEM, text)
+    out = await _chat_json(RESUME_MODEL, RESUME_SYSTEM, text)
     if not isinstance(out, dict):
         return None
     skills = [str(s).strip() for s in (out.get("skills") or []) if str(s).strip()][:20]
@@ -166,7 +172,7 @@ async def extract_jd(jd_text: str):
     """Structured rubric from a JD, or None (caller falls back)."""
     if not jd_text.strip():
         return None
-    out = await _chat_json(JD_SYSTEM, jd_text)
+    out = await _chat_json(JD_MODEL, JD_SYSTEM, jd_text)
     if not isinstance(out, dict):
         return None
     skills = []
