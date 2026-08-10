@@ -35,7 +35,7 @@ services:
         sync: false
       # Swap tiers here without a deploy; see .env.example for the trade-off.
       - key: OPENROUTER_MODEL
-        value: anthropic/claude-haiku-4.5
+        value: google/gemini-2.5-flash
       # Signs auth tokens. Rotating it signs everyone out.
       - key: SECRET_KEY
         sync: false

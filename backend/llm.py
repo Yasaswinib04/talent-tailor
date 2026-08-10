@@ -22,7 +22,7 @@ import httpx
 log = logging.getLogger("llm")
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-haiku-4.5")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # A resume needs only the first few pages of text; unbounded input is an
