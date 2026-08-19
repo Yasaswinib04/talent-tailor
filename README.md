@@ -1,8 +1,10 @@
-# Talent Tailor — CRED HR Talent Engine
+# Talent Tailor
 
-An HR candidate-evaluation app: describe a role, get live skill extraction and recommended
+An HR candidate-shortlisting app: describe a role, get LLM skill extraction and recommended
 criteria, see how many of your pool clears the bar before you publish, and receive applicants
-through a shareable auto-apply link.
+through a shareable auto-apply link — their resumes are read and parsed by an LLM. Each
+account is an isolated workspace; every role shows its top 3 ranked candidates free and
+unlocks the full shortlist + CSV export per role (₹1,999 by default).
 
 - **Frontend** — React 18 (CRA) + Tailwind + Framer Motion + Radix UI
 - **Backend** — FastAPI + MongoDB (motor)
@@ -50,14 +52,16 @@ Frontend (port 3000):
 cd frontend && npm install && npm start
 ```
 
-Open http://localhost:3000. On first run against an empty database the API seeds 4 roles and
-20 candidates; it will not re-seed or duplicate on restart.
+Open http://localhost:3000 and create an account. An empty workspace offers a one-click
+"Explore with sample data" (4 roles, 20 fictional candidates). Set `SEED_DEMO_DATA="1"` to
+also seed a shared demo workspace on first start against an empty database.
 
 ## Routes
 
 | Path | What it is |
 |---|---|
-| `/` | UX report on the redesign |
+| `/` | Landing page (design case study at `/report`) |
+| `/login`, `/signup` | Account sign-in / workspace creation |
 | `/onboarding` | 3-step setup |
 | `/app` | Candidate dashboard (keyboard: `J` `K` `↵` `N` `X`) |
 | `/app/jobs/new` | Role setup with live extraction |
@@ -78,5 +82,16 @@ Two separate mechanisms, deliberately:
   genuinely reorders the list. Education is a floor: a master's satisfies a bachelor's
   requirement.
 
-Skill extraction is a keyword dictionary (`SKILL_DICTIONARY` in `backend/server.py`), not an
-LLM. Resume "parsing" on the apply page is simulated — the uploaded file is not read.
+Skill extraction (from JDs) and resume parsing (on the apply page — the uploaded PDF/DOCX is
+read and its text extracted) run through an LLM via OpenRouter (`backend/llm.py`, model set by
+`OPENROUTER_MODEL`). Without an `OPENROUTER_API_KEY`, both fall back to the keyword dictionary
+(`SKILL_DICTIONARY` in `backend/server.py`) so an outage degrades quality, never availability.
+Scanned-image PDFs aren't OCR'd — the applicant is asked to fill the form manually.
+
+## Monetization
+
+The shortlist is free to see, paid to use: every role reveals its top 3 candidates in full;
+the rest are ranked but identity-redacted (server-side) until the role is unlocked. Unlocking
+(₹`UNLOCK_PRICE_INR`, default 1999, one-time per role) reveals everyone and enables CSV
+export. Payment is currently manual: the buyer pays you directly, you share the `UNLOCK_CODE`,
+they enter it on the job page — swap that check for a Razorpay webhook to go fully self-serve.

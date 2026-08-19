@@ -29,6 +29,36 @@ services:
         sync: false
       - key: DB_NAME
         value: talent_tailor
+      # OpenRouter key for LLM resume/JD extraction. Without it the app still
+      # runs, falling back to the keyword heuristic (visibly worse shortlists).
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Swap tiers here without a deploy; see .env.example for the trade-off.
+      # Resume parsing = candidate-facing, fast tier. JD extraction = recruiter-
+      # facing, bigger model. OPENROUTER_MODEL (unset here) overrides both.
+      - key: OPENROUTER_MODEL_RESUME
+        value: google/gemini-3.5-flash
+      - key: OPENROUTER_MODEL_JD
+        value: google/gemini-2.5-pro
+      # Signs auth tokens. Rotating it signs everyone out.
+      - key: SECRET_KEY
+        sync: false
+      # The manual-payment bridge: share this code with a buyer once they pay,
+      # they enter it on the job page, the shortlist unlocks.
+      - key: UNLOCK_CODE
+        sync: false
+      # Razorpay checkout (in-app payment, auto-unlock). Set both or neither.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      # UPI fallback shown in the unlock modal when Razorpay keys are unset.
+      - key: UPI_VPA
+        sync: false
+      # Lock CORS to the web service's origin once both URLs are known,
+      # e.g. https://talent-tailor-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
 
   - type: web
     name: talent-tailor-web

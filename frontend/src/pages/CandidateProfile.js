@@ -63,11 +63,17 @@ export default function CandidateProfile() {
           <div className="border hairline overflow-hidden bg-surface">
             {/* Airbnb-style large portrait treatment */}
             <div className="relative h-40 bg-gradient-to-br from-brand/40 via-brand/20 to-transparent">
-              <img
-                src={c.avatar}
-                alt=""
-                className="w-28 h-28 rounded-full object-cover absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
-              />
+              {c.avatar ? (
+                <img
+                  src={c.avatar}
+                  alt=""
+                  className="w-28 h-28 rounded-full object-cover absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-app border-4 border-surface shadow-2xl absolute -bottom-14 left-6 flex items-center justify-center font-editorial text-3xl text-white/40">
+                  {c.locked ? "?" : (c.name || "?")[0]}
+                </div>
+              )}
             </div>
             <div className="pt-16 px-6 pb-6">
               <div className="font-mono-label mb-1">{c.current_title}</div>

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, fmtINR, cx } from "../lib/api";
-import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users } from "lucide-react";
-import ActivationCapture from "../components/ActivationCapture";
+import { api, fmtINR, cx, getUser } from "../lib/api";
+import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload, Loader2 } from "lucide-react";
 
 export default function JobDetail() {
   const { jobId } = useParams();
@@ -10,6 +9,14 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSummary, setUploadSummary] = useState(null);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockCode, setUnlockCode] = useState("");
+  const [unlockError, setUnlockError] = useState(null);
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [billing, setBilling] = useState(null);
+  const [payBusy, setPayBusy] = useState(false);
 
   const load = async () => {
     const [j, c] = await Promise.all([api.get(`/jobs/${jobId}`), api.get(`/candidates?job_id=${jobId}`)]);
@@ -29,6 +36,116 @@ export default function JobDetail() {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openUnlock = async () => {
+    setUnlockOpen(true);
+    if (!billing) {
+      try {
+        const res = await api.get("/billing/config");
+        setBilling(res.data);
+      } catch {
+        setBilling({ price_inr: 1999, razorpay: false, upi_vpa: null, unlock_code_enabled: true });
+      }
+    }
+  };
+
+  // Razorpay checkout: order created server-side, payment verified server-side
+  // (HMAC signature) before anything unlocks — the client is never trusted.
+  const payWithRazorpay = async () => {
+    setUnlockError(null);
+    setPayBusy(true);
+    try {
+      if (!window.Razorpay) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://checkout.razorpay.com/v1/checkout.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("Couldn't load the payment window"));
+          document.body.appendChild(s);
+        });
+      }
+      const { data: order } = await api.post(`/jobs/${jobId}/create-order`);
+      const rzp = new window.Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: order.name,
+        description: order.description,
+        prefill: order.prefill || { name: getUser()?.name, email: getUser()?.email },
+        theme: { color: "#b28a5d" },
+        handler: async (resp) => {
+          try {
+            await api.post(`/jobs/${jobId}/verify-payment`, resp);
+            setUnlockOpen(false);
+            await load();
+          } catch {
+            setUnlockError("Payment made but verification failed — contact us with your payment id and we'll unlock it.");
+          } finally {
+            setPayBusy(false);
+          }
+        },
+        modal: { ondismiss: () => setPayBusy(false) },
+      });
+      rzp.open();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setUnlockError(typeof detail === "string" ? detail : err.message || "Couldn't start the payment. Try again.");
+      setPayBusy(false);
+    }
+  };
+
+  const submitUnlock = async (e) => {
+    e.preventDefault();
+    setUnlockError(null);
+    setUnlockBusy(true);
+    try {
+      await api.post(`/jobs/${jobId}/unlock`, { code: unlockCode });
+      setUnlockOpen(false);
+      setUnlockCode("");
+      await load();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setUnlockError(typeof detail === "string" ? detail : "Couldn't unlock. Please try again.");
+    } finally {
+      setUnlockBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    const res = await api.get(`/jobs/${jobId}/export`, { responseType: "blob" });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${job.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-shortlist.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const lockedCount = cands.filter((c) => c.locked).length;
+
+  // The activation path: turn the resume pile the recruiter already has into a
+  // ranked shortlist now, instead of waiting for the apply link to fill up.
+  const onBulkUpload = async (e) => {
+    const files = [...(e.target.files || [])].slice(0, 20);
+    e.target.value = "";
+    if (!files.length) return;
+    setUploadSummary(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const res = await api.post(`/jobs/${jobId}/upload-resumes`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUploadSummary(res.data);
+      await load();
+    } catch (err) {
+      setUploadSummary({ total: files.length, ranked: 0, failed: [], error: "Upload failed — please try again." });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -157,7 +274,62 @@ export default function JobDetail() {
             <h2 className="font-display text-xl font-semibold">Candidates for this role</h2>
             <span className="font-mono-label">{cands.length} total</span>
           </div>
+          <div className="flex items-center gap-3">
+          <label className={cx("btn btn-light !py-2 text-xs cursor-pointer", uploading && "opacity-50 pointer-events-none")}>
+            <input type="file" multiple accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={onBulkUpload} data-testid="jd-bulk-upload-input" />
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            {uploading ? "Parsing & ranking…" : "Upload resumes"}
+          </label>
+          {job.unlocked ? (
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-mono text-success flex items-center gap-1.5" data-testid="jd-unlocked-badge">
+                <Unlock size={12} /> full shortlist unlocked
+              </span>
+              <button
+                onClick={exportCsv}
+                data-testid="jd-export-btn"
+                className="btn btn-light !py-2 text-xs"
+              >
+                <Download size={12} /> Export CSV
+              </button>
+            </div>
+          ) : (
+            lockedCount > 0 && (
+              <button
+                onClick={openUnlock}
+                data-testid="jd-unlock-btn"
+                className="btn btn-primary !py-2 text-xs"
+              >
+                <Lock size={12} /> Unlock all {cands.length} — ₹1,999
+              </button>
+            )
+          )}
+          </div>
         </div>
+
+        {uploadSummary && (
+          <div data-testid="jd-upload-summary" className={cx(
+            "mb-4 border px-5 py-4 text-sm flex items-start gap-3",
+            uploadSummary.error || uploadSummary.ranked === 0 ? "border-red-500/40 bg-red-500/5" : "border-success/40 bg-success/5"
+          )}>
+            <Check size={14} className={uploadSummary.error ? "text-red-400 mt-0.5" : "text-success mt-0.5"} />
+            <div className="flex-1">
+              {uploadSummary.error ? (
+                uploadSummary.error
+              ) : (
+                <>
+                  <span className="font-medium">{uploadSummary.ranked} of {uploadSummary.total} resumes parsed and ranked.</span>
+                  {uploadSummary.failed?.length > 0 && (
+                    <div className="mt-1 text-white/72 text-xs">
+                      Couldn't read: {uploadSummary.failed.map((f) => `${f.filename} (${f.error})`).join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <button onClick={() => setUploadSummary(null)} className="text-white/55 hover:text-white"><X size={13} /></button>
+          </div>
+        )}
         <div className="border hairline">
           {cands.map((c) => (
             <div
@@ -166,9 +338,15 @@ export default function JobDetail() {
               data-testid={`jd-cand-${c.id}`}
               className="flex items-center gap-4 p-4 border-b hairline last:border-b-0 hover:bg-white/[0.02] cursor-pointer transition-colors group"
             >
-              <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+              {c.locked ? (
+                <div className="w-10 h-10 rounded-full bg-white/5 border hairline flex items-center justify-center shrink-0">
+                  <Lock size={14} className="text-white/40" />
+                </div>
+              ) : (
+                <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+              )}
               <div className="flex-1 min-w-0">
-                <div className="font-medium">{c.name}</div>
+                <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
                 <div className="text-xs text-white/72">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
               </div>
               <div className="text-xs text-white/72 hidden md:block">
@@ -182,18 +360,110 @@ export default function JobDetail() {
             </div>
           ))}
           {cands.length === 0 && (
-            <div className="p-12 text-center text-white/65 text-sm">
-              No candidates yet. Share the public apply link →
+            <div className="p-12 text-center text-sm">
+              <div className="text-white/78 mb-1">Have a resume pile already?</div>
+              <div className="text-white/65">
+                Upload it above — every resume gets parsed and ranked against this role in about a minute.
+                Or share the public apply link and let candidates come to you.
+              </div>
             </div>
           )}
         </div>
 
-        {/* The ask sits here and nowhere earlier: they have a ranked shortlist
-            on screen, so there is something real to take away. */}
-        <div className="mt-6">
-          <ActivationCapture context="shortlist" count={cands.length} />
-        </div>
+        {/* The ask sits here and nowhere earlier: the full ranked list is on
+            screen with the top of it revealed, so what's being bought is
+            visible before it's paid for. */}
+        {!job.unlocked && lockedCount > 0 && (
+          <div data-testid="jd-paywall-banner" className="mt-6 border border-brand/40 bg-brand/5 p-6 flex flex-wrap items-center gap-4">
+            <Lock size={16} className="text-brand shrink-0" />
+            <div className="flex-1 min-w-[240px]">
+              <div className="font-display text-lg font-semibold mb-1">
+                Top {cands.length - lockedCount} revealed free — {lockedCount} more ranked candidate{lockedCount > 1 ? "s" : ""} hidden
+              </div>
+              <p className="text-sm text-white/72">
+                Unlock the full shortlist for this role: every name, contact detail, and the CSV export. ₹1,999, one-time, per role.
+              </p>
+            </div>
+            <button onClick={openUnlock} data-testid="jd-paywall-unlock-btn" className="btn btn-primary">
+              <Unlock size={14} /> Unlock full shortlist
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Unlock modal */}
+      {unlockOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setUnlockOpen(false)}>
+          <div className="bg-surface border hairline max-w-md w-full p-8 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setUnlockOpen(false)} data-testid="unlock-close" className="absolute top-4 right-4 text-white/55 hover:text-white">
+              <X size={16} />
+            </button>
+            <div className="font-mono-label mb-2">unlock this shortlist</div>
+            <div className="font-editorial text-3xl mb-1">
+              ₹{(billing?.price_inr ?? 1999).toLocaleString("en-IN")} <span className="text-base text-white/55">· one-time · this role</span>
+            </div>
+            <p className="text-sm text-white/72 mt-3 mb-6">
+              You get every ranked candidate's name and contact details, plus the CSV export —
+              for all current and future applicants to this role.
+            </p>
+
+            {billing?.razorpay && (
+              <button
+                onClick={payWithRazorpay}
+                disabled={payBusy}
+                data-testid="unlock-pay-btn"
+                className="btn btn-primary w-full justify-center mb-4 disabled:opacity-50"
+              >
+                {payBusy ? "Opening payment…" : `Pay ₹${(billing?.price_inr ?? 1999).toLocaleString("en-IN")} & unlock instantly`}
+              </button>
+            )}
+
+            {!billing?.razorpay && billing?.upi_vpa && (
+              <div className="border hairline bg-app p-4 text-sm text-white/78 mb-4 leading-relaxed" data-testid="unlock-upi-block">
+                <div className="font-mono-label mb-2">pay via upi</div>
+                Pay ₹{(billing?.price_inr ?? 1999).toLocaleString("en-IN")} to{" "}
+                <span className="text-brand font-mono">{billing.upi_vpa}</span>
+                {billing.upi_payee ? ` (${billing.upi_payee})` : ""}, then WhatsApp the payment screenshot
+                with this role's name — you'll get your unlock code within minutes.
+                <a
+                  href={`upi://pay?pa=${encodeURIComponent(billing.upi_vpa)}&pn=${encodeURIComponent(billing.upi_payee || "Talent Tailor")}&am=${billing?.price_inr ?? 1999}&cu=INR&tn=${encodeURIComponent("Shortlist unlock - " + job.title)}`}
+                  className="block mt-3 text-brand underline underline-offset-2"
+                >
+                  Open UPI app →
+                </a>
+              </div>
+            )}
+
+            {!billing?.razorpay && !billing?.upi_vpa && (
+              <div className="border hairline bg-app p-4 text-sm text-white/78 mb-4 leading-relaxed">
+                To pay: contact the Talent Tailor team with this role's name. You'll get a
+                payment link and an unlock code within minutes.
+              </div>
+            )}
+
+            {!billing && (
+              <div className="text-sm text-white/55 mb-4">Loading payment options…</div>
+            )}
+
+            <div className="font-mono-label mb-2 mt-2">{billing?.razorpay ? "or have an unlock code?" : "have an unlock code?"}</div>
+            <form onSubmit={submitUnlock} className="flex gap-3">
+              <input
+                value={unlockCode}
+                onChange={(e) => setUnlockCode(e.target.value)}
+                placeholder="Unlock code"
+                data-testid="unlock-code-input"
+                className="flex-1 bg-app border hairline px-4 py-2.5 text-sm placeholder:text-white/40 focus:border-brand focus:outline-none"
+              />
+              <button type="submit" disabled={unlockBusy || !unlockCode.trim()} data-testid="unlock-submit" className="btn btn-light disabled:opacity-50">
+                {unlockBusy ? "Unlocking…" : "Unlock"}
+              </button>
+            </form>
+            {unlockError && (
+              <div data-testid="unlock-error" className="mt-3 text-sm text-red-300">{unlockError}</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
