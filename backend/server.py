@@ -5,11 +5,15 @@ workspaces, and a per-role paywall (top-3 free preview, unlock for the rest).
 """
 import asyncio
 import csv
+import hashlib
+import hmac
 import io
 import os
 import re
 import uuid
 import zlib
+
+import httpx
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -35,6 +39,19 @@ DB_NAME = os.environ["DB_NAME"]
 FREE_REVEAL = int(os.environ.get("FREE_REVEAL", "3"))
 UNLOCK_CODE = os.environ.get("UNLOCK_CODE", "")
 UNLOCK_PRICE_INR = int(os.environ.get("UNLOCK_PRICE_INR", "1999"))
+
+# Payment rails, in order of preference at runtime:
+#   1. Razorpay checkout (both keys set) — verified server-side, auto-unlocks.
+#   2. Direct UPI (UPI_VPA set) — buyer pays the VPA, operator sends UNLOCK_CODE.
+#   3. Neither — the modal shows contact-the-team copy with code entry only.
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
+UPI_VPA = os.environ.get("UPI_VPA", "")
+UPI_PAYEE_NAME = os.environ.get("UPI_PAYEE_NAME", "Talent Tailor")
+
+
+def _razorpay_enabled() -> bool:
+    return bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)
 
 # Fictional demo dataset only seeds when explicitly asked for (local dev,
 # hosted demo). A paying customer's empty database must stay empty.
@@ -118,6 +135,12 @@ class LoginRequest(BaseModel):
 
 class UnlockRequest(BaseModel):
     code: str
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 
 class Job(BaseModel):
@@ -616,6 +639,88 @@ async def unlock_job(job_id: str, payload: UnlockRequest, user: dict = Depends(c
         raise HTTPException(403, "That unlock code isn't valid")
     await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
     return {"ok": True}
+
+
+@app.get("/api/billing/config")
+async def billing_config(user: dict = Depends(current_user)):
+    """What payment rails the frontend should offer, without leaking secrets."""
+    return {
+        "price_inr": UNLOCK_PRICE_INR,
+        "razorpay": _razorpay_enabled(),
+        "razorpay_key_id": RAZORPAY_KEY_ID if _razorpay_enabled() else None,
+        "upi_vpa": UPI_VPA or None,
+        "upi_payee": UPI_PAYEE_NAME,
+        "unlock_code_enabled": bool(UNLOCK_CODE),
+    }
+
+
+@app.post("/api/jobs/{job_id}/create-order")
+async def create_payment_order(job_id: str, user: dict = Depends(current_user)):
+    """Create a Razorpay order for unlocking this job's shortlist."""
+    job = await _owned_job(job_id, user)
+    if job.get("unlocked"):
+        raise HTTPException(409, "This shortlist is already unlocked")
+    if not _razorpay_enabled():
+        raise HTTPException(503, "Online payment isn't configured — use the UPI/code option")
+    try:
+        async with httpx.AsyncClient(timeout=20, auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) as rp:
+            resp = await rp.post(
+                "https://api.razorpay.com/v1/orders",
+                json={
+                    "amount": UNLOCK_PRICE_INR * 100,  # paise
+                    "currency": "INR",
+                    "receipt": job_id[:40],
+                    "notes": {"job_id": job_id, "owner_id": user["id"], "product": "shortlist-unlock"},
+                },
+            )
+            resp.raise_for_status()
+            order = resp.json()
+    except httpx.HTTPError:
+        raise HTTPException(502, "Couldn't reach the payment gateway — try again in a moment")
+    await db.payments.insert_one({
+        "id": str(uuid.uuid4()),
+        "order_id": order["id"],
+        "job_id": job_id,
+        "owner_id": user["id"],
+        "amount_inr": UNLOCK_PRICE_INR,
+        "status": "created",
+        "created_at": now_iso(),
+    })
+    return {
+        "order_id": order["id"],
+        "amount": order["amount"],
+        "currency": order["currency"],
+        "key_id": RAZORPAY_KEY_ID,
+        "name": "Talent Tailor",
+        "description": f"Full shortlist unlock — {job.get('title', 'role')}",
+        "prefill": {"name": user.get("name", ""), "email": user.get("email", "")},
+    }
+
+
+@app.post("/api/jobs/{job_id}/verify-payment")
+async def verify_payment(job_id: str, payload: VerifyPaymentRequest, user: dict = Depends(current_user)):
+    """Razorpay checkout handed the client a signature; verify it server-side
+    and unlock. The signature is HMAC-SHA256(order_id|payment_id, key_secret),
+    so a client can't forge an unlock without the secret."""
+    await _owned_job(job_id, user)
+    if not _razorpay_enabled():
+        raise HTTPException(503, "Online payment isn't configured")
+    record = await db.payments.find_one({"order_id": payload.razorpay_order_id, "job_id": job_id})
+    if not record:
+        raise HTTPException(404, "No payment order found for this job")
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode(),
+        f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected, payload.razorpay_signature):
+        raise HTTPException(403, "Payment verification failed")
+    await db.payments.update_one(
+        {"order_id": payload.razorpay_order_id},
+        {"$set": {"status": "paid", "payment_id": payload.razorpay_payment_id, "paid_at": now_iso()}},
+    )
+    await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
+    return {"ok": True, "unlocked": True}
 
 
 def _redact(c: dict, rank: int) -> dict:

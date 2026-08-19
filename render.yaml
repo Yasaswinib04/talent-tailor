@@ -47,6 +47,14 @@ services:
       # they enter it on the job page, the shortlist unlocks.
       - key: UNLOCK_CODE
         sync: false
+      # Razorpay checkout (in-app payment, auto-unlock). Set both or neither.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      # UPI fallback shown in the unlock modal when Razorpay keys are unset.
+      - key: UPI_VPA
+        sync: false
       # Lock CORS to the web service's origin once both URLs are known,
       # e.g. https://talent-tailor-web.onrender.com
       - key: CORS_ORIGINS
