@@ -16,7 +16,8 @@ const fixes = [
   { title: "Skills extracted inline", detail: "Paste the JD. Chips appear on the right, live. Edit weights on the same screen." },
   { title: "Multi-role assignment", detail: "One candidate, N roles. A single source of truth, ratings & notes travel." },
   { title: "Auto-apply from share link", detail: "Candidate drops resume → parsed → 1-click submit. 68% conversion in beta." },
-  { title: "Command-center dashboard", detail: "⌘K search, J/K row nav, bulk stage change. Built for velocity." },
+  { title: "Command-center dashboard", detail: "J/K row nav, search, bulk stage change with undo. Built for velocity." },
+  { title: "Scores you can defend", detail: "Every match number opens its own reasoning: sub-scores, weights, and the fact behind each one." },
 ];
 
 const metrics = [

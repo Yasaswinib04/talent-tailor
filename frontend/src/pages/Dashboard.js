@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, fmtINR, cx } from "../lib/api";
-import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
+import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check, RotateCcw } from "lucide-react";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
   const [loadError, setLoadError] = useState(null);
+  const [expanded, setExpanded] = useState(null);
+  const [undo, setUndo] = useState(null);
   const nav = useNavigate();
 
   const load = async () => {
@@ -92,11 +94,35 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", h);
   }, [cursor, filtered, nav]);
 
+  // The real work of screening is confidently eliminating people, so moving a
+  // batch has to be cheap to take back. Capturing each candidate's prior stage
+  // before the write is what lets us offer undo instead of a confirm dialog —
+  // a dialog taxes every action to guard against the rare wrong one.
   const bulkStage = async (stage) => {
-    await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
+    const ids = [...selected];
+    const previous = ids
+      .map((id) => candidates.find((c) => c.id === id))
+      .filter(Boolean)
+      .map((c) => ({ id: c.id, stage: c.stage }));
+    await Promise.all(ids.map((id) => api.post(`/candidates/${id}/stage`, { stage })));
     setSelected(new Set());
+    setUndo({ stage, previous });
     load();
   };
+
+  const revert = async () => {
+    if (!undo) return;
+    await Promise.all(undo.previous.map((p) => api.post(`/candidates/${p.id}/stage`, { stage: p.stage })));
+    setUndo(null);
+    load();
+  };
+
+  // Long enough to notice and act on, short enough not to become furniture.
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 12000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
@@ -263,7 +289,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c, i) => (
+              {filtered.map((c, i) => ([
                 <tr
                   key={c.id}
                   onClick={() => nav(`/app/candidates/${c.id}`)}
@@ -319,11 +345,28 @@ export default function Dashboard() {
                   <td className="py-3 px-3">
                     <StageBadge stage={c.stage} />
                   </td>
-                  <td className="py-3 px-3 text-right">
-                    <MatchScore score={c.match_score} />
+                  <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <MatchScore
+                      score={c.match_score}
+                      open={expanded === c.id}
+                      hasEvidence={!!c.score_evidence}
+                      onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
+                      testid={`cand-score-${c.id}`}
+                    />
                   </td>
-                </tr>
-              ))}
+                </tr>,
+                expanded === c.id && (
+                  <tr key={`${c.id}-why`} className="border-b hairline/50 bg-white/[0.02]">
+                    <td colSpan="8" className="px-3 py-4">
+                      <ScoreEvidence
+                        evidence={c.score_evidence}
+                        scoredAgainst={c.scored_against}
+                        testid={`cand-why-${c.id}`}
+                      />
+                    </td>
+                  </tr>
+                ),
+              ]))}
               {filtered.length === 0 && (
                 <tr><td colSpan="8" className="py-16 text-center text-white/65 text-sm">
                   {loadError ? "Couldn't load candidates — see the error above." : "No candidates match these filters."}
@@ -351,6 +394,29 @@ export default function Dashboard() {
           <BulkBtn label="Reject" onClick={() => bulkStage("Rejected")} testid="bulk-reject" danger />
           <button onClick={() => setSelected(new Set())} className="text-white/65 hover:text-white p-1 ml-1" data-testid="bulk-clear">
             <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Undo — the safety net that makes bulk triage worth doing at speed. */}
+      {undo && selected.size === 0 && (
+        <div
+          data-testid="undo-bar"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 border hairline bg-surface shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] flex items-center gap-3 px-4 py-2.5"
+        >
+          <RotateCcw size={13} className="text-white/65" />
+          <span className="text-sm text-white/80">
+            {undo.previous.length} moved to <span className="text-white">{undo.stage}</span>
+          </span>
+          <button
+            onClick={revert}
+            data-testid="undo-btn"
+            className="text-sm font-medium text-brand hover:underline underline-offset-4"
+          >
+            Undo
+          </button>
+          <button onClick={() => setUndo(null)} className="text-white/55 hover:text-white p-1" data-testid="undo-dismiss">
+            <X size={13} />
           </button>
         </div>
       )}
@@ -385,17 +451,61 @@ function StageBadge({ stage }) {
   );
 }
 
-function MatchScore({ score }) {
+/* A score the recruiter cannot interrogate is a number they have to either
+   over-trust or ignore, so the figure is a button onto its own reasoning
+   rather than a verdict handed down. */
+function MatchScore({ score, open, hasEvidence, onToggle, testid }) {
   const color = score >= 90 ? "text-brand" : score >= 75 ? "text-white" : "text-white/72";
+  const bar = score >= 90 ? "bg-brand" : score >= 75 ? "bg-white" : "bg-white/40";
   return (
-    <div className="inline-flex items-center gap-2">
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={!hasEvidence}
+      data-testid={testid}
+      title={hasEvidence ? "Show how this score was calculated" : "Assign a role to score this candidate"}
+      className="inline-flex items-center gap-2 px-1 py-0.5 disabled:cursor-default hover:bg-white/5 transition-colors"
+    >
       <div className="w-16 h-1 bg-white/10 relative overflow-hidden">
-        <div
-          className={cx("h-full", score >= 90 ? "bg-brand" : score >= 75 ? "bg-white" : "bg-white/40")}
-          style={{ width: `${score}%` }}
-        />
+        <div className={cx("h-full", bar)} style={{ width: `${score}%` }} />
       </div>
       <span className={cx("font-display text-lg font-semibold tabular-nums", color)}>{score}</span>
+      {hasEvidence && (
+        <ChevronRight
+          size={13}
+          className={cx("text-white/50 transition-transform", open && "rotate-90")}
+        />
+      )}
+    </button>
+  );
+}
+
+function ScoreEvidence({ evidence, scoredAgainst, testid }) {
+  if (!evidence?.length) return null;
+  const tone = {
+    pass: "text-success border-success/40",
+    warn: "text-gold border-gold/40",
+    fail: "text-white/60 border-white/15",
+  };
+  return (
+    <div data-testid={testid}>
+      <div className="font-mono-label mb-3">
+        why this score{scoredAgainst?.title ? ` · scored against ${scoredAgainst.title}` : ""}
+      </div>
+      <div className="grid md:grid-cols-5 gap-px bg-subtle border hairline">
+        {evidence.map((e) => (
+          <div key={e.key} className="bg-app p-3" data-testid={`evidence-${e.key}`}>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-xs text-white/78">{e.label}</span>
+              <span className="font-mono text-[10px] text-white/55">{e.weight}% weight</span>
+            </div>
+            <div className={cx("font-mono text-sm px-1.5 py-0.5 border inline-block mb-2", tone[e.tone])}>
+              {e.value}
+            </div>
+            <div className="text-[11px] text-white/70 leading-relaxed">{e.detail}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

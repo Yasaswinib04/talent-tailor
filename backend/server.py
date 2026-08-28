@@ -542,10 +542,18 @@ def _parse_notice_days(s: str) -> int:
     s = s.lower()
     if "immediate" in s:
         return 0
-    # extract first number
+    # The unit matters: reading "2 months" as 2 days ranked a two-month notice
+    # ahead of a thirty-day one, and both the filter and the score believed it.
     import re
     m = re.search(r"(\d+)", s)
-    return int(m.group(1)) if m else 999
+    if not m:
+        return 999
+    n = int(m.group(1))
+    if "month" in s:
+        return n * 30
+    if "week" in s:
+        return n * 7
+    return n
 
 
 UNKNOWN = {"", "—", "-", "n/a", "na", "unknown"}
@@ -681,15 +689,106 @@ def _score_components(c: dict, job: dict) -> dict:
     }
 
 
+def _effective_weights(job: dict) -> dict:
+    weights = {k: v for k, v in (job.get("scoring_weights") or {}).items() if isinstance(v, (int, float))}
+    return weights if sum(weights.values()) > 0 else dict(DEFAULT_WEIGHTS)
+
+
 def _score_candidate(c: dict, job: dict) -> int:
     """Weighted match score for this candidate *against this role*."""
-    weights = {k: v for k, v in (job.get("scoring_weights") or {}).items() if isinstance(v, (int, float))}
+    weights = _effective_weights(job)
     total = sum(weights.values())
-    if total <= 0:
-        weights, total = DEFAULT_WEIGHTS, sum(DEFAULT_WEIGHTS.values())
     comp = _score_components(c, job)
     score = sum(comp.get(k, 0) * w for k, w in weights.items()) / total
     return max(0, min(100, round(score)))
+
+
+def _tone(value: int) -> str:
+    return "pass" if value >= 75 else "warn" if value >= 50 else "fail"
+
+
+def _score_evidence(c: dict, job: dict) -> List[dict]:
+    """The score's reasoning, in the recruiter's own vocabulary.
+
+    A bare "92" is a number a recruiter cannot defend to a hiring manager, so
+    they either over-trust it or ignore it. Every dimension therefore ships the
+    fact it was derived from — the missing skills, the years against the bar —
+    alongside the sub-score and the weight it carried.
+    """
+    comp = _score_components(c, job)
+    weights = _effective_weights(job)
+    filters = job.get("filters") or {}
+    cand_skills = set(s.lower() for s in (c.get("skills") or []))
+
+    job_skills = job.get("skills") or []
+    missing = [s.get("name", "") for s in job_skills if s.get("name", "").lower() not in cand_skills]
+    if not job_skills:
+        skills_detail = "No skills defined on this role — scored neutral"
+    elif missing:
+        shown = ", ".join(missing[:3]) + (f" +{len(missing) - 3} more" if len(missing) > 3 else "")
+        skills_detail = f"{len(job_skills) - len(missing)} of {len(job_skills)} role skills — missing {shown}"
+    else:
+        skills_detail = f"All {len(job_skills)} role skills present"
+
+    min_exp = (filters.get("min_experience_years") or 0)
+    exp = c.get("experience_years") or 0
+    exp_detail = f"{exp:g}y experience vs {min_exp:g}y required" if min_exp else f"{exp:g}y experience — no minimum set"
+
+    edu_raw = c.get("education", "")
+    edu_pref = filters.get("education_preference", "No preference")
+    edu_detail = (
+        "Education not stated — scored neutral, not zero"
+        if _is_unknown(edu_raw)
+        else f"{edu_raw} vs preference: {edu_pref}"
+    )
+
+    notice_raw = c.get("notice_period", "")
+    if _is_unknown(notice_raw):
+        notice_detail = "Notice period not stated — scored neutral, not best"
+    elif "day" in notice_raw.lower():
+        notice_detail = f"{notice_raw} notice period"
+    else:
+        notice_detail = f"{notice_raw} notice period ({_parse_notice_days(notice_raw)} days)"
+
+    preferred = filters.get("preferred_companies") or []
+    company_raw = c.get("current_company") or ""
+    at = "Company not stated" if _is_unknown(company_raw) else f"Currently at {company_raw}"
+    fit_detail = (
+        f"{at} — no preferred companies set, scored neutral"
+        if not preferred
+        else f"{at}; preferred: {', '.join(preferred[:3])}"
+    )
+
+    rows = [
+        ("skills", "Skills", skills_detail),
+        ("experience", "Experience", exp_detail),
+        ("education", "Education", edu_detail),
+        ("notice", "Availability", notice_detail),
+        ("cultural_fit", "Prior company", fit_detail),
+    ]
+    total_w = sum(weights.values()) or 1
+    return [
+        {
+            "key": key,
+            "label": label,
+            "detail": detail,
+            "value": comp.get(key, 0),
+            "weight": round(100 * weights.get(key, 0) / total_w),
+            "tone": _tone(comp.get(key, 0)),
+        }
+        for key, label, detail in rows
+    ]
+
+
+def _explain(c: dict, job: Optional[dict]) -> dict:
+    """Attach the score and its reasoning to a candidate payload, in place."""
+    if not job:
+        return c
+    c["match_score"] = _score_candidate(c, job)
+    c["score_breakdown"] = _score_components(c, job)
+    c["score_evidence"] = _score_evidence(c, job)
+    c["scored_against"] = {"id": job.get("id"), "title": job.get("title")}
+    return c
 
 
 @app.post("/api/candidates/preview-filter")
@@ -730,9 +829,20 @@ async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = N
         job = await db.jobs.find_one({"id": job_id})
         if job:
             for c in result:
-                c["match_score"] = _score_candidate(c, job)
-                c["score_breakdown"] = _score_components(c, job)
+                _explain(c, job)
             result.sort(key=lambda c: c["match_score"], reverse=True)
+    else:
+        # No role in the query still means every row shows a number, so each one is
+        # explained against the role the candidate is actually assigned to rather
+        # than left as an unattributable figure.
+        job_cache: dict = {}
+        for c in result:
+            rid = (c.get("role_ids") or [None])[0]
+            if not rid:
+                continue
+            if rid not in job_cache:
+                job_cache[rid] = await db.jobs.find_one({"id": rid})
+            _explain(c, job_cache[rid])
     if q:
         ql = q.lower()
         result = [c for c in result if ql in c["name"].lower() or ql in c["current_company"].lower() or any(ql in s.lower() for s in c["skills"])]
@@ -740,11 +850,15 @@ async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = N
 
 
 @app.get("/api/candidates/{cid}")
-async def get_candidate(cid: str):
+async def get_candidate(cid: str, job_id: Optional[str] = None):
     c = await db.candidates.find_one({"id": cid})
     if not c:
         raise HTTPException(404, "Candidate not found")
-    return strip_mongo(c)
+    c = strip_mongo(c)
+    rid = job_id or (c.get("role_ids") or [None])[0]
+    if rid:
+        _explain(c, await db.jobs.find_one({"id": rid}))
+    return c
 
 
 @app.patch("/api/candidates/{cid}")

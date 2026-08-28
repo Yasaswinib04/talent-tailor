@@ -117,13 +117,21 @@ export default function CandidateProfile() {
           <div className="border hairline p-6 bg-surface">
             <div className="grid grid-cols-2 gap-6 items-center pb-6 mb-6 border-b hairline">
               <div>
-                <div className="font-mono-label mb-2">match score</div>
+                <div className="font-mono-label mb-2">
+                  match score
+                  {c.scored_against?.title ? ` · vs ${c.scored_against.title}` : ""}
+                </div>
                 <div className="flex items-baseline gap-3">
                   <span className={cx("font-display text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
                     {c.match_score}
                   </span>
                   <span className="text-white/65 text-sm">/ 100</span>
                 </div>
+                {!c.score_evidence && (
+                  <div className="text-xs text-white/60 mt-2">
+                    Assign a role below to see how this is calculated.
+                  </div>
+                )}
               </div>
               <div>
                 <div className="font-mono-label mb-2">stage</div>
@@ -146,6 +154,41 @@ export default function CandidateProfile() {
                 </div>
               </div>
             </div>
+
+            {/* The score's reasoning, always visible — this is the number the
+                recruiter has to defend to a hiring manager. */}
+            {c.score_evidence?.length > 0 && (
+              <div className="pb-6 mb-6 border-b hairline" data-testid="cp-score-evidence">
+                <div className="font-mono-label mb-3">how this was calculated</div>
+                <div className="space-y-2">
+                  {c.score_evidence.map((e) => (
+                    <div
+                      key={e.key}
+                      data-testid={`cp-evidence-${e.key}`}
+                      className="flex items-start gap-3 text-sm"
+                    >
+                      <span
+                        className={cx(
+                          "font-mono text-xs px-1.5 py-0.5 border shrink-0 w-10 text-center",
+                          e.tone === "pass"
+                            ? "text-success border-success/40"
+                            : e.tone === "warn"
+                            ? "text-gold border-gold/40"
+                            : "text-white/60 border-white/15"
+                        )}
+                      >
+                        {e.value}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-white/85">{e.label}</span>
+                        <span className="font-mono text-[10px] text-white/50 ml-2">{e.weight}% weight</span>
+                        <div className="text-xs text-white/70 leading-relaxed mt-0.5">{e.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Multi-role assignment */}
             <div>
