@@ -15,6 +15,16 @@ def client():
     s.headers.update({"Content-Type": "application/json"})
     try:
         s.get(f"{BASE_URL}/api/health", timeout=3).raise_for_status()
+        # The API requires a session for everything except the public routes.
+        email = os.environ.get("TEST_USER_EMAIL", "maya@cred.club")
+        password = os.environ.get("TEST_USER_PASSWORD", "correct horse battery staple")
+        r = s.post(f"{BASE_URL}/api/auth/login", json={"email": email, "password": password}, timeout=5)
+        if r.status_code != 200:
+            pytest.skip(
+                f"Could not sign in to {BASE_URL} as {email} ({r.status_code}). "
+                "Set TEST_USER_EMAIL / TEST_USER_PASSWORD to run these.",
+                allow_module_level=True,
+            )
     except Exception as exc:
         # These are integration tests against a live server. Skipping is honest;
         # a wall of connection errors is not a test result.

@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutGrid, Briefcase, Users, Plus, Search, Command } from "lucide-react";
+import { LayoutGrid, Briefcase, Users, Plus, Search, Command, LogOut } from "lucide-react";
+import { useAuth } from "../lib/auth";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -61,6 +62,21 @@ function SideLink({ to, icon, label, testid }) {
 }
 
 function TopBar() {
+  const { user, signOut } = useAuth();
+  const nav = useNavigate();
+  const initials = (user?.name || user?.email || "?")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  const onSignOut = async () => {
+    await signOut();
+    nav("/login", { replace: true });
+  };
+
   return (
     <div className="h-14 border-b hairline flex items-center px-6 gap-4">
       <div className="flex items-center gap-2 text-white/40">
@@ -74,8 +90,23 @@ function TopBar() {
         <span className="kbd flex items-center gap-1"><Command size={10} /> K</span>
       </div>
       <div className="ml-auto flex items-center gap-4">
-        <span className="font-mono-label">recruiter · maya n.</span>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-gold" />
+        <span className="font-mono-label" data-testid="topbar-user">
+          {user ? `${user.role} · ${user.name}` : ""}
+        </span>
+        <div
+          className="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-gold flex items-center justify-center text-[11px] font-medium"
+          title={user?.email}
+        >
+          {initials}
+        </div>
+        <button
+          onClick={onSignOut}
+          data-testid="signout-btn"
+          title="Sign out"
+          className="text-white/40 hover:text-white transition-colors"
+        >
+          <LogOut size={14} />
+        </button>
       </div>
     </div>
   );

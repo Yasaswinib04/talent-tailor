@@ -12,10 +12,12 @@ from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+import auth
 
 load_dotenv()
 
@@ -45,10 +47,24 @@ db = client[DB_NAME]
 
 app = FastAPI(title="CRED HR API")
 
+# Sessions travel in a cookie, and browsers only send cookies cross-origin when
+# the server names an exact origin and sets Allow-Credentials. A wildcard is
+# therefore unusable for a cross-origin deployment: sign-in fails with what
+# looks like a network error. Harmless if the app and API share an origin
+# (single domain behind one proxy), so warn rather than refuse to start.
+if "*" in CORS_ORIGINS:
+    print(
+        "\n  CORS_ORIGINS is '*'. Sign-in will FAIL from a browser on a different"
+        "\n  origin, because session cookies are not sent to a wildcard origin."
+        "\n  Set CORS_ORIGINS to your frontend's exact origin, e.g."
+        "\n      CORS_ORIGINS=https://hr.example.com"
+        "\n  Ignore this only if the app and API are served from the same origin.\n"
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    # Credentials cannot be combined with a wildcard origin — browsers reject it
+    # Never combine credentials with a wildcard: browsers reject it outright,
     # and it would let any site read authenticated responses.
     allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
@@ -196,6 +212,33 @@ class CandidateUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: str
+    password_hash: str
+    role: str = "recruiter"  # recruiter | admin
+    created_at: str = Field(default_factory=now_iso)
+    last_login_at: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    name: str
+    password: str
+    role: Literal["recruiter", "admin"] = "recruiter"
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class RoleAssignment(BaseModel):
     role_ids: List[str]
 
@@ -319,6 +362,46 @@ AVATAR_POOL = [
 
 # ---------- Seeder ----------
 @app.on_event("startup")
+async def bootstrap_admin():
+    """Create the first admin account from the environment, once.
+
+    There is deliberately no default password: an app that ships with known
+    credentials is no better protected than one with no login at all. If
+    ADMIN_EMAIL/ADMIN_PASSWORD are unset and no users exist, the API starts but
+    nobody can sign in — and says so loudly in the logs.
+    """
+    await db.sessions.create_index("token_fp", unique=True)
+    await db.sessions.create_index("expires_at")
+    await db.users.create_index("email", unique=True)
+    # Expired sessions are dead weight; clear them on boot.
+    await db.sessions.delete_many({"expires_at": {"$lt": now_iso()}})
+
+    if await db.users.count_documents({}) > 0:
+        return
+
+    email = os.environ.get("ADMIN_EMAIL", "").lower().strip()
+    password = os.environ.get("ADMIN_PASSWORD", "")
+    if not email or not password:
+        print(
+            "\n  No user accounts exist and ADMIN_EMAIL / ADMIN_PASSWORD are not set."
+            "\n  Nobody can sign in. Set both and restart to create the first admin.\n"
+        )
+        return
+    problem = auth.password_problem(password)
+    if problem:
+        print(f"\n  ADMIN_PASSWORD rejected: {problem}\n  No admin account was created.\n")
+        return
+    admin = User(
+        email=email,
+        name=os.environ.get("ADMIN_NAME", "").strip() or email.split("@")[0],
+        password_hash=auth.hash_password(password),
+        role="admin",
+    )
+    await db.users.insert_one(admin.model_dump())
+    print(f"  Created the first admin account: {email}")
+
+
+@app.on_event("startup")
 async def seed():
     jobs_count = await db.jobs.count_documents({})
     if jobs_count == 0:
@@ -378,33 +461,166 @@ def strip_mongo(doc):
     return doc
 
 
+# ---------- Authentication ----------
+# Everything under /api requires a session except health, the public job page
+# and the public apply endpoint — candidates are not logged in.
+_login_attempts: dict = {}
+
+
+def _public_user(doc: dict) -> dict:
+    return {k: doc.get(k) for k in ("id", "email", "name", "role", "created_at", "last_login_at")}
+
+
+async def current_user(request: Request) -> Optional[dict]:
+    """Resolve the session cookie to a user, or None. Never raises."""
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if not token:
+        return None
+    session = await db.sessions.find_one({"token_fp": auth.token_fingerprint(token)})
+    if not session:
+        return None
+    if auth.is_expired(session.get("expires_at", "")):
+        await db.sessions.delete_one({"token_fp": session["token_fp"]})
+        return None
+    user = await db.users.find_one({"id": session["user_id"]})
+    return user or None
+
+
+async def require_user(request: Request) -> dict:
+    """Dependency for every recruiter-facing route."""
+    user = await current_user(request)
+    if not user:
+        raise HTTPException(401, "Sign in to continue.")
+    return user
+
+
+async def require_admin(user: dict = Depends(require_user)) -> dict:
+    if user.get("role") != "admin":
+        raise HTTPException(403, "This action needs an admin account.")
+    return user
+
+
+def _throttle_key(request: Request, email: str) -> str:
+    return f"{request.client.host if request.client else 'unknown'}:{email.lower()}"
+
+
+def _check_login_throttle(key: str):
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(key, []) if now - t < auth.LOGIN_LOCKOUT_SECONDS]
+    _login_attempts[key] = attempts
+    if len(attempts) >= auth.MAX_LOGIN_ATTEMPTS:
+        wait = int(auth.LOGIN_LOCKOUT_SECONDS - (now - attempts[0])) // 60 + 1
+        raise HTTPException(429, f"Too many failed sign-in attempts. Try again in {wait} minutes.")
+
+
+@app.post("/api/auth/login")
+async def login(payload: LoginRequest, request: Request, response: Response):
+    key = _throttle_key(request, payload.email)
+    _check_login_throttle(key)
+
+    user = await db.users.find_one({"email": payload.email.lower().strip()})
+    # Same message and comparable timing either way — do not reveal which
+    # addresses have accounts.
+    ok = user is not None and auth.verify_password(payload.password, user.get("password_hash", ""))
+    if not ok:
+        _login_attempts.setdefault(key, []).append(time.time())
+        raise HTTPException(401, "That email and password don't match.")
+
+    _login_attempts.pop(key, None)
+    token = auth.new_session_token()
+    await db.sessions.insert_one({
+        "token_fp": auth.token_fingerprint(token),
+        "user_id": user["id"],
+        "created_at": now_iso(),
+        "expires_at": auth.session_expiry().isoformat(),
+    })
+    await db.users.update_one({"id": user["id"]}, {"$set": {"last_login_at": now_iso()}})
+    response.set_cookie(auth.SESSION_COOKIE, token, **auth.cookie_settings())
+    return {"user": _public_user(user)}
+
+
+@app.post("/api/auth/logout")
+async def logout(request: Request, response: Response):
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if token:
+        await db.sessions.delete_one({"token_fp": auth.token_fingerprint(token)})
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def me(user: dict = Depends(require_user)):
+    return _public_user(user)
+
+
+@app.get("/api/auth/users")
+async def list_users(user: dict = Depends(require_admin)):
+    users = await db.users.find({}).to_list(1000)
+    return [_public_user(u) for u in users]
+
+
+@app.post("/api/auth/users")
+async def create_user(payload: UserCreate, admin: dict = Depends(require_admin)):
+    problem = auth.password_problem(payload.password)
+    if problem:
+        raise HTTPException(400, problem)
+    email = payload.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "An account with that email already exists.")
+    u = User(email=email, name=payload.name.strip() or email,
+             password_hash=auth.hash_password(payload.password), role=payload.role)
+    await db.users.insert_one(u.model_dump())
+    return _public_user(u.model_dump())
+
+
+@app.post("/api/auth/change-password")
+async def change_password(payload: PasswordChange, request: Request, user: dict = Depends(require_user)):
+    if not auth.verify_password(payload.current_password, user.get("password_hash", "")):
+        raise HTTPException(401, "Your current password is incorrect.")
+    problem = auth.password_problem(payload.new_password)
+    if problem:
+        raise HTTPException(400, problem)
+    await db.users.update_one(
+        {"id": user["id"]}, {"$set": {"password_hash": auth.hash_password(payload.new_password)}}
+    )
+    # Changing a password should end every other session.
+    keep = request.cookies.get(auth.SESSION_COOKIE)
+    await db.sessions.delete_many({
+        "user_id": user["id"],
+        "token_fp": {"$ne": auth.token_fingerprint(keep) if keep else ""},
+    })
+    return {"ok": True}
+
+
 # ---------- Routes ----------
+# PUBLIC — liveness probe, returns no data.
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": now_iso()}
 
 
 @app.get("/api/jobs")
-async def list_jobs():
+async def list_jobs(user: dict = Depends(require_user)):
     jobs = await db.jobs.find({}).to_list(1000)
     return [strip_mongo(j) for j in jobs]
 
 
 @app.post("/api/jobs")
-async def create_job(payload: JobCreate):
+async def create_job(payload: JobCreate, user: dict = Depends(require_user)):
     job = Job(**payload.model_dump())
     await db.jobs.insert_one(job.model_dump())
     return job.model_dump()
 
 
 @app.get("/api/jobs/{job_id}")
-async def get_job(job_id: str):
+async def get_job(job_id: str, user: dict = Depends(require_user)):
     job = await db.jobs.find_one({"id": job_id})
     if not job:
         raise HTTPException(404, "Job not found")
     return strip_mongo(job)
 
 
+# PUBLIC — candidates open this from a share link and are not logged in.
 @app.get("/api/jobs/share/{slug}")
 async def get_job_by_slug(slug: str):
     job = await db.jobs.find_one({"share_slug": slug})
@@ -414,7 +630,7 @@ async def get_job_by_slug(slug: str):
 
 
 @app.patch("/api/jobs/{job_id}")
-async def update_job(job_id: str, payload: JobUpdate):
+async def update_job(job_id: str, payload: JobUpdate, user: dict = Depends(require_user)):
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
     if not changes:
         raise HTTPException(400, "No fields to update.")
@@ -426,7 +642,7 @@ async def update_job(job_id: str, payload: JobUpdate):
 
 
 @app.delete("/api/jobs/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, user: dict = Depends(require_user)):
     await db.jobs.delete_one({"id": job_id})
     return {"ok": True}
 
@@ -453,7 +669,7 @@ SKILL_DICTIONARY = {
 
 
 @app.post("/api/extract-skills")
-async def extract_skills(payload: ExtractSkillsRequest):
+async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(require_user)):
     text = (payload.jd or "").lower()
     found = {}
     for k, v in SKILL_DICTIONARY.items():
@@ -684,7 +900,8 @@ def _score_against_job(candidate_skills: List[str], job: dict) -> int:
 
 
 @app.post("/api/jobs/{job_id}/bulk-upload")
-async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadFile] = File(...)):
+async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadFile] = File(...),
+                              user: dict = Depends(require_user)):
     """Recruiter drops up to MAX_BULK_FILES resumes against one role.
 
     Every file is reported on individually — one unreadable resume never fails
@@ -859,7 +1076,7 @@ def _matches_education(candidate_edu: str, pref: str) -> bool:
 
 
 @app.post("/api/candidates/preview-filter")
-async def preview_filter(payload: FilterPreviewRequest):
+async def preview_filter(payload: FilterPreviewRequest, user: dict = Depends(require_user)):
     filters = payload.filters or {}
     cands = await db.candidates.find({}).to_list(1000)
     total = len(cands)
@@ -909,7 +1126,8 @@ async def preview_filter(payload: FilterPreviewRequest):
 
 # ---------- Candidates ----------
 @app.get("/api/candidates")
-async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None, q: Optional[str] = None):
+async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None, q: Optional[str] = None,
+                          user: dict = Depends(require_user)):
     query = {}
     if job_id:
         query["role_ids"] = job_id
@@ -924,7 +1142,7 @@ async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = N
 
 
 @app.get("/api/candidates/{cid}")
-async def get_candidate(cid: str):
+async def get_candidate(cid: str, user: dict = Depends(require_user)):
     c = await db.candidates.find_one({"id": cid})
     if not c:
         raise HTTPException(404, "Candidate not found")
@@ -932,7 +1150,7 @@ async def get_candidate(cid: str):
 
 
 @app.patch("/api/candidates/{cid}")
-async def update_candidate(cid: str, payload: CandidateUpdate):
+async def update_candidate(cid: str, payload: CandidateUpdate, user: dict = Depends(require_user)):
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
     if not changes:
         raise HTTPException(400, "No fields to update.")
@@ -950,7 +1168,7 @@ async def update_candidate(cid: str, payload: CandidateUpdate):
 
 
 @app.post("/api/candidates/{cid}/assign-roles")
-async def assign_roles(cid: str, payload: RoleAssignment):
+async def assign_roles(cid: str, payload: RoleAssignment, user: dict = Depends(require_user)):
     result = await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": payload.role_ids}})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
@@ -963,7 +1181,7 @@ async def assign_roles(cid: str, payload: RoleAssignment):
 
 
 @app.post("/api/candidates/{cid}/stage")
-async def set_stage(cid: str, payload: StageUpdate):
+async def set_stage(cid: str, payload: StageUpdate, user: dict = Depends(require_user)):
     result = await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
@@ -972,6 +1190,7 @@ async def set_stage(cid: str, payload: StageUpdate):
 
 
 # ---------- Public Apply (auto-apply from shareable link) ----------
+# PUBLIC — the candidate-facing application endpoint.
 @app.post("/api/apply/{slug}")
 async def apply_to_job(slug: str, payload: CandidateApply):
     job = await db.jobs.find_one({"share_slug": slug})
@@ -1012,7 +1231,7 @@ async def apply_to_job(slug: str, payload: CandidateApply):
 
 # ---------- Analytics ----------
 @app.get("/api/analytics/summary")
-async def analytics_summary():
+async def analytics_summary(user: dict = Depends(require_user)):
     total_jobs = await db.jobs.count_documents({})
     total_candidates = await db.candidates.count_documents({})
     stages = ["New", "Shortlisted", "Interview", "Offer", "Rejected"]

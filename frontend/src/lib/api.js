@@ -17,7 +17,28 @@ if (CONFIG_ERROR) console.error(CONFIG_ERROR);
 export const api = axios.create({
   baseURL: `${(BASE || "").replace(/\/+$/, "")}/api`,
   headers: { "Content-Type": "application/json" },
+  // The session lives in an httpOnly cookie, so it must be sent cross-origin.
+  withCredentials: true,
 });
+
+// A 401 anywhere means the session ended — expired, revoked, or signed out in
+// another tab. Notify once and let the app route to the login screen, rather
+// than letting every in-flight call render its own error.
+let onUnauthorized = null;
+export const setUnauthorizedHandler = (fn) => {
+  onUnauthorized = fn;
+};
+
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const url = err.config?.url || "";
+    // /auth/me probing for a session, and a failed sign-in, are expected 401s.
+    const isAuthProbe = url.includes("/auth/me") || url.includes("/auth/login");
+    if (err.response?.status === 401 && !isAuthProbe) onUnauthorized?.();
+    return Promise.reject(err);
+  }
+);
 
 export const fmtINR = (n) => {
   if (n == null) return "—";

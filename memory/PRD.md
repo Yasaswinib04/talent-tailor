@@ -37,12 +37,21 @@ A full UAT found 5 P0 and 8 P1 issues — see `specs/uat-report-2026-08-08.md` a
 build-time backend URL, `.env.example`, the job-create 500, unvalidated PATCH,
 and missing frontend error states. 50 backend tests pass.
 
-**Still open — the app has no authentication.** `/app` and every `/api/*`
-endpoint is public, exposing candidate name, email, phone, employer, expected
-CTC and recruiter notes. Fine for a prototype on seeded synthetic data; a hard
-blocker before any real candidate applies. CORS is now configurable and no
-longer pairs a wildcard origin with credentials, but that is mitigation, not a
-fix. Remaining P1s are listed as Track B in the fix plan.
+**Authentication shipped (P0-3 closed).** Per-recruiter accounts, bcrypt
+passwords, opaque server-side sessions in an httpOnly cookie, login throttling,
+admin-only account creation. Every `/api` route requires a session except
+`/api/health`, `/api/jobs/share/{slug}` and `/api/apply/{slug}` — candidates
+applying via a share link have no account. First admin is bootstrapped from
+ADMIN_EMAIL/ADMIN_PASSWORD; there is no default password.
+
+Note: `CORS_ORIGINS` must name the frontend's exact origin. Cookies are not sent
+to a wildcard origin, so `"*"` makes sign-in fail like a network error. The API
+warns at startup.
+
+**Still open before real candidates:** the public apply path accepts blank name
+and email, does not de-duplicate, and deleting a role orphans its candidates.
+The system-recommended filters still reject 100% of the pool. Track B in the fix
+plan.
 
 ## Prioritized backlog
 - **P1** — Persist onboarding to backend (currently client-only; skip button jumps directly to app)

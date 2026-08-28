@@ -31,7 +31,9 @@ There are four:
 |---|---|---|
 | `MONGO_URL` | backend, runtime | Required. The API refuses to start without it. |
 | `DB_NAME` | backend, runtime | Required. Seed data is inserted on first startup if the database is empty. |
-| `CORS_ORIGINS` | backend, runtime | Comma-separated allowed origins. Defaults to `*`. **Set this in production.** |
+| `CORS_ORIGINS` | backend, runtime | Comma-separated allowed origins. **Required** when the app and API are on different origins — see below. |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | backend, runtime | Used once on first startup to create the first admin. No default password; without these, nobody can sign in. |
+| `COOKIE_SECURE` | backend, runtime | Set to `true` on HTTPS. Marks the session cookie `Secure` + `SameSite=None`. |
 | `REACT_APP_BACKEND_URL` | frontend, **build time** | Backend origin, no trailing slash, no `/api` suffix. |
 
 ### The one that bites
@@ -46,12 +48,44 @@ request. It builds clean and fails only once deployed.
 `frontend/.env.production` (committed — it's a public URL, not a secret) or
 export it in your build step, and rebuild whenever it changes.
 
+## Authentication
+
+The recruiter console requires a sign-in. Sessions are opaque server-side
+tokens delivered in an `httpOnly` cookie — page JavaScript cannot read them, and
+signing out or revoking a session takes effect immediately. Passwords are bcrypt
+hashed, and repeated failed sign-ins are throttled per IP and email.
+
+Three endpoints stay public by design: `/api/health`, `/api/jobs/share/{slug}`
+and `/api/apply/{slug}` — candidates applying through a share link do not have
+accounts. Everything else returns 401 without a session.
+
+**Bootstrapping the first account:** set `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+(12+ characters) before first startup. There is deliberately no default
+password. Once you can sign in, add colleagues from the app and you can drop
+those variables. Admins can create accounts; recruiters cannot.
+
+### CORS and cookies
+
+Because the session is a cookie, browsers only send it cross-origin when the
+API names an **exact** origin. With `CORS_ORIGINS="*"`, sign-in fails with what
+looks like a network error. Set it to your frontend's origin:
+
+```
+CORS_ORIGINS=https://hr.example.com
+```
+
+Leave it as `*` only when the app and API are served from the same origin behind
+one proxy. The API prints a warning at startup if it is a wildcard.
+
 ## Deploying
 
 ```bash
 # 1. Backend
 pip install -r backend/requirements.txt
-MONGO_URL=... DB_NAME=... CORS_ORIGINS=https://your-frontend.example.com \
+MONGO_URL=... DB_NAME=... \
+CORS_ORIGINS=https://hr.your-domain.example.com \
+COOKIE_SECURE=true \
+ADMIN_EMAIL=you@company.com ADMIN_PASSWORD='a long passphrase here' \
   uvicorn server:app --app-dir backend --host 0.0.0.0 --port 8001
 
 # 2. Frontend — build with the backend URL, then serve frontend/build statically
@@ -72,12 +106,13 @@ grep -o 'baseURL[^,]*' frontend/build/static/js/main.*.js   # must not contain "
 
 ```bash
 pip install -r backend/requirements.txt -r backend/tests/requirements.txt
-pytest backend/tests                    # 50 tests; integration ones skip without a server
+pytest backend/tests                    # 73 tests; integration ones skip without a server
 TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration tests
 ```
 
-- `test_bulk_upload.py` and `test_p0_fixes.py` run fully locally against an
-  in-memory Mongo — no server needed.
+- `test_auth.py`, `test_bulk_upload.py` and `test_p0_fixes.py` run fully locally
+  against an in-memory Mongo — no server needed. `test_auth.py` walks the app's
+  own route table, so a new endpoint added without a guard fails the build.
 - `backend_test.py` is an integration suite; point it at a running API with
   `TEST_API_URL`.
 
@@ -86,6 +121,5 @@ TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration
 A full UAT was run on 2026-08-08. See
 [`specs/uat-report-2026-08-08.md`](specs/uat-report-2026-08-08.md) for findings
 and [`specs/launch-fix-plan.md`](specs/launch-fix-plan.md) for what is fixed and
-what remains. **The app currently ships with no authentication** — `/app` and
-every `/api/*` endpoint is public. Do not put real candidate data behind it
-until that is addressed.
+what remains. All P0s are closed, including authentication. Remaining items are
+data-integrity issues on the public apply path — see Track B in the fix plan.

@@ -25,6 +25,43 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
+### Authentication — P0-3 closed
+
+The console now requires a sign-in. Per-recruiter accounts rather than a shared
+password, because in hiring you need to know who moved a candidate to Rejected.
+
+- **Sessions** are opaque server-side tokens in an `httpOnly` cookie — page
+  JavaScript, and therefore XSS, cannot read them. Only a SHA-256 fingerprint is
+  stored, so a database dump yields no usable sessions. Sign-out and revocation
+  take effect immediately, which a JWT would not give us.
+- **Passwords** are bcrypt hashed, minimum 12 characters, with obvious choices
+  refused. Failed sign-ins are throttled (5 per 15 min per IP+email), and the
+  throttle is not bypassable by then supplying the correct password.
+- **Every** `/api` route requires a session except three that are public by
+  design: `/api/health`, `/api/jobs/share/{slug}` and `/api/apply/{slug}` —
+  candidates applying through a share link have no account.
+- **Bootstrap** from `ADMIN_EMAIL`/`ADMIN_PASSWORD` on first startup, with no
+  default password. An app shipping known credentials is no better off than one
+  with no login. Admins can add accounts; recruiters cannot.
+- **Frontend**: login screen, session context, route guard, sign-out, and a 401
+  interceptor that routes to login when a session ends mid-use. Deep links are
+  remembered across the redirect. `/themes` is now behind the gate too (P2-8).
+
+One trap found while testing, now guarded: with `CORS_ORIGINS="*"` the browser
+refuses to send the session cookie cross-origin, so sign-in fails looking like a
+network error. The API warns loudly at startup if the origin is a wildcard, and
+`.env.example` explains it.
+
+**Verification:** 23 auth tests, including one that walks the app's own route
+table so a future endpoint added without a guard fails the build. Plus 17
+browser cases: signed-out redirect, no candidate data in the page, deep-link
+memory, wrong password, httpOnly cookie invisible to JS, session surviving
+reload, revocation mid-session, sign-out, and candidates still applying with no
+account. 73 backend tests pass in total.
+
+---
+
+
 ### Track 0 — complete (all five P0s closed)
 
 | Item | What changed |
