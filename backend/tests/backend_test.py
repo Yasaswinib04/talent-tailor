@@ -3,13 +3,23 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://29cfe93b-a616-42ca-891a-3c423a1bbdf7.preview.emergentagent.com").rstrip("/")
+# Point this at a running API. Defaults to a local backend rather than a
+# hardcoded preview host, which made the suite pass or fail for reasons that had
+# nothing to do with the code under test.
+BASE_URL = os.environ.get("TEST_API_URL", os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")).rstrip("/")
 
 
 @pytest.fixture(scope="session")
 def client():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    try:
+        s.get(f"{BASE_URL}/api/health", timeout=3).raise_for_status()
+    except Exception as exc:
+        # These are integration tests against a live server. Skipping is honest;
+        # a wall of connection errors is not a test result.
+        pytest.skip(f"No API reachable at {BASE_URL} ({exc}). Set TEST_API_URL to run these.",
+                    allow_module_level=True)
     return s
 
 

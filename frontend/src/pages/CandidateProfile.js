@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, fmtINR, cx } from "../lib/api";
+import { api, fmtINR, cx, errMessage } from "../lib/api";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Star, Check, X, Plus, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import Avatar from "../components/Avatar";
+import ErrorState from "../components/ErrorState";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -15,39 +16,88 @@ export default function CandidateProfile() {
   const [tab, setTab] = useState("resume");
   const [note, setNote] = useState("");
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const load = async () => {
-    const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
-    setC(cr.data);
-    setJobs(jr.data);
-    setNote(cr.data.notes || "");
+    try {
+      const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
+      setC(cr.data);
+      setJobs(jr.data);
+      setNote(cr.data.notes || "");
+      setError("");
+    } catch (err) {
+      // Without this the 404 rejects unhandled and the page spins forever.
+      setError(
+        err.response?.status === 404
+          ? "This candidate doesn't exist or has been removed."
+          : errMessage(err, "Couldn't load this candidate.")
+      );
+    }
   };
 
   useEffect(() => {
     load();
   }, [cid]);
 
+  if (error) {
+    return (
+      <div className="max-w-[1200px] mx-auto p-8">
+        <ErrorState
+          message={error}
+          onRetry={load}
+          testid="cp-error"
+          action={
+            <button onClick={() => nav("/app")} className="text-xs text-white/50 hover:text-white transition-colors">
+              Back to overview
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (!c) return <div className="p-8 text-white/40">Loading…</div>;
 
   const toggleRole = async (roleId) => {
-    const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
-    await api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds });
-    load();
+    try {
+      const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
+      await api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds });
+      load();
+      setActionError("");
+    } catch (err) {
+      setActionError(errMessage(err, "Couldn't update this candidate's roles."));
+    }
   };
 
   const setStage = async (stage) => {
-    await api.post(`/candidates/${cid}/stage`, { stage });
-    load();
+    try {
+      await api.post(`/candidates/${cid}/stage`, { stage });
+      load();
+      setActionError("");
+    } catch (err) {
+      setActionError(errMessage(err, "Couldn't change the stage."));
+    }
   };
 
   const saveNote = async () => {
-    await api.patch(`/candidates/${cid}`, { notes: note });
-    load();
+    try {
+      await api.patch(`/candidates/${cid}`, { notes: note });
+      load();
+      setActionError("");
+    } catch (err) {
+      setActionError(errMessage(err, "Couldn't save your note."));
+    }
   };
 
   const setRating = async (rating) => {
-    await api.patch(`/candidates/${cid}`, { rating });
-    load();
+    try {
+      await api.patch(`/candidates/${cid}`, { rating });
+      load();
+      setActionError("");
+    } catch (err) {
+      setActionError(errMessage(err, "Couldn't save that rating."));
+    }
   };
 
   const assignedJobs = jobs.filter((j) => c.role_ids.includes(j.id));
@@ -57,6 +107,12 @@ export default function CandidateProfile() {
       <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back
       </button>
+
+      {actionError && (
+        <div className="mb-6 border border-danger/50 bg-danger/10 px-4 py-3 text-sm text-white/80" data-testid="cp-action-error">
+          {actionError}
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-8">
         {/* LEFT: Identity */}

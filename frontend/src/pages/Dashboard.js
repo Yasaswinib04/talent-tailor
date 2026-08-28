@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, fmtINR, cx } from "../lib/api";
+import { api, fmtINR, cx, errMessage } from "../lib/api";
 import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
 import Avatar from "../components/Avatar";
+import ErrorState from "../components/ErrorState";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -17,17 +18,27 @@ export default function Dashboard() {
   const [filterJob, setFilterJob] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const nav = useNavigate();
 
   const load = async () => {
-    const [j, c, s] = await Promise.all([
-      api.get("/jobs"),
-      api.get("/candidates"),
-      api.get("/analytics/summary"),
-    ]);
-    setJobs(j.data);
-    setCandidates(c.data);
-    setSummary(s.data);
+    setLoading(true);
+    try {
+      const [j, c, s] = await Promise.all([
+        api.get("/jobs"),
+        api.get("/candidates"),
+        api.get("/analytics/summary"),
+      ]);
+      setJobs(j.data);
+      setCandidates(c.data);
+      setSummary(s.data);
+      setError("");
+    } catch (err) {
+      setError(errMessage(err, "Couldn't load your pipeline."));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -82,13 +93,30 @@ export default function Dashboard() {
   }, [cursor, filtered, nav]);
 
   const bulkStage = async (stage) => {
-    await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
-    setSelected(new Set());
-    load();
+    try {
+      await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
+      setSelected(new Set());
+      load();
+    } catch (err) {
+      setError(errMessage(err, "Couldn't update those candidates."));
+    }
   };
+
+  if (error && !jobs.length && !candidates.length) {
+    return (
+      <div className="p-8 max-w-[1400px] mx-auto">
+        <ErrorState message={error} onRetry={load} testid="dash-error" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
+      {error && (
+        <div className="mb-6">
+          <ErrorState message={error} onRetry={load} testid="dash-error-inline" />
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
@@ -295,7 +323,9 @@ export default function Dashboard() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">No candidates match these filters.</td></tr>
+                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">
+                  {loading ? "Loading candidates…" : "No candidates match these filters."}
+                </td></tr>
               )}
             </tbody>
           </table>

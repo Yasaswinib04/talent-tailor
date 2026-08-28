@@ -33,12 +33,16 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 
 ## Known state (UAT, Aug 2026)
 A full UAT found 5 P0 and 8 P1 issues — see `specs/uat-report-2026-08-08.md` and
-`specs/launch-fix-plan.md`. The two hard launch blockers are config, not logic:
-the frontend bundle builds with `baseURL:"undefined/api"` because
-`REACT_APP_BACKEND_URL` is unset, and `.env.example` documents four variables no
-code reads while omitting the three that are required. The earlier "14/14 backend
-pass, 100% frontend flows verified" claim was happy-path only, against a hosted
-preview URL hardcoded in `backend_test.py`.
+`specs/launch-fix-plan.md`. **All five P0s are now fixed** (Track 0): the
+build-time backend URL, `.env.example`, the job-create 500, unvalidated PATCH,
+and missing frontend error states. 50 backend tests pass.
+
+**Still open — the app has no authentication.** `/app` and every `/api/*`
+endpoint is public, exposing candidate name, email, phone, employer, expected
+CTC and recruiter notes. Fine for a prototype on seeded synthetic data; a hard
+blocker before any real candidate applies. CORS is now configurable and no
+longer pairs a wildcard origin with credentials, but that is mitigation, not a
+fix. Remaining P1s are listed as Track B in the fix plan.
 
 ## Prioritized backlog
 - **P1** — Persist onboarding to backend (currently client-only; skip button jumps directly to app)

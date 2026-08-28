@@ -9,5 +9,7 @@ credentials.json
 *.key
 .credentials
 .env
-.env.*
+.env.local
+.env.*.local
 *.env
+!frontend/.env.production

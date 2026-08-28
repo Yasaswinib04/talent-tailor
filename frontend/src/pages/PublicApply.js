@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, fmtINR } from "../lib/api";
-import { Upload, Check, Loader2, ArrowRight, Sparkles, FileText } from "lucide-react";
+import { api, fmtINR, errMessage } from "../lib/api";
+import { Upload, Check, Loader2, ArrowRight, Sparkles, FileText, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
@@ -25,6 +25,8 @@ export default function PublicApply() {
   });
   const [result, setResult] = useState(null);
   const [scanText, setScanText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
@@ -61,9 +63,19 @@ export default function PublicApply() {
   const onDemoParse = () => simulateParse("");
 
   const submit = async () => {
-    const res = await api.post(`/apply/${slug}`, form);
-    setResult(res.data);
-    setStage("submitted");
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await api.post(`/apply/${slug}`, form);
+      setResult(res.data);
+      setStage("submitted");
+    } catch (err) {
+      // Keep them on the review step with their details intact so they can retry.
+      setSubmitError(errMessage(err, "We couldn't submit your application. Nothing was lost — try again."));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (job === false) {
@@ -172,16 +184,24 @@ export default function PublicApply() {
                 <FieldPA label="Experience (years)" value={form.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
                 <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} type="number" onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} testid="pa-ctc" />
               </div>
+              {submitError && (
+                <div className="mt-6 border border-danger/50 bg-danger/10 px-4 py-3 flex items-start gap-2" data-testid="pa-submit-error">
+                  <AlertTriangle size={13} className="text-danger mt-0.5 shrink-0" />
+                  <span className="text-xs text-white/80">{submitError}</span>
+                </div>
+              )}
               <div className="mt-8 flex items-center justify-between">
                 <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/50 hover:text-white transition-colors">
                   ← Upload a different resume
                 </button>
                 <button
                   onClick={submit}
+                  disabled={submitting}
                   data-testid="pa-submit-btn"
-                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors"
+                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  Submit application <ArrowRight size={14} />
+                  {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</>
+                    : <>Submit application <ArrowRight size={14} /></>}
                 </button>
               </div>
             </motion.div>

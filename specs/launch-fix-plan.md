@@ -25,7 +25,35 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
-**Recruiter bulk resume upload** — `POST /api/jobs/{id}/bulk-upload` plus a
+### Track 0 — complete (all five P0s closed)
+
+| Item | What changed |
+|---|---|
+| **0.1** P0-1 | `npm run build` now **fails** via a `prebuild` guard if `REACT_APP_BACKEND_URL` is missing or malformed (no scheme, or a stray `/api`). `frontend/.env.production` is committed as a working default. If a bad bundle ever does ship, `index.js` renders a config-error screen naming the variable instead of a blank page. Verified: the built bundle contains the real URL and zero occurrences of `undefined/api`. |
+| **0.2** P0-2 | `.env.example` rewritten to the four variables the code actually reads — `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`, `REACT_APP_BACKEND_URL` — with the build-time caveat spelled out. Missing backend config now raises a message naming the variable instead of a bare `KeyError`. `README.md` rewritten with real run/deploy/test instructions. |
+| **0.3** P0-4 | `JobCreate.filters` / `scoring_weights` default to `{}` via `default_factory`, so a payload omitting them returns 200 instead of 500. |
+| **0.4** P0-5 | Both PATCH routes take closed `JobUpdate` / `CandidateUpdate` models (`extra="forbid"`). `id`, `share_slug`, `created_at`, `match_score`, `auto_applied` and `source` are no longer writable; `rating` is bounded 0–5 and `experience_years` 0–60. An empty patch is a 400, an unknown id a 404. |
+| **0.5** P1-6 | Every data-loading screen has an error state with Retry: Dashboard, JobDetail, CandidateProfile. A 404 renders "doesn't exist" rather than an endless "Loading…". Writes (stage, rating, notes, roles, bulk actions, publish, apply) surface failures instead of looking like no-ops. `PublicApply` keeps the candidate's details on the review step so they can retry. Added a top-level error boundary and a catch-all 404 route. `alert()` replaced with an inline message. |
+
+Also closed while in the area, because leaving them half-done would have been
+worse than not starting: **CORS** no longer pairs `allow_origins=["*"]` with
+`allow_credentials=True` (P0-3 partial — origins are configurable and
+credentials are disabled under a wildcard), and **stage is now a `Literal`** on
+both `PATCH` and `POST /stage` (P1-3) — free text let `"Banana"` through, after
+which the candidate matched no funnel bucket and no dashboard filter.
+`backend_test.py` no longer targets a hardcoded `emergentagent.com` preview
+host; it takes `TEST_API_URL` and skips cleanly when nothing is running.
+
+**Verification:** 50 backend tests pass (`backend/tests/`), plus 12 browser
+cases covering each fix end to end — API-down error state and recovery via
+Retry, unknown candidate/role/route, failed application preserving its data,
+and the rebuilt bundle calling the real backend.
+
+---
+
+### Recruiter bulk resume upload — added on request
+
+`POST /api/jobs/{id}/bulk-upload` plus a
 drag-and-drop panel on the role page. Up to 10 resumes per batch, capped both
 client-side and server-side (413), with a 12-batch/minute rate limit. Real
 PDF/DOCX/TXT parsing extracts name, email, phone, title, company, years, CTC,
@@ -40,9 +68,10 @@ candidate-side `PublicApply` upload still discards the file — A.6 below.
 
 ---
 
-## Track 0 — Required for any launch (~2–3 hours)
+## Track 0 — Required for any launch ✅ DONE
 
-Without these the deployed app is dead on arrival.
+Without these the deployed app is dead on arrival. Kept below as the record of
+what was planned; see the summary table above for what actually shipped.
 
 ### 0.1 · Fix the API base URL — P0-1 · 20 min
 - Add `frontend/.env.production` with `REACT_APP_BACKEND_URL` (and commit it —

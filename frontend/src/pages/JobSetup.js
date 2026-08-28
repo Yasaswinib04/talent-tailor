@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, fmtINR } from "../lib/api";
+import { api, fmtINR, errMessage } from "../lib/api";
 import {
   Sparkles, X, Plus, ChevronLeft, Loader2, Check, ChevronDown, ChevronUp,
   Filter, Scale, Info, RotateCcw, GraduationCap, Briefcase, Clock, MapPin
@@ -63,6 +63,8 @@ export default function JobSetup() {
   const [recommendedSnapshot, setRecommendedSnapshot] = useState({ filters: null, weights: null });
   const [filterPreview, setFilterPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const [publishError, setPublishError] = useState("");
+  const [extractError, setExtractError] = useState("");
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -73,6 +75,7 @@ export default function JobSetup() {
     const t = setTimeout(async () => {
       try {
         const res = await api.post("/extract-skills", { jd: form.jd });
+        setExtractError("");
         setForm((f) => ({
           ...f,
           skills: res.data.skills,
@@ -87,6 +90,8 @@ export default function JobSetup() {
           weights: res.data.recommended_weights,
         });
         setExtracted(true);
+      } catch (err) {
+        setExtractError(errMessage(err, "Couldn't read that job description."));
       } finally {
         setExtracting(false);
       }
@@ -104,6 +109,8 @@ export default function JobSetup() {
           skills: form.skills,
         });
         setFilterPreview(res.data);
+      } catch {
+        setFilterPreview(null);
       } finally {
         setPreviewing(false);
       }
@@ -144,11 +151,17 @@ export default function JobSetup() {
   const weightsTotal = Object.values(form.scoring_weights).reduce((a, b) => a + b, 0);
 
   const publish = async () => {
-    if (!form.title.trim()) return alert("Add a role title first");
+    if (!form.title.trim()) {
+      setPublishError("Give the role a title before publishing.");
+      return;
+    }
     setSaving(true);
+    setPublishError("");
     try {
       const res = await api.post("/jobs", form);
       nav(`/app/jobs/${res.data.id}`);
+    } catch (err) {
+      setPublishError(errMessage(err, "Couldn't publish this role. Your draft is still here."));
     } finally {
       setSaving(false);
     }
@@ -168,6 +181,11 @@ export default function JobSetup() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {publishError && (
+            <span className="text-[11px] text-danger border border-danger/50 bg-danger/10 px-3 py-1.5" data-testid="js-publish-error">
+              {publishError}
+            </span>
+          )}
           <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
           <button
             onClick={publish}
@@ -436,7 +454,12 @@ export default function JobSetup() {
                     <Loader2 size={10} className="animate-spin" /> scanning
                   </span>
                 )}
-                {extracted && !extracting && (
+                {extractError && !extracting && (
+                  <span className="text-[10px] font-mono text-danger" data-testid="js-extract-error">
+                    {extractError}
+                  </span>
+                )}
+                {extracted && !extracting && !extractError && (
                   <span className="text-[10px] font-mono text-success inline-flex items-center gap-1">
                     <Check size={10} /> ready
                   </span>

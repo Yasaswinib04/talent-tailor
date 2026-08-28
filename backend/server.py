@@ -9,18 +9,36 @@ import re
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 load_dotenv()
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
+
+
+def _required_env(name: str, example: str) -> str:
+    """Missing config should say what is missing, not raise a bare KeyError."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(
+            f"{name} is not set. The API cannot start without it.\n"
+            f"  Expected something like: {name}={example}\n"
+            f"  See .env.example for every variable this service needs."
+        )
+    return value
+
+
+MONGO_URL = _required_env("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = _required_env("DB_NAME", "cred_hr")
+
+# Comma-separated list of allowed browser origins. "*" is the permissive
+# default for local development; set this in any deployed environment.
+CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -29,14 +47,19 @@ app = FastAPI(title="CRED HR API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    # Credentials cannot be combined with a wildcard origin — browsers reject it
+    # and it would let any site read authenticated responses.
+    allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 # ---------- Models ----------
+Stage = Literal["New", "Shortlisted", "Interview", "Offer", "Rejected"]
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -72,8 +95,10 @@ class JobCreate(BaseModel):
     jd: Optional[str] = ""
     skills: Optional[List[dict]] = []
     screening_questions: Optional[List[str]] = []
-    filters: Optional[dict] = None
-    scoring_weights: Optional[dict] = None
+    # These must default to {} rather than None: Job requires dicts, so None
+    # here turns a documented-optional payload into a 500.
+    filters: dict = Field(default_factory=dict)
+    scoring_weights: dict = Field(default_factory=dict)
 
 
 class ExtractSkillsRequest(BaseModel):
@@ -123,12 +148,62 @@ class CandidateApply(BaseModel):
     resume_text: Optional[str] = ""
 
 
+class JobUpdate(BaseModel):
+    """Whitelist for PATCH /api/jobs/{id}.
+
+    The previous `payload: dict` was $set verbatim, so `{"id": "spoofed"}`
+    rewrote the primary key and orphaned the record. Identity and provenance
+    fields are deliberately absent here and cannot be written.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: Optional[str] = None
+    department: Optional[str] = None
+    location: Optional[str] = None
+    employment_type: Optional[str] = None
+    seniority: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    jd: Optional[str] = None
+    skills: Optional[List[dict]] = None
+    screening_questions: Optional[List[str]] = None
+    filters: Optional[dict] = None
+    scoring_weights: Optional[dict] = None
+    status: Optional[str] = None
+
+
+class CandidateUpdate(BaseModel):
+    """Whitelist for PATCH /api/candidates/{id}. Same reasoning as JobUpdate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    current_title: Optional[str] = None
+    current_company: Optional[str] = None
+    location: Optional[str] = None
+    experience_years: Optional[float] = Field(default=None, ge=0, le=60)
+    expected_ctc: Optional[int] = Field(default=None, ge=0)
+    notice_period: Optional[str] = None
+    skills: Optional[List[str]] = None
+    education: Optional[str] = None
+    stage: Optional[Stage] = None
+    role_ids: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    rating: Optional[int] = Field(default=None, ge=0, le=5)
+    notes: Optional[str] = None
+
+
 class RoleAssignment(BaseModel):
     role_ids: List[str]
 
 
 class StageUpdate(BaseModel):
-    stage: str
+    # Free text here let "Banana" through, after which the candidate matched no
+    # funnel bucket and no dashboard filter — invisible but still in the database.
+    stage: Stage
 
 
 # ---------- Seed Data ----------
@@ -339,8 +414,11 @@ async def get_job_by_slug(slug: str):
 
 
 @app.patch("/api/jobs/{job_id}")
-async def update_job(job_id: str, payload: dict):
-    result = await db.jobs.update_one({"id": job_id}, {"$set": payload})
+async def update_job(job_id: str, payload: JobUpdate):
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    if not changes:
+        raise HTTPException(400, "No fields to update.")
+    result = await db.jobs.update_one({"id": job_id}, {"$set": changes})
     if result.matched_count == 0:
         raise HTTPException(404, "Job not found")
     job = await db.jobs.find_one({"id": job_id})
@@ -854,13 +932,16 @@ async def get_candidate(cid: str):
 
 
 @app.patch("/api/candidates/{cid}")
-async def update_candidate(cid: str, payload: dict):
-    result = await db.candidates.update_one({"id": cid}, {"$set": payload})
+async def update_candidate(cid: str, payload: CandidateUpdate):
+    changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+    if not changes:
+        raise HTTPException(400, "No fields to update.")
+    result = await db.candidates.update_one({"id": cid}, {"$set": changes})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
     c = await db.candidates.find_one({"id": cid})
     # update job candidate counts if role_ids changed
-    if "role_ids" in payload:
+    if "role_ids" in changes:
         jobs = await db.jobs.find({}).to_list(1000)
         for j in jobs:
             count = await db.candidates.count_documents({"role_ids": j["id"]})
