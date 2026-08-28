@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 import auth
 
@@ -154,14 +154,32 @@ class Candidate(BaseModel):
 
 
 class CandidateApply(BaseModel):
-    name: str
-    email: str
-    phone: str
-    current_title: str
-    current_company: str
-    experience_years: float
-    expected_ctc: int
-    resume_text: Optional[str] = ""
+    """A real person filling this in. Anything accepted here lands in a
+    recruiter's pipeline, so blank and nonsense values are rejected rather than
+    stored — previously an empty name and email produced a blank dashboard row.
+    """
+
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    phone: str = Field(default="", max_length=32)
+    current_title: str = Field(default="", max_length=120)
+    current_company: str = Field(default="", max_length=120)
+    experience_years: float = Field(ge=0, le=60)
+    expected_ctc: int = Field(ge=0, le=1_000_000_000)
+    resume_text: Optional[str] = Field(default="", max_length=50_000)
+
+    @field_validator("name", "current_title", "current_company", "phone")
+    @classmethod
+    def _not_only_whitespace(cls, v: str) -> str:
+        v = (v or "").strip()
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _name_has_letters(cls, v: str) -> str:
+        if not re.search(r"[^\W\d_]", v, re.UNICODE):
+            raise ValueError("Enter your name.")
+        return v
 
 
 class JobUpdate(BaseModel):
@@ -455,6 +473,15 @@ async def seed():
             await db.jobs.update_one({"id": jd["id"]}, {"$set": {"candidates_count": count}})
 
 
+async def _recount_all_jobs():
+    """Refresh candidates_count on every role. Cheap at this scale, and the
+    counts drifting from reality is worse than the extra queries."""
+    for j in await db.jobs.find({}).to_list(1000):
+        count = await db.candidates.count_documents({"role_ids": j["id"]})
+        if count != j.get("candidates_count"):
+            await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
+
+
 def strip_mongo(doc):
     if doc and "_id" in doc:
         doc.pop("_id")
@@ -643,8 +670,27 @@ async def update_job(job_id: str, payload: JobUpdate, user: dict = Depends(requi
 
 @app.delete("/api/jobs/{job_id}")
 async def delete_job(job_id: str, user: dict = Depends(require_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    # Detach the role from every candidate first. Leaving the id behind made
+    # them unreachable: no role page listed them, and their chips silently
+    # vanished from the dashboard.
+    detached = await db.candidates.update_many(
+        {"role_ids": job_id}, {"$pull": {"role_ids": job_id}}
+    )
     await db.jobs.delete_one({"id": job_id})
-    return {"ok": True}
+    await _recount_all_jobs()
+
+    # Anyone left with no role at all is still in the pool, reachable through
+    # the dashboard's "Unassigned" filter — not deleted behind the recruiter's back.
+    unassigned = await db.candidates.count_documents({"role_ids": {"$size": 0}})
+    return {
+        "ok": True,
+        "detached_candidates": detached.modified_count,
+        "unassigned_total": unassigned,
+    }
 
 
 # --------- AI Skill Extraction (mocked heuristic) ---------
@@ -710,17 +756,40 @@ async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(req
     is_junior = any(k in text for k in ["junior", "entry", "intern"])
     min_exp = 5 if is_senior else (0 if is_junior else 2)
 
-    # Recommended mandatory filters
-    must_have = [s["name"] for s in skills[:3]]
-    recommended_filters = {
-        "min_experience_years": min_exp,
-        "education_preference": "Bachelor's degree or equivalent",
-        "notice_period_max_days": 90,
-        "must_have_skills": must_have,
-        "preferred_companies": [],
-        "locations": ["Bengaluru", "Remote"],
-        "no_gaps_over_months": 6,
-    }
+    # Recommended mandatory filters, strictest first. A recommendation that
+    # leaves nobody is worse than no recommendation: the previous version took
+    # the top three skills and required all of them, which passed 0 of 20
+    # candidates on this app's own sample JD.
+    def _tier(n_skills: int, exp: int, edu: str, notice: Optional[int]):
+        return {
+            "min_experience_years": exp,
+            "education_preference": edu,
+            "notice_period_max_days": notice,
+            "must_have_skills": [sk["name"] for sk in skills[:n_skills]],
+            "preferred_companies": [],
+            "locations": [],
+        }
+
+    tiers = [
+        _tier(2, min_exp, "Bachelor's degree or equivalent", 90),
+        _tier(1, min_exp, "Bachelor's degree or equivalent", 90),
+        _tier(1, min_exp, "No preference", 90),
+        _tier(1, max(0, min_exp - 2), "No preference", None),
+        _tier(0, max(0, min_exp - 2), "No preference", None),
+    ]
+
+    pool = await db.candidates.find({}).to_list(1000)
+    # Aim to leave the recruiter a workable shortlist rather than an empty one.
+    target = max(3, int(len(pool) * 0.15)) if pool else 0
+    recommended_filters = tiers[-1]
+    filter_impact = None
+    for tier in tiers:
+        impact = _evaluate_filters(pool, tier)
+        if not pool or impact["passing"] >= target:
+            recommended_filters, filter_impact = tier, impact
+            break
+    else:
+        filter_impact = _evaluate_filters(pool, recommended_filters)
 
     # Recommended scoring weights (sum to 100)
     if is_senior:
@@ -736,6 +805,9 @@ async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(req
         "screening_questions": suggested_questions,
         "recommended_filters": recommended_filters,
         "recommended_weights": recommended_weights,
+        # What these defaults do to the current pool, so the UI can say so up
+        # front instead of the recruiter discovering it by opening the section.
+        "filter_impact": filter_impact,
     }
 
 
@@ -1046,82 +1118,133 @@ async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadF
 
 
 # --------- Filter Preview: "how many candidates will pass?" ---------
-def _parse_notice_days(s: str) -> int:
-    if not s:
-        return 999
-    s = s.lower()
-    if "immediate" in s or s == "—":
+def _parse_notice_days(s: str) -> Optional[int]:
+    """Days of notice, or None when the resume didn't say.
+
+    None is not 999 and not 0. Returning 999 auto-rejected anyone whose notice
+    period we failed to parse; returning 0 (the old behaviour for the "—"
+    placeholder) marked every self-applied candidate an immediate joiner.
+    """
+    if not s or not s.strip() or s.strip() in {"—", "-", "n/a", "na"}:
+        return None
+    low = s.lower()
+    if "immediate" in low:
         return 0
-    # extract first number
-    import re
-    m = re.search(r"(\d+)", s)
-    return int(m.group(1)) if m else 999
+    m = re.search(r"(\d+)", low)
+    if not m:
+        return None
+    days = int(m.group(1))
+    return days * 30 if "month" in low else days
 
 
-def _matches_education(candidate_edu: str, pref: str) -> bool:
+def _edu_has(edu: str, tokens: List[str]) -> bool:
+    """Substring matching is wrong here: "mba" sits inside "IIT Bo(mba)y" and
+    "b.e." inside "Be(ngaluru)". Require a non-letter on both sides, which also
+    works for dotted abbreviations where \\b does not.
+    """
+    return any(
+        re.search(rf"(?<![a-z]){re.escape(t)}(?![a-z])", edu, re.I) for t in tokens
+    )
+
+
+def _matches_education(candidate_edu: str, pref: str) -> Optional[bool]:
+    """True / False, or None when we don't know the candidate's education.
+
+    Unknown must not mean rejected. Resume parsing misses education constantly,
+    and silently dropping a good candidate over a parsing failure is far more
+    expensive than showing the recruiter one extra profile.
+    """
     if not pref or pref == "No preference":
         return True
-    edu = (candidate_edu or "").lower()
+    edu = (candidate_edu or "").strip().lower()
+    if not edu or edu in {"—", "-"}:
+        return None
     p = pref.lower()
     if "tier-1" in p or "tier 1" in p:
-        tokens = ["iit", "nit", "iiit", "bits"]
-        return any(t in edu for t in tokens)
+        return _edu_has(edu, ["iit", "nit", "iiit", "bits"])
     if "master" in p:
-        return any(t in edu for t in ["m.tech", "m.sc", "m.des", "mba", "master", "isb", "iim"])
+        return _edu_has(edu, ["m.tech", "m.sc", "m.des", "mba", "master", "isb", "iim", "phd"])
     if "cs" in p or "engineering" in p:
-        return any(t in edu for t in ["b.tech", "b.e.", "m.tech", "cs", "engineering", "iit", "nit", "iiit", "bits"])
+        return _edu_has(edu, ["b.tech", "b.e.", "m.tech", "cs", "engineering", "iit", "nit", "iiit", "bits"])
     if "bachelor" in p:
-        return any(t in edu for t in ["b.tech", "b.e.", "b.sc", "b.des", "bachelor", "b.a."])
+        return _edu_has(edu, ["b.tech", "b.e.", "b.sc", "b.des", "bachelor", "b.a.",
+                              "m.tech", "m.sc", "mba", "master", "phd"])
     return True
 
 
-@app.post("/api/candidates/preview-filter")
-async def preview_filter(payload: FilterPreviewRequest, user: dict = Depends(require_user)):
-    filters = payload.filters or {}
-    cands = await db.candidates.find({}).to_list(1000)
-    total = len(cands)
-    passing = 0
-    breakdown = {
-        "failed_experience": 0,
-        "failed_education": 0,
-        "failed_notice": 0,
-        "failed_must_have": 0,
-        "failed_location": 0,
-    }
-    min_exp = filters.get("min_experience_years", 0) or 0
+def _matches_location(candidate_loc: str, accepted: set) -> Optional[bool]:
+    if not accepted:
+        return True
+    loc = (candidate_loc or "").strip().lower()
+    if not loc or loc in {"—", "-"}:
+        return None
+    if "remote" in loc and "remote" in accepted:
+        return True
+    return any(a in loc for a in accepted)
+
+
+def _evaluate_filters(cands: List[dict], filters: dict) -> dict:
+    """Apply a filter set to a pool and report who fails, and why.
+
+    Unknown values never reject. They are counted separately so the recruiter
+    can see how much of the pool is being taken on trust.
+    """
+    min_exp = filters.get("min_experience_years") or 0
     edu_pref = filters.get("education_preference", "No preference")
-    max_notice = filters.get("notice_period_max_days", 999) or 999
-    must_have = set([s.lower() for s in (filters.get("must_have_skills") or [])])
-    locations = set([l.lower() for l in (filters.get("locations") or [])])
+    max_notice = filters.get("notice_period_max_days")
+    must_have = {s.lower() for s in (filters.get("must_have_skills") or [])}
+    locations = {l.lower() for l in (filters.get("locations") or [])}
+
+    breakdown = dict.fromkeys(
+        ["failed_experience", "failed_education", "failed_notice",
+         "failed_must_have", "failed_location"], 0)
+    unknown = dict.fromkeys(["unknown_education", "unknown_notice", "unknown_location"], 0)
+    passing = 0
 
     for c in cands:
         fail = False
         if (c.get("experience_years") or 0) < min_exp:
             breakdown["failed_experience"] += 1
             fail = True
-        if not _matches_education(c.get("education", ""), edu_pref):
+
+        edu_ok = _matches_education(c.get("education", ""), edu_pref)
+        if edu_ok is None:
+            unknown["unknown_education"] += 1
+        elif not edu_ok:
             breakdown["failed_education"] += 1
             fail = True
-        if _parse_notice_days(c.get("notice_period", "")) > max_notice:
-            breakdown["failed_notice"] += 1
-            fail = True
+
+        if max_notice is not None:
+            notice = _parse_notice_days(c.get("notice_period", ""))
+            if notice is None:
+                unknown["unknown_notice"] += 1
+            elif notice > max_notice:
+                breakdown["failed_notice"] += 1
+                fail = True
+
         if must_have:
-            cand_skills = set([s.lower() for s in (c.get("skills") or [])])
+            cand_skills = {s.lower() for s in (c.get("skills") or [])}
             if not must_have.issubset(cand_skills):
                 breakdown["failed_must_have"] += 1
                 fail = True
-        if locations:
-            cloc = (c.get("location") or "").lower()
-            # "remote" acts as wildcard
-            if "remote" not in locations and not any(l in cloc for l in locations):
-                # Remote candidates pass if remote is accepted
-                if not ("remote" in locations and "remote" in cloc):
-                    breakdown["failed_location"] += 1
-                    fail = True
+
+        loc_ok = _matches_location(c.get("location", ""), locations)
+        if loc_ok is None:
+            unknown["unknown_location"] += 1
+        elif not loc_ok:
+            breakdown["failed_location"] += 1
+            fail = True
+
         if not fail:
             passing += 1
 
-    return {"total": total, "passing": passing, "breakdown": breakdown}
+    return {"total": len(cands), "passing": passing, "breakdown": breakdown, "unknown": unknown}
+
+
+@app.post("/api/candidates/preview-filter")
+async def preview_filter(payload: FilterPreviewRequest, user: dict = Depends(require_user)):
+    cands = await db.candidates.find({}).to_list(1000)
+    return _evaluate_filters(cands, payload.filters or {})
 
 
 # ---------- Candidates ----------
@@ -1160,10 +1283,7 @@ async def update_candidate(cid: str, payload: CandidateUpdate, user: dict = Depe
     c = await db.candidates.find_one({"id": cid})
     # update job candidate counts if role_ids changed
     if "role_ids" in changes:
-        jobs = await db.jobs.find({}).to_list(1000)
-        for j in jobs:
-            count = await db.candidates.count_documents({"role_ids": j["id"]})
-            await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
+        await _recount_all_jobs()
     return strip_mongo(c)
 
 
@@ -1172,10 +1292,7 @@ async def assign_roles(cid: str, payload: RoleAssignment, user: dict = Depends(r
     result = await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": payload.role_ids}})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
-    jobs = await db.jobs.find({}).to_list(1000)
-    for j in jobs:
-        count = await db.candidates.count_documents({"role_ids": j["id"]})
-        await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
+    await _recount_all_jobs()
     c = await db.candidates.find_one({"id": cid})
     return strip_mongo(c)
 
@@ -1196,28 +1313,68 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     job = await db.jobs.find_one({"share_slug": slug})
     if not job:
         raise HTTPException(404, "Job not found")
+
     # mock: derive skills from resume_text using dictionary
     text = ((payload.resume_text or "") + " " + payload.current_title).lower()
-    matched_skills = set()
-    for k, v in SKILL_DICTIONARY.items():
-        if k in text:
-            matched_skills.add(v)
-    # score against job skills
-    score = _score_against_job(list(matched_skills), job)
+    matched_skills = sorted({v for k, v in SKILL_DICTIONARY.items() if k in text})
+    score = _score_against_job(matched_skills, job)
+    email = payload.email.lower().strip()
+
+    # Someone re-applying is the same person, not a second candidate. Refresh
+    # what they told us this time and attach the role; never create a duplicate,
+    # and never overwrite the recruiter's own stage, rating or notes.
+    existing = await db.candidates.find_one({"email": email})
+    if existing:
+        already_on_role = job["id"] in (existing.get("role_ids") or [])
+        updates = {
+            "name": payload.name,
+            "phone": payload.phone or existing.get("phone", ""),
+            "current_title": payload.current_title or existing.get("current_title", ""),
+            "current_company": payload.current_company or existing.get("current_company", ""),
+            "experience_years": payload.experience_years,
+            "expected_ctc": payload.expected_ctc,
+            "applied_at": now_iso(),
+        }
+        if matched_skills:
+            updates["skills"] = matched_skills
+        if payload.resume_text:
+            updates["resume_summary"] = payload.resume_text[:600]
+        if not already_on_role:
+            updates["match_score"] = score
+        await db.candidates.update_one(
+            {"id": existing["id"]},
+            {"$set": updates, "$addToSet": {"role_ids": job["id"]}},
+        )
+        await _recount_all_jobs()
+        return {
+            "ok": True,
+            "candidate_id": existing["id"],
+            "match_score": score if not already_on_role else existing.get("match_score", score),
+            "duplicate": True,
+            "message": (
+                "You've already applied to this role — we've updated your details."
+                if already_on_role
+                else "Welcome back. We've added you to this role."
+            ),
+        }
+
     c = Candidate(
         name=payload.name,
-        email=payload.email,
+        email=email,
         phone=payload.phone,
         current_title=payload.current_title,
         current_company=payload.current_company,
-        location="—",
+        # Empty, not an em dash: "—" is a value, and a value that parses as
+        # "immediate joiner" and fails every education filter.
+        location="",
         experience_years=payload.experience_years,
         expected_ctc=payload.expected_ctc,
-        notice_period="—",
-        skills=list(matched_skills) if matched_skills else ["General"],
-        education="—",
-        resume_summary=(payload.resume_text or "")[:400] or f"{payload.current_title} at {payload.current_company}",
-        avatar=AVATAR_POOL[hash(payload.email) % len(AVATAR_POOL)],
+        notice_period="",
+        skills=matched_skills,
+        education="",
+        resume_summary=(payload.resume_text or "")[:600]
+        or f"{payload.current_title} at {payload.current_company}".strip(" at"),
+        avatar="",
         match_score=score,
         stage="New",
         role_ids=[job["id"]],
@@ -1226,7 +1383,7 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     )
     await db.candidates.insert_one(c.model_dump())
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})
-    return {"ok": True, "candidate_id": c.id, "match_score": score}
+    return {"ok": True, "candidate_id": c.id, "match_score": score, "duplicate": False}
 
 
 # ---------- Analytics ----------

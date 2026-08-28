@@ -50,10 +50,44 @@ export const fmtINR = (n) => {
 export const cx = (...arr) => arr.filter(Boolean).join(" ");
 
 /** Turn an axios failure into something worth showing a person. */
+// FastAPI validation errors arrive as a list of {loc, msg}. Rendering "try
+// again" for those is wrong — the same input will fail identically, so the
+// person needs to know which field is the problem.
+const FIELD_LABELS = {
+  name: "Full name",
+  email: "Email",
+  phone: "Phone",
+  current_title: "Current title",
+  current_company: "Current company",
+  experience_years: "Experience (years)",
+  expected_ctc: "Expected CTC",
+  password: "Password",
+  stage: "Stage",
+  rating: "Rating",
+};
+
+const readableValidation = (detail) => {
+  const parts = detail
+    .map((d) => {
+      const field = [...(d.loc || [])].reverse().find((x) => FIELD_LABELS[x]);
+      const msg = (d.msg || "").replace(/^Value error,\s*/i, "");
+      if (!field) return msg;
+      const label = FIELD_LABELS[field];
+      if (/valid email/i.test(msg)) return `${label} doesn't look like a valid email address.`;
+      if (/at least (\d+) character/i.test(msg)) return `${label} is too short.`;
+      if (/greater than or equal/i.test(msg)) return `${label} can't be negative.`;
+      if (/less than or equal/i.test(msg)) return `${label} looks too large.`;
+      return `${label}: ${msg}`;
+    })
+    .filter(Boolean);
+  return parts.length ? [...new Set(parts)].join(" ") : null;
+};
+
 export const errMessage = (err, fallback = "Something went wrong.") => {
   if (err?.response) {
     const detail = err.response.data?.detail;
     if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) return readableValidation(detail) || fallback;
     if (err.response.status === 404) return "Not found.";
     if (err.response.status >= 500) return "The server had a problem. Try again in a moment.";
     return fallback;

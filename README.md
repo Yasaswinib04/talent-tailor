@@ -106,11 +106,12 @@ grep -o 'baseURL[^,]*' frontend/build/static/js/main.*.js   # must not contain "
 
 ```bash
 pip install -r backend/requirements.txt -r backend/tests/requirements.txt
-pytest backend/tests                    # 73 tests; integration ones skip without a server
+pytest backend/tests                    # 101 tests; integration ones skip without a server
 TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration tests
 ```
 
-- `test_auth.py`, `test_bulk_upload.py` and `test_p0_fixes.py` run fully locally
+- `test_auth.py`, `test_bulk_upload.py`, `test_p0_fixes.py` and
+  `test_pipeline_integrity.py` run fully locally
   against an in-memory Mongo — no server needed. `test_auth.py` walks the app's
   own route table, so a new endpoint added without a guard fails the build.
 - `backend_test.py` is an integration suite; point it at a running API with
@@ -121,5 +122,6 @@ TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration
 A full UAT was run on 2026-08-08. See
 [`specs/uat-report-2026-08-08.md`](specs/uat-report-2026-08-08.md) for findings
 and [`specs/launch-fix-plan.md`](specs/launch-fix-plan.md) for what is fixed and
-what remains. All P0s are closed, including authentication. Remaining items are
-data-integrity issues on the public apply path — see Track B in the fix plan.
+what remains. All P0s and the pipeline-integrity P1s are closed. What's left is
+cosmetic: some dead UI in the sidebar, no mobile layout, and no pagination past
+1000 candidates — see Track B in the fix plan.

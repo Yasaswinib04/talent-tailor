@@ -48,10 +48,19 @@ Note: `CORS_ORIGINS` must name the frontend's exact origin. Cookies are not sent
 to a wildcard origin, so `"*"` makes sign-in fail like a network error. The API
 warns at startup.
 
-**Still open before real candidates:** the public apply path accepts blank name
-and email, does not de-duplicate, and deleting a role orphans its candidates.
-The system-recommended filters still reject 100% of the pool. Track B in the fix
-plan.
+**Pipeline integrity fixed (Track B part 1).** The public apply path validates
+name/email/experience/CTC with inline per-field errors; re-applying updates the
+existing candidate and attaches the role instead of duplicating; deleting a role
+detaches it from candidates rather than orphaning them, with an Unassigned
+filter keeping them reachable; and recommended filters are verified against the
+real pool and back off until they leave a shortlist (0 of 20 → 4 of 20 on the
+sample JD). Unknown education/notice/location no longer auto-reject — they are
+counted and surfaced instead, which matters once real resumes are parsed.
+
+**Remaining (P2, none launch-blocking):** dead sidebar nav and non-functional
+global search, no confirm on bulk reject, publish allowed with weights ≠ 100%,
+unusable on mobile, no pagination past 1000, share_slug uniqueness. Track B in
+the fix plan.
 
 ## Prioritized backlog
 - **P1** — Persist onboarding to backend (currently client-only; skip button jumps directly to app)

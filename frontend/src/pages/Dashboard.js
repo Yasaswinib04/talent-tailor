@@ -45,10 +45,19 @@ export default function Dashboard() {
     load();
   }, []);
 
+  const unassignedCount = useMemo(
+    () => candidates.filter((c) => c.role_ids.length === 0).length,
+    [candidates]
+  );
+
   const filtered = useMemo(() => {
     return candidates.filter((c) => {
       if (filterStage && c.stage !== filterStage) return false;
-      if (filterJob && !c.role_ids.includes(filterJob)) return false;
+      // "unassigned" keeps candidates reachable after their role is deleted;
+      // otherwise they exist but appear under no role at all.
+      if (filterJob === "unassigned") {
+        if (c.role_ids.length > 0) return false;
+      } else if (filterJob && !c.role_ids.includes(filterJob)) return false;
       if (q) {
         const ql = q.toLowerCase();
         if (
@@ -242,6 +251,9 @@ export default function Dashboard() {
             >
               <option value="" className="bg-app">All roles</option>
               {jobs.map((j) => <option key={j.id} value={j.id} className="bg-app">{j.title}</option>)}
+              {unassignedCount > 0 && (
+                <option value="unassigned" className="bg-app">Unassigned ({unassignedCount})</option>
+              )}
             </select>
           </div>
         </div>
@@ -311,6 +323,11 @@ export default function Dashboard() {
                       })}
                       {c.role_ids.length > 2 && (
                         <span className="text-[10px] font-mono text-white/50">+{c.role_ids.length - 2}</span>
+                      )}
+                      {c.role_ids.length === 0 && (
+                        <span className="text-[10px] font-mono text-amber-400/70 border border-amber-400/30 px-2 py-0.5">
+                          unassigned
+                        </span>
                       )}
                     </div>
                   </td>

@@ -383,6 +383,27 @@ export default function JobSetup() {
                       <div className="text-white/40 italic">Every candidate in your pool passes.</div>
                     )}
                   </div>
+                  {filterPreview.unknown &&
+                    Object.values(filterPreview.unknown).some((v) => v > 0) && (
+                      <div className="mt-3 pt-3 border-t hairline space-y-1 text-[11px]" data-testid="js-unknown-breakdown">
+                        <div className="text-white/40 mb-1.5">
+                          Passing on missing data — we don't reject a candidate because their
+                          resume didn't say:
+                        </div>
+                        {[
+                          { key: "unknown_education", label: "Education not stated" },
+                          { key: "unknown_notice", label: "Notice period not stated" },
+                          { key: "unknown_location", label: "Location not stated" },
+                        ]
+                          .filter((r) => filterPreview.unknown[r.key] > 0)
+                          .map((r) => (
+                            <div key={r.key} className="flex items-center justify-between text-white/50">
+                              <span>{r.label}</span>
+                              <span className="font-mono text-white/70">{filterPreview.unknown[r.key]}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                 </div>
               )}
             </CollapsibleSection>

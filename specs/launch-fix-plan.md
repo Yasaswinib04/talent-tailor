@@ -25,6 +25,37 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
+### Track B, part 1 — the four pipeline-integrity issues
+
+| | Fix |
+|---|---|
+| **P1-1** blank applications | `CandidateApply` now validates: name must contain letters, email must be a real address, experience 0–60, CTC non-negative. Mirrored client-side with per-field inline errors, so a candidate is told *which* field is wrong instead of getting "try again" for something a retry can't fix. FastAPI's 422 detail lists are also now translated into readable text app-wide. |
+| **P1-2** duplicate applicants | Re-applying updates the existing candidate and attaches the role rather than creating a second record — matched on lower-cased email. Their details refresh, but the recruiter's own stage, rating and notes are never overwritten. The confirmation says "Updated" and explains what happened. |
+| **P1-4** role delete orphaning | `DELETE /api/jobs/{id}` now `$pull`s the role from every candidate and recomputes all counts, returning how many it detached. Candidates are never deleted along with a role. Anyone left with no role appears under a new **Unassigned** filter on the dashboard and is tagged in their row, so they stay reachable (this also closes **P1-8**). |
+| **P1-5** filters rejecting everyone | The recommendation is now checked against the real pool and backs off through tiers until it leaves a workable shortlist (≥15% or 3 candidates). On the app's own sample JD it went from **0 of 20** to **4 of 20**. `/extract-skills` returns `filter_impact` so the UI can say so up front. |
+
+**Missing data no longer auto-rejects.** This mattered more than expected once
+real resumes are parsed: unknown education, notice period or location used to
+fail their filters silently, which would have dropped good candidates over a
+parsing miss. `_parse_notice_days` returns `None` rather than `999` (reject) or
+`0` (the old "—" behaviour, which marked every self-applied candidate an
+immediate joiner). Unknowns are counted separately and shown in the UI as
+"passing on missing data", so the recruiter can see how much is being taken on
+trust. This closes the filtering half of **P1-7**.
+
+One more substring bug of the same family as the earlier `B.E.`/`Bengaluru`
+one: `"mba"` matched inside `"IIT Bo(mba)y"`, so a B.Tech passed a "Master's or
+higher" filter. Education tokens are now matched with letter boundaries.
+
+**Verification:** 101 backend tests (28 new), plus 13 browser cases covering
+junk applications refused with per-field guidance, re-application updating
+rather than duplicating, role deletion detaching without deleting people,
+orphans reachable via the Unassigned filter, and every role count still matching
+reality afterwards.
+
+---
+
+
 ### Authentication — P0-3 closed
 
 The console now requires a sign-in. Per-recruiter accounts rather than a shared

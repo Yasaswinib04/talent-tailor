@@ -12,6 +12,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test")
+os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 # Endpoints require a session; bootstrap an admin and sign in for each test.
 os.environ["ADMIN_EMAIL"] = "maya@cred.club"
 os.environ["ADMIN_PASSWORD"] = "correct horse battery staple"

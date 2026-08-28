@@ -27,6 +27,7 @@ export default function PublicApply() {
   const [scanText, setScanText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [invalid, setInvalid] = useState({});
 
   useEffect(() => {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
@@ -62,8 +63,23 @@ export default function PublicApply() {
 
   const onDemoParse = () => simulateParse("");
 
+  const fieldErrors = () => {
+    const e = {};
+    if (!form.name.trim() || !/[^\W\d_]/u.test(form.name)) e.name = "Please enter your name.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())) e.email = "Please enter a valid email address.";
+    if (form.experience_years < 0 || form.experience_years > 60) e.experience_years = "Enter a number between 0 and 60.";
+    if (form.expected_ctc < 0) e.expected_ctc = "This can't be negative.";
+    return e;
+  };
+
   const submit = async () => {
     if (submitting) return;
+    const errs = fieldErrors();
+    setInvalid(errs);
+    if (Object.keys(errs).length) {
+      setSubmitError("Please fix the highlighted fields before submitting.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -176,13 +192,13 @@ export default function PublicApply() {
                 <div className="font-mono-label">auto-filled · confirm and submit</div>
               </div>
               <div className="grid md:grid-cols-2 gap-6">
-                <FieldPA label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
-                <FieldPA label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />
+                <FieldPA label="Full name" value={form.name} error={invalid.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
+                <FieldPA label="Email" value={form.email} error={invalid.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />
                 <FieldPA label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} testid="pa-phone" />
                 <FieldPA label="Current title" value={form.current_title} onChange={(v) => setForm({ ...form, current_title: v })} testid="pa-title" />
                 <FieldPA label="Current company" value={form.current_company} onChange={(v) => setForm({ ...form, current_company: v })} testid="pa-company" />
-                <FieldPA label="Experience (years)" value={form.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
-                <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} type="number" onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} testid="pa-ctc" />
+                <FieldPA label="Experience (years)" value={form.experience_years} error={invalid.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
+                <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} error={invalid.expected_ctc} onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} type="number" testid="pa-ctc" />
               </div>
               {submitError && (
                 <div className="mt-6 border border-danger/50 bg-danger/10 px-4 py-3 flex items-start gap-2" data-testid="pa-submit-error">
@@ -212,9 +228,11 @@ export default function PublicApply() {
               <div className="w-14 h-14 border border-brand rounded-full mx-auto flex items-center justify-center mb-6">
                 <Check size={22} className="text-brand" />
               </div>
-              <h2 className="font-editorial text-4xl mb-3">Applied.</h2>
-              <p className="text-white/60 max-w-md mx-auto mb-8">
-                Our team will review your profile. Your match score for this role is:
+              <h2 className="font-editorial text-4xl mb-3">
+                {result.duplicate ? "Updated." : "Applied."}
+              </h2>
+              <p className="text-white/60 max-w-md mx-auto mb-8" data-testid="pa-result-message">
+                {result.message || "Our team will review your profile. Your match score for this role is:"}
               </p>
               <div className="font-editorial text-8xl text-brand mb-2">{result.match_score}</div>
               <div className="font-mono-label">match / 100</div>
@@ -227,7 +245,7 @@ export default function PublicApply() {
   );
 }
 
-function FieldPA({ label, value, onChange, testid, type = "text" }) {
+function FieldPA({ label, value, onChange, testid, type = "text", error }) {
   return (
     <label className="block">
       <div className="font-mono-label mb-1.5">{label}</div>
@@ -236,8 +254,16 @@ function FieldPA({ label, value, onChange, testid, type = "text" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         data-testid={testid}
-        className="w-full bg-transparent border-b hairline pb-2 text-lg focus:border-white outline-none"
+        aria-invalid={error ? "true" : undefined}
+        className={`w-full bg-transparent border-b pb-2 text-lg outline-none transition-colors ${
+          error ? "border-danger focus:border-danger" : "hairline focus:border-white"
+        }`}
       />
+      {error && (
+        <div className="mt-1.5 text-[11px] text-danger" data-testid={`${testid}-error`}>
+          {error}
+        </div>
+      )}
     </label>
   );
 }
