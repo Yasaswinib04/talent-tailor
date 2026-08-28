@@ -34,12 +34,12 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       # Swap tiers here without a deploy; see .env.example for the trade-off.
-      # Resume parsing = candidate-facing, fast tier. JD extraction = recruiter-
-      # facing, bigger model. OPENROUTER_MODEL (unset here) overrides both.
+      # Both jobs run the Opus tier: extraction quality is the product, and a
+      # fully parsed role costs ~₹125 in LLM spend against ₹1,999 revenue.
       - key: OPENROUTER_MODEL_RESUME
-        value: google/gemini-3.5-flash
+        value: anthropic/claude-opus-5
       - key: OPENROUTER_MODEL_JD
-        value: google/gemini-2.5-pro
+        value: anthropic/claude-opus-5
       # Signs auth tokens. Rotating it signs everyone out.
       - key: SECRET_KEY
         sync: false

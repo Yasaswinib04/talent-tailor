@@ -60,6 +60,10 @@ SEED_DEMO_DATA = os.environ.get("SEED_DEMO_DATA", "0") == "1"
 # Operator-only endpoints (lead list). Disabled unless the key is set.
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
 
+# OpenRouter reports per-call cost in USD credits; INR views convert at this
+# rate. It's display-only — the stored records keep the USD figure.
+USD_INR = float(os.environ.get("USD_INR", "88"))
+
 # For Atlas (mongodb+srv) pin the CA bundle explicitly. Without it, hosts whose
 # system trust store isn't wired up for Python throw CERTIFICATE_VERIFY_FAILED;
 # certifi ships a known-good bundle so TLS verifies everywhere. Harmless for a
@@ -69,6 +73,16 @@ client = AsyncIOMotorClient(MONGO_URL, **_client_opts)
 db = client[DB_NAME]
 
 app = FastAPI(title="Talent Tailor API")
+
+
+# Every OpenRouter call writes one row here: who spent, on what, how much.
+# Feeds the per-account burn view in analytics and the operator rollup.
+async def _log_llm_usage(record: dict):
+    record = {**record, "id": str(uuid.uuid4()), "created_at": now_iso()}
+    await db.llm_usage.insert_one(record)
+
+
+llm.usage_logger = _log_llm_usage
 
 # Bearer tokens, not cookies, so credentials-mode CORS is unnecessary — and
 # "*" origins with credentials enabled is spec-invalid anyway. Set
@@ -850,7 +864,7 @@ def _extract_skills_heuristic(text: str) -> dict:
 
 @app.post("/api/extract-skills")
 async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(current_user)):
-    result = await llm.extract_jd(payload.jd or "")
+    result = await llm.extract_jd(payload.jd or "", ctx={"owner_id": user["id"], "kind": "jd_extract"})
     if result:
         result["source"] = "llm"
         return result
@@ -1155,7 +1169,7 @@ async def _ingest_resume_file(file: UploadFile, job: dict) -> dict:
     if not text:
         return {"filename": filename, "ok": False, "error": "No readable text (scanned image?)"}
 
-    fields = await llm.parse_resume(text)
+    fields = await llm.parse_resume(text, ctx={"owner_id": job["owner_id"], "job_id": job["id"], "kind": "resume_bulk"})
     needs_review = False
     if not fields:
         # LLM off or down: keep the pile moving with a stub the recruiter can
@@ -1279,7 +1293,7 @@ async def parse_resume(slug: str, file: UploadFile = File(...)):
             "message": "We couldn't read text from this file (scanned image?). Please fill in your details below.",
             "fields": None,
         }
-    fields = await llm.parse_resume(text)
+    fields = await llm.parse_resume(text, ctx={"owner_id": job["owner_id"], "job_id": job["id"], "kind": "resume_apply"})
     if not fields:
         # LLM off or down — hand back the raw text plus dictionary skills so the
         # candidate still gets a mostly-prefilled form.
@@ -1383,3 +1397,48 @@ async def analytics_summary(user: dict = Depends(current_user)):
         "auto_apply_conversion": (auto_applied / total_candidates) if total_candidates else 0.0,
         "unlock_price_inr": UNLOCK_PRICE_INR,
     }
+
+
+def _usage_totals(rows: list) -> dict:
+    cost_usd = sum(r.get("cost_usd") or 0.0 for r in rows)
+    return {
+        "calls": len(rows),
+        "prompt_tokens": sum(r.get("prompt_tokens") or 0 for r in rows),
+        "completion_tokens": sum(r.get("completion_tokens") or 0 for r in rows),
+        "cost_usd": round(cost_usd, 4),
+        "cost_inr": round(cost_usd * USD_INR, 2),
+    }
+
+
+@app.get("/api/analytics/llm-usage")
+async def llm_usage(user: dict = Depends(current_user)):
+    """This account's AI burn: totals plus a by-step breakdown. Costs come
+    from OpenRouter's own usage accounting, not a local price table."""
+    rows = await db.llm_usage.find({"owner_id": user["id"]}).to_list(10000)
+    by_kind = {}
+    for r in rows:
+        by_kind.setdefault(r.get("kind") or "other", []).append(r)
+    return {
+        **_usage_totals(rows),
+        "usd_inr_rate": USD_INR,
+        "by_kind": {k: _usage_totals(v) for k, v in sorted(by_kind.items())},
+    }
+
+
+@app.get("/api/admin/llm-usage")
+async def admin_llm_usage(x_admin_key: Optional[str] = Header(None)):
+    """Operator rollup: burn per account, worst spenders first. The unit-
+    economics view — compare each account's cost against what they've paid."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(403, "Not available")
+    rows = await db.llm_usage.find({}).to_list(100000)
+    by_owner = {}
+    for r in rows:
+        by_owner.setdefault(r.get("owner_id") or "unknown", []).append(r)
+    users = {u["id"]: u for u in await db.users.find({}).to_list(10000)}
+    accounts = [
+        {"owner_id": oid, "email": users.get(oid, {}).get("email", ""), **_usage_totals(v)}
+        for oid, v in by_owner.items()
+    ]
+    accounts.sort(key=lambda a: a["cost_usd"], reverse=True)
+    return {"total": _usage_totals(rows), "usd_inr_rate": USD_INR, "accounts": accounts}
