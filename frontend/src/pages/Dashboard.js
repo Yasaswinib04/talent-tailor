@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [llmUsage, setLlmUsage] = useState(null);
   const [q, setQ] = useState("");
   const [filterStage, setFilterStage] = useState("");
   const [filterJob, setFilterJob] = useState("");
@@ -32,14 +33,16 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
-      const [j, c, s] = await Promise.all([
+      const [j, c, s, u] = await Promise.all([
         api.get("/jobs"),
         api.get("/candidates"),
         api.get("/analytics/summary"),
+        api.get("/analytics/llm-usage"),
       ]);
       setJobs(j.data);
       setCandidates(c.data);
       setSummary(s.data);
+      setLlmUsage(u.data);
       setLoadError(null);
     } catch (e) {
       // Distinguish "the server is unreachable" from "your filters matched nobody" —
@@ -147,12 +150,20 @@ export default function Dashboard() {
 
       {/* KPI band */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 border hairline mb-8">
+        <div className={cx("grid grid-cols-2 border hairline mb-8", llmUsage ? "md:grid-cols-6" : "md:grid-cols-5")}>
           <Kpi label="open roles" value={summary.total_jobs} icon={<Briefcase size={14} />} testid="kpi-jobs" />
           <Kpi label="candidates" value={summary.total_candidates} icon={<Users size={14} />} testid="kpi-candidates" />
           <Kpi label="shortlisted" value={summary.funnel.Shortlisted} icon={<Star size={14} />} testid="kpi-shortlisted" />
           <Kpi label="interviewing" value={summary.funnel.Interview} icon={<TrendingUp size={14} />} testid="kpi-interview" />
           <Kpi label="auto-apply rate" value={`${Math.round(summary.auto_apply_conversion * 100)}%`} icon={<Zap size={14} />} testid="kpi-autoapply" gold />
+          {llmUsage && (
+            <Kpi
+              label={`AI spend · ${llmUsage.calls} calls`}
+              value={`₹${llmUsage.cost_inr.toFixed(llmUsage.cost_inr < 100 ? 2 : 0)}`}
+              icon={<Sparkles size={14} />}
+              testid="kpi-llm-spend"
+            />
+          )}
         </div>
       )}
 

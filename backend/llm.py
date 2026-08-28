@@ -27,13 +27,20 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 # runs once per role with a recruiter watching a spinner, so it can afford a
 # bigger model. OPENROUTER_MODEL overrides both; the specific vars win over it.
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "")
-RESUME_MODEL = os.environ.get("OPENROUTER_MODEL_RESUME") or OPENROUTER_MODEL or "google/gemini-3.5-flash"
-JD_MODEL = os.environ.get("OPENROUTER_MODEL_JD") or OPENROUTER_MODEL or "google/gemini-2.5-pro"
+# Extraction quality is the product and LLM cost is ~7% of the unlock price,
+# so both default to the Opus tier. Downgrade via env if burn ever matters.
+RESUME_MODEL = os.environ.get("OPENROUTER_MODEL_RESUME") or OPENROUTER_MODEL or "anthropic/claude-opus-5"
+JD_MODEL = os.environ.get("OPENROUTER_MODEL_JD") or OPENROUTER_MODEL or "anthropic/claude-opus-5"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # A resume needs only the first few pages of text; unbounded input is an
 # invitation to pay for someone's 200-page appendix.
 MAX_INPUT_CHARS = 20000
+
+# Set by the server at import time to persist per-call token/cost telemetry.
+# Signature: async fn(record: dict). Logging must never break extraction, so
+# failures are swallowed here.
+usage_logger = None
 
 
 def enabled() -> bool:
@@ -70,8 +77,9 @@ def extract_text_from_file(filename: str, data: bytes) -> str:
 
 
 # ---------- OpenRouter ----------
-async def _chat_json(model: str, system: str, user: str, max_tokens: int = 1600):
-    """One JSON-mode completion. Dict on success, None on any failure."""
+async def _chat_json(model: str, system: str, user: str, max_tokens: int = 1600, ctx: dict = None):
+    """One JSON-mode completion. Dict on success, None on any failure.
+    `ctx` (owner_id, job_id, kind) is attached to the usage record."""
     if not enabled():
         return None
     try:
@@ -88,6 +96,9 @@ async def _chat_json(model: str, system: str, user: str, max_tokens: int = 1600)
                     "temperature": 0,
                     "max_tokens": max_tokens,
                     "response_format": {"type": "json_object"},
+                    # OpenRouter returns the actual credit cost of the call in
+                    # the usage block — no local price table to keep in sync.
+                    "usage": {"include": True},
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": user[:MAX_INPUT_CHARS]},
@@ -95,13 +106,31 @@ async def _chat_json(model: str, system: str, user: str, max_tokens: int = 1600)
                 },
             )
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"]
+            body = resp.json()
+            content = body["choices"][0]["message"]["content"]
+        await _record_usage(model, body.get("usage") or {}, ctx)
         # Some models wrap JSON in fences despite json mode.
         content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
         return json.loads(content)
     except Exception:
         log.exception("OpenRouter call failed (model=%s)", model)
         return None
+
+
+async def _record_usage(model: str, usage: dict, ctx: dict = None):
+    if usage_logger is None:
+        return
+    try:
+        await usage_logger({
+            "model": model,
+            "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+            "completion_tokens": int(usage.get("completion_tokens") or 0),
+            # OpenRouter reports cost in credits, which are USD-denominated.
+            "cost_usd": float(usage.get("cost") or 0.0),
+            **(ctx or {}),
+        })
+    except Exception:
+        log.exception("LLM usage logging failed")
 
 
 RESUME_SYSTEM = """You extract structured data from resumes for a hiring tool. Reply with ONLY a JSON object:
@@ -144,11 +173,11 @@ def _num(v, default=0.0):
         return default
 
 
-async def parse_resume(text: str):
+async def parse_resume(text: str, ctx: dict = None):
     """Structured fields from resume text, or None (caller falls back)."""
     if not text.strip():
         return None
-    out = await _chat_json(RESUME_MODEL, RESUME_SYSTEM, text)
+    out = await _chat_json(RESUME_MODEL, RESUME_SYSTEM, text, ctx=ctx)
     if not isinstance(out, dict):
         return None
     skills = [str(s).strip() for s in (out.get("skills") or []) if str(s).strip()][:20]
@@ -168,11 +197,11 @@ async def parse_resume(text: str):
     }
 
 
-async def extract_jd(jd_text: str):
+async def extract_jd(jd_text: str, ctx: dict = None):
     """Structured rubric from a JD, or None (caller falls back)."""
     if not jd_text.strip():
         return None
-    out = await _chat_json(JD_MODEL, JD_SYSTEM, jd_text)
+    out = await _chat_json(JD_MODEL, JD_SYSTEM, jd_text, ctx=ctx)
     if not isinstance(out, dict):
         return None
     skills = []
