@@ -1,15 +1,28 @@
+# Node
 node_modules/
 build/
 dist/
 coverage/
-.DS_Store
-*.log
-credentials.json
-*.pem
-*.key
-.credentials
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Secrets and local config
 .env
 .env.local
 .env.*.local
 *.env
 !frontend/.env.production
+credentials.json
+.credentials
+*.pem
+*.key
+
+# Misc
+.DS_Store
+*.log
