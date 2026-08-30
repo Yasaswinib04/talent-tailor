@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Building2, Briefcase, UserPlus } from "lucide-react";
+import { ArrowRight, Check, Building2, Briefcase, UserPlus, Loader2, AlertTriangle } from "lucide-react";
+import { api, errMessage } from "../lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 
 const steps = [
@@ -11,10 +12,40 @@ const steps = [
 
 export default function Onboarding() {
   const [step, setStep] = useState(1);
-  const [company, setCompany] = useState({ name: "CRED", size: "500-1000", industry: "Fintech" });
+  const [company, setCompany] = useState({ name: "", size: "50-500", industry: "Fintech" });
   const [role, setRole] = useState({ title: "", department: "Engineering", location: "Bengaluru" });
   const [invites, setInvites] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const nav = useNavigate();
+
+  // Everything entered across these three steps used to be discarded on Finish.
+  const finish = async () => {
+    if (saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const emails = invites
+        .split(/[,\s]+/)
+        .map((e) => e.trim())
+        .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+      const res = await api.post("/onboarding", {
+        company_name: company.name,
+        company_size: company.size,
+        industry: company.industry,
+        role_title: role.title,
+        role_department: role.department,
+        role_location: role.location,
+        invite_emails: emails,
+      });
+      // If they named a first role, take them straight into it.
+      nav(res.data.job ? `/app/jobs/${res.data.job.id}` : "/app");
+    } catch (err) {
+      setSaveError(errMessage(err, "Couldn't save your setup. Nothing was lost — try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-app text-white relative overflow-hidden">
@@ -68,6 +99,7 @@ export default function Onboarding() {
                   <Field label="Company name">
                     <input
                       data-testid="onb-company-name"
+                      placeholder="Your company"
                       value={company.name}
                       onChange={(e) => setCompany({ ...company, name: e.target.value })}
                       className="w-full bg-transparent border-b hairline pb-2 text-lg focus:border-white outline-none"
@@ -166,6 +198,13 @@ export default function Onboarding() {
           </AnimatePresence>
         </div>
 
+        {saveError && (
+          <div className="mt-6 border border-danger/50 bg-danger/10 px-4 py-3 flex items-start gap-2" data-testid="onb-error">
+            <AlertTriangle size={13} className="text-danger mt-0.5 shrink-0" />
+            <span className="text-xs text-white/80">{saveError}</span>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-between mt-8">
           <button
@@ -179,13 +218,15 @@ export default function Onboarding() {
             <div className="font-mono-label">step {String(step).padStart(2, "0")} / 03</div>
             <button
               data-testid="onb-continue-btn"
+              disabled={saving || (step === 1 && !company.name.trim())}
               onClick={() => {
                 if (step < 3) setStep(step + 1);
-                else nav("/app/jobs/new");
+                else finish();
               }}
-              className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors"
+              className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors disabled:opacity-40"
             >
-              {step === 3 ? "Finish & set up first role" : "Continue"} <ArrowRight size={14} />
+              {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                : <>{step === 3 ? "Finish & set up first role" : "Continue"} <ArrowRight size={14} /></>}
             </button>
           </div>
         </div>

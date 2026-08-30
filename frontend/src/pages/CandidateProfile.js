@@ -18,12 +18,18 @@ export default function CandidateProfile() {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [events, setEvents] = useState([]);
 
   const load = async () => {
     try {
-      const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
+      const [cr, jr, er] = await Promise.all([
+        api.get(`/candidates/${cid}`),
+        api.get("/jobs"),
+        api.get(`/candidates/${cid}/events`).catch(() => ({ data: [] })),
+      ]);
       setC(cr.data);
       setJobs(jr.data);
+      setEvents(er.data || []);
       setNote(cr.data.notes || "");
       setError("");
     } catch (err) {
@@ -326,10 +332,15 @@ export default function CandidateProfile() {
                 </div>
               )}
               {tab === "activity" && (
-                <div className="space-y-3 text-sm">
-                  <ActivityItem when="Just now" text={`Assigned to ${assignedJobs.length} role(s).`} />
-                  <ActivityItem when="Yesterday" text={`Stage moved to ${c.stage}.`} />
-                  <ActivityItem when="3 days ago" text={c.auto_applied ? "Auto-applied via shareable link." : "Added to pipeline by recruiter."} />
+                <div className="space-y-3 text-sm" data-testid="cp-activity">
+                  {events.length === 0 && (
+                    <div className="text-white/40 text-xs italic">
+                      Nothing has happened on this profile yet.
+                    </div>
+                  )}
+                  {events.map((e) => (
+                    <ActivityItem key={e.id} when={relativeTime(e.at)} text={e.summary} who={e.actor} />
+                  ))}
                 </div>
               )}
             </div>
@@ -349,11 +360,35 @@ function Row({ icon, label }) {
   );
 }
 
-function ActivityItem({ when, text }) {
+/** Real elapsed time from a stored timestamp — the three entries here used to
+ *  be hardcoded "Just now / Yesterday / 3 days ago" on a hiring record. */
+function relativeTime(iso) {
+  if (!iso) return "";
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  const secs = Math.max(0, (Date.now() - then.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  const units = [
+    ["minute", 60], ["hour", 3600], ["day", 86400], ["week", 604800],
+    ["month", 2592000], ["year", 31536000],
+  ];
+  let label = "just now";
+  for (const [name, size] of units) {
+    if (secs >= size) {
+      const n = Math.floor(secs / size);
+      label = `${n} ${name}${n > 1 ? "s" : ""} ago`;
+    }
+  }
+  return label;
+}
+
+function ActivityItem({ when, text, who }) {
   return (
     <div className="flex items-start gap-3 border-l-2 border-brand/40 pl-3 py-1">
       <div>
-        <div className="font-mono-label mb-0.5">{when}</div>
+        <div className="font-mono-label mb-0.5">
+          {when}{who ? ` · ${who}` : ""}
+        </div>
         <div className="text-white/80">{text}</div>
       </div>
     </div>

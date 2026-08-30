@@ -8,18 +8,20 @@ import ErrorState from "../components/ErrorState";
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
 export default function Dashboard() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "overview";
+  const urlQuery = params.get("q") || "";
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(urlQuery);
   const [filterStage, setFilterStage] = useState("");
   const [filterJob, setFilterJob] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [totalCandidates, setTotalCandidates] = useState(0);
   const nav = useNavigate();
 
   const load = async () => {
@@ -27,11 +29,12 @@ export default function Dashboard() {
     try {
       const [j, c, s] = await Promise.all([
         api.get("/jobs"),
-        api.get("/candidates"),
+        api.get("/candidates?limit=500"),
         api.get("/analytics/summary"),
       ]);
       setJobs(j.data);
-      setCandidates(c.data);
+      setCandidates(c.data.items || []);
+      setTotalCandidates(c.data.total ?? (c.data.items || []).length);
       setSummary(s.data);
       setError("");
     } catch (err) {
@@ -44,6 +47,11 @@ export default function Dashboard() {
   useEffect(() => {
     load();
   }, []);
+
+  // The top-bar search writes ?q=; keep the table in step with it.
+  useEffect(() => {
+    setQ(urlQuery);
+  }, [urlQuery]);
 
   const unassignedCount = useMemo(
     () => candidates.filter((c) => c.role_ids.length === 0).length,
@@ -129,8 +137,12 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <div className="font-mono-label mb-2">overview · jan 2026</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">Talent pipeline</h1>
+          <div className="font-mono-label mb-2">
+            {tab === "jobs" ? "roles" : tab === "candidates" ? "candidates" : "overview"}
+          </div>
+          <h1 className="font-display text-4xl font-bold tracking-tight">
+            {tab === "jobs" ? "Open roles" : tab === "candidates" ? "All candidates" : "Talent pipeline"}
+          </h1>
         </div>
         <button
           onClick={() => nav("/app/jobs/new")}
@@ -142,18 +154,25 @@ export default function Dashboard() {
       </div>
 
       {/* KPI band */}
-      {summary && (
+      {summary && tab === "overview" && (
         <div className="grid grid-cols-2 md:grid-cols-5 border hairline mb-8">
           <Kpi label="open roles" value={summary.total_jobs} icon={<Briefcase size={14} />} testid="kpi-jobs" />
           <Kpi label="candidates" value={summary.total_candidates} icon={<Users size={14} />} testid="kpi-candidates" />
           <Kpi label="shortlisted" value={summary.funnel.Shortlisted} icon={<Star size={14} />} testid="kpi-shortlisted" />
           <Kpi label="interviewing" value={summary.funnel.Interview} icon={<TrendingUp size={14} />} testid="kpi-interview" />
-          <Kpi label="auto-apply rate" value={`${Math.round(summary.auto_apply_conversion * 100)}%`} icon={<Zap size={14} />} testid="kpi-autoapply" gold />
+          <Kpi
+            label="self-applied"
+            value={summary.self_applied_share == null ? "—" : `${Math.round(summary.self_applied_share * 100)}%`}
+            hint={summary.self_applied_count != null ? `${summary.self_applied_count} of ${summary.total_candidates}` : null}
+            icon={<Zap size={14} />}
+            testid="kpi-autoapply"
+            gold
+          />
         </div>
       )}
 
       {/* Roles grid */}
-      <div className="mb-10">
+      <div className={cx("mb-10", tab === "candidates" && "hidden")}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-xl font-semibold">Open roles</h2>
           <div className="font-mono-label">{jobs.length} active</div>
@@ -193,7 +212,7 @@ export default function Dashboard() {
       </div>
 
       {/* Candidate table */}
-      <div>
+      <div className={cx(tab === "jobs" && "hidden")}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h2 className="font-display text-xl font-semibold">All candidates</h2>
@@ -214,7 +233,14 @@ export default function Dashboard() {
                   {filtered.length} matching
                 </span>
                 <button
-                  onClick={() => { setQ(""); setFilterStage(""); setFilterJob(""); }}
+                  onClick={() => {
+                    setQ(""); setFilterStage(""); setFilterJob("");
+                    if (urlQuery) {
+                      const next = new URLSearchParams(params);
+                      next.delete("q");
+                      setParams(next, { replace: true });
+                    }
+                  }}
                   data-testid="dash-clear-filters"
                   className="text-white/40 hover:text-white transition-colors ml-1"
                 >
@@ -348,6 +374,12 @@ export default function Dashboard() {
           </table>
         </div>
 
+        {totalCandidates > candidates.length && (
+          <div className="mt-3 text-[11px] text-white/40" data-testid="dash-truncated">
+            Showing {candidates.length} of {totalCandidates} candidates. Use search or filters to narrow down.
+          </div>
+        )}
+
         {/* Keyboard hint */}
         <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/40">
           <span><span className="kbd">J</span> <span className="kbd">K</span> row nav</span>
@@ -373,7 +405,7 @@ export default function Dashboard() {
   );
 }
 
-function Kpi({ label, value, icon, testid, gold }) {
+function Kpi({ label, value, icon, testid, gold, hint }) {
   return (
     <div className="p-5 border-r hairline last:border-r-0" data-testid={testid}>
       <div className="flex items-center gap-2 mb-2">
@@ -381,6 +413,7 @@ function Kpi({ label, value, icon, testid, gold }) {
         <span className="font-mono-label">{label}</span>
       </div>
       <div className={cx("font-display text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
+      {hint && <div className="text-[10px] text-white/35 mt-1 font-mono">{hint}</div>}
     </div>
   );
 }

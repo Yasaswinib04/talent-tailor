@@ -14,6 +14,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 # Endpoints require a session; bootstrap an admin and sign in for each test.
+os.environ["SEED_DEMO_DATA"] = "true"  # fixtures need the demo pool
 os.environ["ADMIN_EMAIL"] = "maya@cred.club"
 os.environ["ADMIN_PASSWORD"] = "correct horse battery staple"
 
@@ -106,7 +107,7 @@ def test_rate_limit_after_repeated_batches(client, job_id):
 # ---------- Parsing ----------
 def test_fields_are_parsed_from_the_file(client, job_id):
     upload(client, job_id, [("aarti.txt", RESUME)])
-    c = next(x for x in client.get("/api/candidates").json() if x["email"] == "aarti.deshpande@cv.in")
+    c = next(x for x in client.get("/api/candidates").json()["items"] if x["email"] == "aarti.deshpande@cv.in")
     assert c["name"] == "Aarti Deshpande"
     assert c["current_title"] == "Senior Frontend Engineer"
     assert c["current_company"] == "Razorpay"
@@ -172,7 +173,7 @@ def test_same_person_twice_is_not_duplicated(client, job_id):
     upload(client, job_id, [("cv.txt", RESUME)])
     d = upload(client, job_id, [("cv-again.txt", RESUME)]).json()
     assert d["created"] == 0 and d["duplicates"] == 1
-    matches = [x for x in client.get("/api/candidates").json() if x["email"] == "aarti.deshpande@cv.in"]
+    matches = [x for x in client.get("/api/candidates").json()["items"] if x["email"] == "aarti.deshpande@cv.in"]
     assert len(matches) == 1
 
 
@@ -182,14 +183,14 @@ def test_existing_candidate_is_attached_to_the_new_role(client):
     upload(client, first, [("cv.txt", RESUME)])
     d = upload(client, second, [("cv.txt", RESUME)]).json()
     assert d["duplicates"] == 1
-    c = next(x for x in client.get("/api/candidates").json() if x["email"] == "aarti.deshpande@cv.in")
+    c = next(x for x in client.get("/api/candidates").json()["items"] if x["email"] == "aarti.deshpande@cv.in")
     assert first in c["role_ids"] and second in c["role_ids"]
 
 
 def test_role_count_matches_reality_after_uploads(client, job_id):
     upload(client, job_id, [("a.txt", RESUME), ("b.txt", "Manish Gupta\nm@cv.in\n4 years\nReact\n")])
     job = client.get(f"/api/jobs/{job_id}").json()
-    assert job["candidates_count"] == len(client.get(f"/api/candidates?job_id={job_id}").json())
+    assert job["candidates_count"] == len(client.get(f"/api/candidates?job_id={job_id}").json()["items"])
 
 
 def test_role_count_updates_when_a_duplicate_is_attached(client):
@@ -200,4 +201,4 @@ def test_role_count_updates_when_a_duplicate_is_attached(client):
     upload(client, second, [("cv.txt", RESUME)])  # duplicate, but joins this role
     after = client.get(f"/api/jobs/{second}").json()["candidates_count"]
     assert after == before + 1
-    assert after == len(client.get(f"/api/candidates?job_id={second}").json())
+    assert after == len(client.get(f"/api/candidates?job_id={second}").json()["items"])

@@ -25,6 +25,44 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
+### Nothing is mocked any more
+
+An audit for anything still decorative or fabricated found six things producing
+**wrong data**, not just missing features. All are now real.
+
+| | Was | Now |
+|---|---|---|
+| **Demo seed data** | 4 sample roles and 20 fabricated candidates inserted into whatever database the app pointed at, on first boot | Behind `SEED_DEMO_DATA`, off by default. A production deploy starts empty. |
+| **Candidate resume upload** | Discarded the uploaded file and filled the form from a hardcoded "Aarav Menon" sample, while animating claims about extracting their details — a real applicant would have submitted someone else's name, email and salary | `POST /api/apply/{slug}/parse-resume` parses their actual PDF/DOCX/TXT (rate-limited, since it is public). The UI reports what it genuinely read, and falls back to manual entry rather than a dead end. |
+| **Scoring weights** | The five sliders labelled "How the match score is calculated" were stored and never read; the score was pure skill overlap | `score_candidate()` computes a weighted score across skills, experience, education, notice and cultural fit, using the role's own weights. Editing a role's weights rescores everyone on it. A breakdown endpoint shows why someone scored what they did. |
+| **Dashboard KPIs** | `avg_time_to_shortlist_days: 2.4` and `auto_apply_conversion: 0.68` — constants presented as this team's metrics | Both computed. Time-to-shortlist is measured from real stage-change events; self-applied share is counted from candidate sources. Both return `null` (rendered "—") when there isn't enough history to say anything honest. |
+| **Activity feed** | Three hardcoded lines: "Just now", "Yesterday", "3 days ago" — a fabricated audit trail on a hiring record | A real `events` collection records applications, stage changes, ratings, notes and role assignments with actor and timestamp. Elapsed time is computed. No-op changes record nothing. |
+| **Onboarding** | All three steps discarded on Finish | Persisted to a workspace record, and the named first role is actually created. Re-running does not duplicate it. |
+
+Also fixed in the same pass:
+
+- **Sidebar Roles / Candidates** rendered the identical Overview page (`tab` was
+  parsed and never used); all three links highlighted as active at once because
+  `NavLink` ignores query strings. They are now three distinct views with
+  correct active state.
+- **Top-bar search and the `⌘K` badge** did nothing. The search drives the
+  candidate filter through the URL (so it is shareable and survives a reload),
+  and the shortcut focuses it.
+- **Pagination.** Six `to_list(1000)` calls silently truncated. The candidate
+  list is paginated with an honest total, and search runs in the query so it
+  spans the whole collection rather than one page.
+- **Job validation**: blank titles, inverted and negative salary ranges were all
+  accepted.
+- **`share_slug`** widened to 12 hex characters with a unique index; a collision
+  would previously have hijacked another role's apply link.
+
+**Verification:** 128 backend tests and 62 browser cases. `test_no_mocks.py`
+pins each of the six down — including that analytics report `null` rather than
+inventing a number, and that all-zero weights don't flatten every score to zero.
+
+---
+
+
 ### Track B, part 1 — the four pipeline-integrity issues
 
 | | Fix |

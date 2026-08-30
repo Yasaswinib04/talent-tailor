@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
+os.environ["SEED_DEMO_DATA"] = "true"  # fixtures need the demo pool
 os.environ["ADMIN_EMAIL"] = "maya@cred.club"
 os.environ["ADMIN_PASSWORD"] = "correct horse battery staple"
 
@@ -62,8 +63,8 @@ def slug(client):
 def test_junk_applications_are_rejected(client, slug, bad, label):
     r = client.post(f"/api/apply/{slug}", json={**GOOD_APPLICATION, **bad})
     assert r.status_code == 422, f"{label} was accepted"
-    assert not client.get("/api/candidates").json() or all(
-        c["email"] != GOOD_APPLICATION["email"] for c in client.get("/api/candidates").json()
+    assert not client.get("/api/candidates").json()["items"] or all(
+        c["email"] != GOOD_APPLICATION["email"] for c in client.get("/api/candidates").json()["items"]
     )
 
 
@@ -74,7 +75,7 @@ def test_a_good_application_is_accepted(client, slug):
 
 def test_no_blank_rows_reach_the_dashboard(client, slug):
     client.post(f"/api/apply/{slug}", json={**GOOD_APPLICATION, "name": "", "email": ""})
-    for c in client.get("/api/candidates").json():
+    for c in client.get("/api/candidates").json()["items"]:
         assert c["name"].strip() and c["email"].strip()
 
 
@@ -84,7 +85,7 @@ def test_applying_twice_does_not_create_two_candidates(client, slug):
     second = client.post(f"/api/apply/{slug}", json=GOOD_APPLICATION).json()
     assert second["duplicate"] is True
     assert second["candidate_id"] == first["candidate_id"]
-    matches = [c for c in client.get("/api/candidates").json()
+    matches = [c for c in client.get("/api/candidates").json()["items"]
                if c["email"] == GOOD_APPLICATION["email"]]
     assert len(matches) == 1
 
@@ -93,7 +94,7 @@ def test_reapplying_updates_their_details(client, slug):
     client.post(f"/api/apply/{slug}", json=GOOD_APPLICATION)
     client.post(f"/api/apply/{slug}", json={**GOOD_APPLICATION,
                                             "current_company": "Flipkart", "expected_ctc": 5000000})
-    c = next(x for x in client.get("/api/candidates").json()
+    c = next(x for x in client.get("/api/candidates").json()["items"]
              if x["email"] == GOOD_APPLICATION["email"])
     assert c["current_company"] == "Flipkart" and c["expected_ctc"] == 5000000
 
@@ -112,7 +113,7 @@ def test_applying_to_a_second_role_attaches_rather_than_duplicates(client):
     client.post(f"/api/apply/{jobs[0]['share_slug']}", json=GOOD_APPLICATION)
     r = client.post(f"/api/apply/{jobs[1]['share_slug']}", json=GOOD_APPLICATION).json()
     assert r["duplicate"] is True
-    c = next(x for x in client.get("/api/candidates").json()
+    c = next(x for x in client.get("/api/candidates").json()["items"]
              if x["email"] == GOOD_APPLICATION["email"])
     assert {jobs[0]["id"], jobs[1]["id"]} <= set(c["role_ids"])
 
@@ -120,7 +121,7 @@ def test_applying_to_a_second_role_attaches_rather_than_duplicates(client):
 def test_email_case_does_not_create_a_second_record(client, slug):
     client.post(f"/api/apply/{slug}", json=GOOD_APPLICATION)
     client.post(f"/api/apply/{slug}", json={**GOOD_APPLICATION, "email": "Aarav.Menon@CV.in"})
-    matches = [c for c in client.get("/api/candidates").json()
+    matches = [c for c in client.get("/api/candidates").json()["items"]
                if c["email"].lower() == GOOD_APPLICATION["email"]]
     assert len(matches) == 1
 
@@ -130,28 +131,28 @@ def test_role_counts_stay_truthful_across_reapplications(client, slug):
     for _ in range(3):
         client.post(f"/api/apply/{slug}", json=GOOD_APPLICATION)
     job = client.get(f"/api/jobs/{job_id}").json()
-    assert job["candidates_count"] == len(client.get(f"/api/candidates?job_id={job_id}").json())
+    assert job["candidates_count"] == len(client.get(f"/api/candidates?job_id={job_id}").json()["items"])
 
 
 # ---------- P1-4: deleting a role must not orphan people ----------
 def test_deleting_a_role_detaches_it_from_candidates(client):
     job = client.get("/api/jobs").json()[0]
-    before = client.get(f"/api/candidates?job_id={job['id']}").json()
+    before = client.get(f"/api/candidates?job_id={job['id']}").json()["items"]
     assert before, "fixture should have candidates on this role"
 
     r = client.delete(f"/api/jobs/{job['id']}")
     assert r.status_code == 200
     assert r.json()["detached_candidates"] == len(before)
 
-    stale = [c for c in client.get("/api/candidates").json() if job["id"] in c["role_ids"]]
+    stale = [c for c in client.get("/api/candidates").json()["items"] if job["id"] in c["role_ids"]]
     assert not stale, "candidates still reference the deleted role"
 
 
 def test_candidates_survive_the_deletion_of_their_role(client):
     job = client.get("/api/jobs").json()[0]
-    names = {c["name"] for c in client.get(f"/api/candidates?job_id={job['id']}").json()}
+    names = {c["name"] for c in client.get(f"/api/candidates?job_id={job['id']}").json()["items"]}
     client.delete(f"/api/jobs/{job['id']}")
-    still_there = {c["name"] for c in client.get("/api/candidates").json()}
+    still_there = {c["name"] for c in client.get("/api/candidates").json()["items"]}
     assert names <= still_there, "deleting a role must not delete people"
 
 
@@ -159,7 +160,7 @@ def test_other_role_counts_are_recomputed_after_a_delete(client):
     jobs = client.get("/api/jobs").json()
     client.delete(f"/api/jobs/{jobs[0]['id']}")
     for j in client.get("/api/jobs").json():
-        actual = len(client.get(f"/api/candidates?job_id={j['id']}").json())
+        actual = len(client.get(f"/api/candidates?job_id={j['id']}").json()["items"])
         assert j["candidates_count"] == actual, f"{j['title']} count drifted"
 
 
@@ -224,7 +225,7 @@ def test_unknown_location_does_not_fail_the_filter():
 def test_a_self_applied_candidate_is_not_silently_filtered_out(client, slug):
     """They have no parsed education, location or notice period."""
     client.post(f"/api/apply/{slug}", json=GOOD_APPLICATION)
-    applicant = next(x for x in client.get("/api/candidates").json()
+    applicant = next(x for x in client.get("/api/candidates").json()["items"]
                      if x["email"] == GOOD_APPLICATION["email"])
     result = server._evaluate_filters([applicant], {
         "min_experience_years": 3,

@@ -97,11 +97,11 @@ class Job(BaseModel):
     status: str = "open"
     created_at: str = Field(default_factory=now_iso)
     candidates_count: int = 0
-    share_slug: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
+    share_slug: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
 
 
 class JobCreate(BaseModel):
-    title: str
+    title: str = Field(min_length=2, max_length=140)
     department: str
     location: str
     employment_type: Optional[str] = "Full-time"
@@ -115,6 +115,31 @@ class JobCreate(BaseModel):
     # here turns a documented-optional payload into a 500.
     filters: dict = Field(default_factory=dict)
     scoring_weights: dict = Field(default_factory=dict)
+
+    @field_validator("title")
+    @classmethod
+    def _title_not_blank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if len(v) < 2:
+            raise ValueError("Give the role a title.")
+        return v
+
+    @field_validator("salary_max")
+    @classmethod
+    def _salary_sane(cls, v, info):
+        lo = info.data.get("salary_min")
+        if v is not None and v < 0:
+            raise ValueError("Salary cannot be negative.")
+        if lo is not None and v is not None and lo > v:
+            raise ValueError("Minimum salary is above the maximum.")
+        return v
+
+    @field_validator("salary_min")
+    @classmethod
+    def _salary_min_sane(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Salary cannot be negative.")
+        return v
 
 
 class ExtractSkillsRequest(BaseModel):
@@ -257,6 +282,16 @@ class PasswordChange(BaseModel):
     new_password: str
 
 
+class OnboardingPayload(BaseModel):
+    company_name: str = Field(min_length=1, max_length=120)
+    company_size: str = Field(default="", max_length=40)
+    industry: str = Field(default="", max_length=60)
+    role_title: str = Field(default="", max_length=120)
+    role_department: str = Field(default="Engineering", max_length=60)
+    role_location: str = Field(default="", max_length=120)
+    invite_emails: List[EmailStr] = Field(default_factory=list, max_length=50)
+
+
 class RoleAssignment(BaseModel):
     role_ids: List[str]
 
@@ -391,6 +426,9 @@ async def bootstrap_admin():
     await db.sessions.create_index("token_fp", unique=True)
     await db.sessions.create_index("expires_at")
     await db.users.create_index("email", unique=True)
+    await db.jobs.create_index("share_slug", unique=True)
+    await db.candidates.create_index("email")
+    await db.events.create_index([("candidate_id", 1), ("at", -1)])
     # Expired sessions are dead weight; clear them on boot.
     await db.sessions.delete_many({"expires_at": {"$lt": now_iso()}})
 
@@ -419,8 +457,15 @@ async def bootstrap_admin():
     print(f"  Created the first admin account: {email}")
 
 
+# Demo content. Off unless explicitly requested — a real recruiter opening the
+# app to 20 fabricated candidates is worse than an empty pipeline.
+SEED_DEMO_DATA = os.environ.get("SEED_DEMO_DATA", "").lower() in ("1", "true", "yes")
+
+
 @app.on_event("startup")
 async def seed():
+    if not SEED_DEMO_DATA:
+        return
     jobs_count = await db.jobs.count_documents({})
     if jobs_count == 0:
         job_docs = []
@@ -473,10 +518,35 @@ async def seed():
             await db.jobs.update_one({"id": jd["id"]}, {"$set": {"candidates_count": count}})
 
 
+async def record_event(candidate_id: str, kind: str, summary: str, actor: str = "system"):
+    """Append to a candidate's timeline.
+
+    The Activity tab used to render three hardcoded lines ("Just now",
+    "Yesterday", "3 days ago"). On a hiring record that is a fabricated audit
+    trail, and it also left analytics with no real timestamps to work from.
+    """
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()),
+        "candidate_id": candidate_id,
+        "kind": kind,
+        "summary": summary,
+        "actor": actor,
+        "at": now_iso(),
+    })
+
+
+async def _rescore_role(job: dict):
+    """Re-run scoring for everyone on a role after its weights/filters change."""
+    for c in await db.candidates.find({"role_ids": job["id"]}).to_list(5000):
+        new_score = score_candidate(c, job)["score"]
+        if new_score != c.get("match_score"):
+            await db.candidates.update_one({"id": c["id"]}, {"$set": {"match_score": new_score}})
+
+
 async def _recount_all_jobs():
     """Refresh candidates_count on every role. Cheap at this scale, and the
     counts drifting from reality is worse than the extra queries."""
-    for j in await db.jobs.find({}).to_list(1000):
+    for j in await db.jobs.find({}).to_list(5000):
         count = await db.candidates.count_documents({"role_ids": j["id"]})
         if count != j.get("candidates_count"):
             await db.jobs.update_one({"id": j["id"]}, {"$set": {"candidates_count": count}})
@@ -665,6 +735,9 @@ async def update_job(job_id: str, payload: JobUpdate, user: dict = Depends(requi
     if result.matched_count == 0:
         raise HTTPException(404, "Job not found")
     job = await db.jobs.find_one({"id": job_id})
+    if {"scoring_weights", "filters", "skills"} & set(changes):
+        await _rescore_role(job)
+        job = await db.jobs.find_one({"id": job_id})
     return strip_mongo(job)
 
 
@@ -778,7 +851,7 @@ async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(req
         _tier(0, max(0, min_exp - 2), "No preference", None),
     ]
 
-    pool = await db.candidates.find({}).to_list(1000)
+    pool = await db.candidates.find({}).to_list(10000)
     # Aim to leave the recruiter a workable shortlist rather than an empty one.
     target = max(3, int(len(pool) * 0.15)) if pool else 0
     recommended_filters = tiers[-1]
@@ -962,13 +1035,105 @@ def _parse_resume(text: str) -> dict:
     }
 
 
-def _score_against_job(candidate_skills: List[str], job: dict) -> int:
-    """Shared by bulk upload and public apply so both score identically."""
-    job_skill_names = [s["name"] for s in job.get("skills", [])]
-    if not job_skill_names:
-        return 60
-    overlap = len(set(candidate_skills) & set(job_skill_names))
-    return min(100, 40 + int(overlap / max(1, len(job_skill_names)) * 60))
+DEFAULT_WEIGHTS = {"skills": 40, "experience": 25, "education": 15, "notice": 10, "cultural_fit": 10}
+
+# Neutral rather than zero: a resume that didn't state something should not be
+# scored as though it failed. Same principle as the filters.
+UNKNOWN_COMPONENT_SCORE = 60
+
+
+def _skill_component(candidate_skills: List[str], job: dict) -> float:
+    """Weighted overlap. A job's 5-weight skill counts for more than a 3."""
+    job_skills = job.get("skills") or []
+    if not job_skills:
+        return UNKNOWN_COMPONENT_SCORE
+    have = {s.lower() for s in candidate_skills}
+    total = sum(max(1, int(s.get("weight", 3))) for s in job_skills)
+    got = sum(max(1, int(s.get("weight", 3))) for s in job_skills
+              if str(s.get("name", "")).lower() in have)
+    return 100.0 * got / total if total else UNKNOWN_COMPONENT_SCORE
+
+
+def _experience_component(years: Optional[float], filters: dict) -> float:
+    if years is None:
+        return UNKNOWN_COMPONENT_SCORE
+    minimum = filters.get("min_experience_years") or 0
+    if minimum <= 0:
+        return min(100.0, 60 + years * 5)
+    if years >= minimum:
+        # Meeting the bar is full marks; well beyond it is not better, and
+        # rewarding it would just bias towards the most expensive candidates.
+        return 100.0
+    return max(0.0, 100.0 * years / minimum)
+
+
+def _education_component(education: str, filters: dict) -> float:
+    match = _matches_education(education, filters.get("education_preference", "No preference"))
+    if match is None:
+        return UNKNOWN_COMPONENT_SCORE
+    return 100.0 if match else 0.0
+
+
+def _notice_component(notice: str, filters: dict) -> float:
+    days = _parse_notice_days(notice)
+    if days is None:
+        return UNKNOWN_COMPONENT_SCORE
+    limit = filters.get("notice_period_max_days") or 90
+    if days <= 0:
+        return 100.0
+    return max(0.0, 100.0 * (1 - min(1.0, days / max(1, limit))))
+
+
+def _cultural_component(company: str, filters: dict) -> float:
+    preferred = [c.lower() for c in (filters.get("preferred_companies") or [])]
+    if not preferred:
+        return UNKNOWN_COMPONENT_SCORE
+    current = (company or "").lower()
+    return 100.0 if any(pc in current for pc in preferred if pc) else 40.0
+
+
+def score_candidate(candidate: dict, job: dict) -> dict:
+    """Match score driven by the role's own scoring weights.
+
+    Those five sliders are labelled "How the match score is calculated" in the
+    UI. They were previously stored and never read — the score was pure skill
+    overlap, so the whole panel was decorative. This makes them real.
+
+    Returns the score plus its per-component breakdown, so a recruiter can see
+    why someone scored what they did.
+    """
+    weights = {**DEFAULT_WEIGHTS, **(job.get("scoring_weights") or {})}
+    filters = job.get("filters") or {}
+
+    components = {
+        "skills": _skill_component(candidate.get("skills") or [], job),
+        "experience": _experience_component(candidate.get("experience_years"), filters),
+        "education": _education_component(candidate.get("education", ""), filters),
+        "notice": _notice_component(candidate.get("notice_period", ""), filters),
+        "cultural_fit": _cultural_component(candidate.get("current_company", ""), filters),
+    }
+
+    total_weight = sum(max(0, weights.get(k, 0)) for k in components)
+    if total_weight <= 0:
+        # All sliders at zero: fall back to skills rather than returning 0 for
+        # everyone, which would silently flatten the whole pipeline.
+        return {"score": int(round(components["skills"])),
+                "components": {k: round(v) for k, v in components.items()},
+                "weights": weights}
+
+    weighted = sum(components[k] * max(0, weights.get(k, 0)) for k in components) / total_weight
+    return {
+        "score": max(0, min(100, int(round(weighted)))),
+        "components": {k: round(v) for k, v in components.items()},
+        "weights": weights,
+    }
+
+
+def _score_against_job(candidate_skills: List[str], job: dict, candidate: Optional[dict] = None) -> int:
+    """Convenience wrapper for the intake paths."""
+    c = dict(candidate or {})
+    c.setdefault("skills", candidate_skills)
+    return score_candidate(c, job)["score"]
 
 
 @app.post("/api/jobs/{job_id}/bulk-upload")
@@ -1067,7 +1232,7 @@ async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadF
                 continue
 
         skills = parsed["skills"] or ["General"]
-        score = _score_against_job(skills, job)
+        score = _score_against_job(skills, job, parsed)
         candidate = Candidate(
             name=parsed["name"] or parsed["email"].split("@")[0],
             email=parsed["email"],
@@ -1089,6 +1254,9 @@ async def bulk_upload_resumes(job_id: str, request: Request, files: List[UploadF
             source_filename=filename,
         )
         await db.candidates.insert_one(candidate.model_dump())
+        await record_event(candidate.id, "added",
+                           f"Added from {filename} by bulk upload.",
+                           user.get("name") or user.get("email", "system"))
         created += 1
         results.append({
             "filename": filename,
@@ -1243,25 +1411,47 @@ def _evaluate_filters(cands: List[dict], filters: dict) -> dict:
 
 @app.post("/api/candidates/preview-filter")
 async def preview_filter(payload: FilterPreviewRequest, user: dict = Depends(require_user)):
-    cands = await db.candidates.find({}).to_list(1000)
+    cands = await db.candidates.find({}).to_list(10000)
     return _evaluate_filters(cands, payload.filters or {})
 
 
 # ---------- Candidates ----------
 @app.get("/api/candidates")
-async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None, q: Optional[str] = None,
+async def list_candidates(job_id: Optional[str] = None, stage: Optional[str] = None,
+                          q: Optional[str] = None, unassigned: bool = False,
+                          limit: int = 200, offset: int = 0,
                           user: dict = Depends(require_user)):
-    query = {}
+    """Paginated. The previous to_list(1000) silently dropped everyone past the
+    thousandth candidate, with no indication anything was missing.
+
+    Search is done in the query rather than in Python so it spans the whole
+    collection instead of only the current page.
+    """
+    limit = max(1, min(500, limit))
+    offset = max(0, offset)
+
+    query: dict = {}
     if job_id:
         query["role_ids"] = job_id
+    if unassigned:
+        query["role_ids"] = {"$size": 0}
     if stage:
         query["stage"] = stage
-    cands = await db.candidates.find(query).sort("match_score", -1).to_list(1000)
-    result = [strip_mongo(c) for c in cands]
     if q:
-        ql = q.lower()
-        result = [c for c in result if ql in c["name"].lower() or ql in c["current_company"].lower() or any(ql in s.lower() for s in c["skills"])]
-    return result
+        rx = {"$regex": re.escape(q), "$options": "i"}
+        query["$or"] = [{"name": rx}, {"current_company": rx},
+                        {"current_title": rx}, {"email": rx}, {"skills": rx}]
+
+    total = await db.candidates.count_documents(query)
+    cursor = db.candidates.find(query).sort("match_score", -1).skip(offset).limit(limit)
+    items = [strip_mongo(c) for c in await cursor.to_list(limit)]
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(items) < total,
+    }
 
 
 @app.get("/api/candidates/{cid}")
@@ -1272,6 +1462,18 @@ async def get_candidate(cid: str, user: dict = Depends(require_user)):
     return strip_mongo(c)
 
 
+@app.get("/api/candidates/{cid}/score")
+async def candidate_score(cid: str, job_id: str, user: dict = Depends(require_user)):
+    """Why this candidate scored what they did, against one role."""
+    c = await db.candidates.find_one({"id": cid})
+    if not c:
+        raise HTTPException(404, "Candidate not found")
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return {"job_id": job_id, "job_title": job["title"], **score_candidate(c, job)}
+
+
 @app.patch("/api/candidates/{cid}")
 async def update_candidate(cid: str, payload: CandidateUpdate, user: dict = Depends(require_user)):
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
@@ -1280,6 +1482,11 @@ async def update_candidate(cid: str, payload: CandidateUpdate, user: dict = Depe
     result = await db.candidates.update_one({"id": cid}, {"$set": changes})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
+    actor = user.get("name") or user.get("email", "system")
+    if "rating" in changes:
+        await record_event(cid, "rated", f"Rated {changes['rating']} out of 5.", actor)
+    if "notes" in changes:
+        await record_event(cid, "note", "Notes updated.", actor)
     c = await db.candidates.find_one({"id": cid})
     # update job candidate counts if role_ids changed
     if "role_ids" in changes:
@@ -1292,6 +1499,8 @@ async def assign_roles(cid: str, payload: RoleAssignment, user: dict = Depends(r
     result = await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": payload.role_ids}})
     if result.matched_count == 0:
         raise HTTPException(404, "Candidate not found")
+    await record_event(cid, "roles_changed", f"Assigned to {len(payload.role_ids)} role(s).",
+                       user.get("name") or user.get("email", "system"))
     await _recount_all_jobs()
     c = await db.candidates.find_one({"id": cid})
     return strip_mongo(c)
@@ -1299,14 +1508,67 @@ async def assign_roles(cid: str, payload: RoleAssignment, user: dict = Depends(r
 
 @app.post("/api/candidates/{cid}/stage")
 async def set_stage(cid: str, payload: StageUpdate, user: dict = Depends(require_user)):
-    result = await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
-    if result.matched_count == 0:
+    before = await db.candidates.find_one({"id": cid})
+    if not before:
         raise HTTPException(404, "Candidate not found")
+    await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
+    if before.get("stage") != payload.stage:
+        await db.events.insert_one({
+            "id": str(uuid.uuid4()), "candidate_id": cid, "kind": "stage_changed",
+            "summary": f"Stage moved from {before.get('stage')} to {payload.stage}.",
+            "from_stage": before.get("stage"), "to_stage": payload.stage,
+            "actor": user.get("name") or user.get("email", "system"), "at": now_iso(),
+        })
     c = await db.candidates.find_one({"id": cid})
     return strip_mongo(c)
 
 
 # ---------- Public Apply (auto-apply from shareable link) ----------
+# PUBLIC — candidates parse their own resume before applying. Rate limited by
+# IP because it is unauthenticated and does real file work.
+PARSE_RATE_LIMIT = 20
+_parse_history: dict = {}
+
+
+@app.post("/api/apply/{slug}/parse-resume")
+async def parse_resume_public(slug: str, request: Request, file: UploadFile = File(...)):
+    job = await db.jobs.find_one({"share_slug": slug})
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    key = request.client.host if request.client else "unknown"
+    now = time.time()
+    recent = [t for t in _parse_history.get(key, []) if now - t < 60]
+    if len(recent) >= PARSE_RATE_LIMIT:
+        raise HTTPException(429, "Too many uploads. Please wait a minute and try again.")
+    recent.append(now)
+    _parse_history[key] = recent
+
+    filename = file.filename or "resume"
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_RESUME_EXTS:
+        raise HTTPException(400, f"We can read {', '.join(sorted(ALLOWED_RESUME_EXTS))} files.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "That file is empty.")
+    if len(data) > MAX_FILE_BYTES:
+        raise HTTPException(413, f"Please keep your resume under {MAX_FILE_BYTES // (1024 * 1024)} MB.")
+
+    try:
+        text = _extract_text(filename, data)
+    except ValueError as exc:
+        raise HTTPException(422, f"{exc}. You can still fill the form in yourself.")
+
+    parsed = _parse_resume(text)
+    # Report which fields we actually found, so the UI can tell the truth about
+    # what was extracted rather than animating a fixed list of claims.
+    found = [k for k in ("name", "email", "phone", "current_title", "current_company",
+                         "experience_years", "expected_ctc", "education")
+             if parsed.get(k)]
+    return {"parsed": parsed, "found": found, "filename": filename,
+            "resume_text": text[:50000]}
+
+
 # PUBLIC — the candidate-facing application endpoint.
 @app.post("/api/apply/{slug}")
 async def apply_to_job(slug: str, payload: CandidateApply):
@@ -1317,7 +1579,14 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     # mock: derive skills from resume_text using dictionary
     text = ((payload.resume_text or "") + " " + payload.current_title).lower()
     matched_skills = sorted({v for k, v in SKILL_DICTIONARY.items() if k in text})
-    score = _score_against_job(matched_skills, job)
+    score = _score_against_job(matched_skills, job, {
+        "experience_years": payload.experience_years,
+        "current_company": payload.current_company,
+        # A self-applied candidate states neither, so both score neutral rather
+        # than as failures.
+        "education": "",
+        "notice_period": "",
+    })
     email = payload.email.lower().strip()
 
     # Someone re-applying is the same person, not a second candidate. Refresh
@@ -1346,6 +1615,8 @@ async def apply_to_job(slug: str, payload: CandidateApply):
             {"$set": updates, "$addToSet": {"role_ids": job["id"]}},
         )
         await _recount_all_jobs()
+        await record_event(existing["id"], "applied",
+                           f"Re-applied to {job['title']}; details updated.", "candidate")
         return {
             "ok": True,
             "candidate_id": existing["id"],
@@ -1382,8 +1653,50 @@ async def apply_to_job(slug: str, payload: CandidateApply):
         source="public_apply",
     )
     await db.candidates.insert_one(c.model_dump())
+    await record_event(c.id, "applied", f"Applied to {job['title']} via the public link.", "candidate")
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})
     return {"ok": True, "candidate_id": c.id, "match_score": score, "duplicate": False}
+
+
+# ---------- Onboarding ----------
+@app.get("/api/onboarding")
+async def get_onboarding(user: dict = Depends(require_user)):
+    doc = await db.workspace.find_one({"id": "workspace"})
+    return strip_mongo(doc) if doc else {"completed": False}
+
+
+@app.post("/api/onboarding")
+async def save_onboarding(payload: OnboardingPayload, user: dict = Depends(require_user)):
+    """Persist onboarding. All three steps were previously discarded on Finish.
+
+    Creates the first role if one was named, so "your first hire" actually
+    produces something instead of dropping the recruiter on an empty form.
+    """
+    doc = {
+        "id": "workspace",
+        "company_name": payload.company_name.strip(),
+        "company_size": payload.company_size,
+        "industry": payload.industry,
+        "invite_emails": [e.lower() for e in payload.invite_emails],
+        "completed": True,
+        "completed_at": now_iso(),
+        "completed_by": user.get("email", ""),
+    }
+    await db.workspace.update_one({"id": "workspace"}, {"$set": doc}, upsert=True)
+
+    created_job = None
+    title = payload.role_title.strip()
+    if title:
+        existing = await db.jobs.find_one({"title": title})
+        if existing:
+            created_job = strip_mongo(existing)
+        else:
+            job = Job(title=title, department=payload.role_department,
+                      location=payload.role_location or "Remote")
+            await db.jobs.insert_one(job.model_dump())
+            created_job = job.model_dump()
+
+    return {"ok": True, "workspace": doc, "job": created_job}
 
 
 # ---------- Analytics ----------
@@ -1392,13 +1705,51 @@ async def analytics_summary(user: dict = Depends(require_user)):
     total_jobs = await db.jobs.count_documents({})
     total_candidates = await db.candidates.count_documents({})
     stages = ["New", "Shortlisted", "Interview", "Offer", "Rejected"]
-    funnel = {}
-    for s in stages:
-        funnel[s] = await db.candidates.count_documents({"stage": s})
+    funnel = {st: await db.candidates.count_documents({"stage": st}) for st in stages}
+
+    # These two were hardcoded to 2.4 and 0.68 — fabricated numbers presented on
+    # the dashboard as this team's metrics. Both are now computed, and report
+    # None when there isn't enough history to say anything honest.
+    shortlist_events = await db.events.find(
+        {"kind": "stage_changed", "to_stage": {"$in": ["Shortlisted", "Interview", "Offer"]}}
+    ).to_list(5000)
+    seen, durations = set(), []
+    for ev in sorted(shortlist_events, key=lambda e: e.get("at", "")):
+        cid = ev.get("candidate_id")
+        if cid in seen:
+            continue  # first advance only, not every subsequent move
+        seen.add(cid)
+        cand = await db.candidates.find_one({"id": cid})
+        if not cand:
+            continue
+        try:
+            delta = datetime.fromisoformat(ev["at"]) - datetime.fromisoformat(cand["applied_at"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if delta.total_seconds() >= 0:
+            durations.append(delta.total_seconds() / 86400)
+
+    avg_days = round(sum(durations) / len(durations), 1) if durations else None
+
+    self_applied = await db.candidates.count_documents({"source": "public_apply"})
+    conversion = round(self_applied / total_candidates, 2) if total_candidates else None
+
     return {
         "total_jobs": total_jobs,
         "total_candidates": total_candidates,
         "funnel": funnel,
-        "avg_time_to_shortlist_days": 2.4,
-        "auto_apply_conversion": 0.68,
+        "avg_time_to_shortlist_days": avg_days,
+        "avg_time_to_shortlist_sample": len(durations),
+        "self_applied_share": conversion,
+        "self_applied_count": self_applied,
+        # Kept for compatibility with the existing dashboard tile.
+        "auto_apply_conversion": conversion,
     }
+
+
+@app.get("/api/candidates/{cid}/events")
+async def candidate_events(cid: str, user: dict = Depends(require_user)):
+    if not await db.candidates.find_one({"id": cid}):
+        raise HTTPException(404, "Candidate not found")
+    events = await db.events.find({"candidate_id": cid}).sort("at", -1).to_list(200)
+    return [strip_mongo(e) for e in events]

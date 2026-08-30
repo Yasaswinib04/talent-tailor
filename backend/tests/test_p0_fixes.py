@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test")
 # Endpoints require a session; bootstrap an admin and sign in for each test.
+os.environ["SEED_DEMO_DATA"] = "true"  # fixtures need the demo pool
 os.environ["ADMIN_EMAIL"] = "maya@cred.club"
 os.environ["ADMIN_PASSWORD"] = "correct horse battery staple"
 
@@ -106,14 +107,14 @@ def test_patch_still_applies_legitimate_edits(client, job):
 
 
 def test_candidate_patch_cannot_overwrite_identity_or_score(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     for payload in ({"id": "spoofed"}, {"match_score": 100}, {"auto_applied": True}, {"source": "x"}):
         assert client.patch(f"/api/candidates/{cid}", json=payload).status_code == 422, payload
     assert client.get(f"/api/candidates/{cid}").status_code == 200
 
 
 def test_candidate_patch_validates_rating_and_experience(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     assert client.patch(f"/api/candidates/{cid}", json={"rating": 99}).status_code == 422
     assert client.patch(f"/api/candidates/{cid}", json={"rating": -1}).status_code == 422
     assert client.patch(f"/api/candidates/{cid}", json={"experience_years": -5}).status_code == 422
@@ -121,7 +122,7 @@ def test_candidate_patch_validates_rating_and_experience(client):
 
 
 def test_candidate_patch_rejects_an_invalid_stage(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     assert client.patch(f"/api/candidates/{cid}", json={"stage": "Banana"}).status_code == 422
     assert client.patch(f"/api/candidates/{cid}", json={"stage": "Offer"}).status_code == 200
 
@@ -136,7 +137,7 @@ def test_patch_on_unknown_id_is_404_not_500(client):
 
 
 def test_notes_and_roles_still_save(client):
-    cands = client.get("/api/candidates").json()
+    cands = client.get("/api/candidates").json()["items"]
     jobs = client.get("/api/jobs").json()
     cid = cands[0]["id"]
     assert client.patch(f"/api/candidates/{cid}", json={"notes": "Strong hire"}).json()["notes"] == "Strong hire"
@@ -146,7 +147,7 @@ def test_notes_and_roles_still_save(client):
 
 # ---------- Stage must be one of the five the UI knows about ----------
 def test_post_stage_rejects_an_unknown_value(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     before = client.get(f"/api/candidates/{cid}").json()["stage"]
     for bad in ("Banana", "", "  ", "<script>"):
         assert client.post(f"/api/candidates/{cid}/stage", json={"stage": bad}).status_code == 422, bad
@@ -154,14 +155,14 @@ def test_post_stage_rejects_an_unknown_value(client):
 
 
 def test_post_stage_still_accepts_the_real_stages(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     for stage in ("New", "Shortlisted", "Interview", "Offer", "Rejected"):
         r = client.post(f"/api/candidates/{cid}/stage", json={"stage": stage})
         assert r.status_code == 200 and r.json()["stage"] == stage
 
 
 def test_every_candidate_stays_countable_in_the_funnel(client):
-    cid = client.get("/api/candidates").json()[0]["id"]
+    cid = client.get("/api/candidates").json()["items"][0]["id"]
     client.post(f"/api/candidates/{cid}/stage", json={"stage": "Banana"})
     summary = client.get("/api/analytics/summary").json()
     assert sum(summary["funnel"].values()) == summary["total_candidates"]

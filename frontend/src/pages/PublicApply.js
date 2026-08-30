@@ -28,40 +28,61 @@ export default function PublicApply() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [invalid, setInvalid] = useState({});
+  const [parseError, setParseError] = useState("");
+  const [found, setFound] = useState([]);
 
   useEffect(() => {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
   }, [slug]);
 
-  const simulateParse = async (text, filename) => {
+  // Real parsing. This used to discard the uploaded file entirely and fill the
+  // form with a hardcoded "Aarav Menon" sample, so an applicant submitted
+  // someone else's name, email and salary while the UI animated claims about
+  // extracting theirs.
+  const parseResume = async (file) => {
     setStage("scanning");
-    setScanText(filename || "resume.pdf");
-    await new Promise((r) => setTimeout(r, 1600));
-    // Mock parse: pull "name" / "title" from text if provided, otherwise use sample
-    const sample = {
-      name: "Aarav Menon",
-      email: "aarav.menon@email.in",
-      phone: "+91 98450 22118",
-      current_title: "Senior Frontend Engineer",
-      current_company: "Razorpay",
-      experience_years: 5.5,
-      expected_ctc: 4000000,
-      resume_text:
-        text ||
-        "Senior Frontend Engineer at Razorpay. 5.5 years of production React, TypeScript, Next.js. Built the design system used across all consumer surfaces. Previously at Freshworks working on performance optimization. B.Tech from IIT Roorkee.",
-    };
-    setForm(sample);
-    setStage("review");
+    setScanText(file.name);
+    setParseError("");
+    setFound([]);
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    try {
+      const res = await api.post(`/apply/${slug}/parse-resume`, fd, {
+        headers: { "Content-Type": undefined },
+      });
+      const p = res.data.parsed || {};
+      setForm((f) => ({
+        ...f,
+        name: p.name || f.name,
+        email: p.email || f.email,
+        phone: p.phone || f.phone,
+        current_title: p.current_title || f.current_title,
+        current_company: p.current_company || f.current_company,
+        experience_years: p.experience_years || f.experience_years,
+        expected_ctc: p.expected_ctc || f.expected_ctc,
+        resume_text: res.data.resume_text || "",
+      }));
+      setFound(res.data.found || []);
+      setStage("review");
+    } catch (err) {
+      // Never a dead end: they can always type it in themselves.
+      setParseError(errMessage(err, "We couldn't read that file — please fill in your details below."));
+      setForm((f) => ({ ...f, resume_text: "" }));
+      setStage("review");
+    }
   };
 
   const onFile = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    // We can't truly parse PDF here; simulate.
-    simulateParse("", file.name);
+    if (file) parseResume(file);
   };
 
-  const onDemoParse = () => simulateParse("");
+  const startManually = () => {
+    setScanText("");
+    setFound([]);
+    setParseError("");
+    setStage("review");
+  };
 
   const fieldErrors = () => {
     const e = {};
@@ -150,8 +171,8 @@ export default function PublicApply() {
               </label>
               <div className="mt-6 text-[11px] text-white/40">
                 or{" "}
-                <button onClick={onDemoParse} data-testid="pa-demo-btn" className="text-brand hover:text-white underline underline-offset-2">
-                  try with a demo resume
+                <button onClick={startManually} data-testid="pa-manual-btn" className="text-brand hover:text-white underline underline-offset-2">
+                  fill the form in yourself
                 </button>
               </div>
             </motion.div>
@@ -169,16 +190,16 @@ export default function PublicApply() {
                 <Loader2 size={16} className="animate-spin text-brand ml-auto" />
               </div>
               <div className="space-y-2">
-                {["Name and contact", "Current title & company", "Years of experience", "Skills & expertise", "Education"].map((s, i) => (
+                {["Reading the file", "Finding your contact details", "Picking out your experience"].map((label, i) => (
                   <motion.div
-                    key={s}
+                    key={label}
                     initial={{ opacity: 0, x: -6 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.15 * i }}
+                    transition={{ delay: 0.2 * i }}
                     className="flex items-center gap-3 text-xs text-white/70"
                   >
-                    <Check size={12} className="text-success" />
-                    <span>Extracted {s.toLowerCase()}</span>
+                    <Loader2 size={12} className="animate-spin text-brand" />
+                    <span>{label}…</span>
                   </motion.div>
                 ))}
               </div>
@@ -187,9 +208,24 @@ export default function PublicApply() {
 
           {stage === "review" && (
             <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-8 bg-surface/30">
-              <div className="flex items-center gap-2 mb-6">
-                <Sparkles size={14} className="text-brand" />
-                <div className="font-mono-label">auto-filled · confirm and submit</div>
+              <div className="mb-6">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-brand" />
+                  <div className="font-mono-label">
+                    {found.length > 0 ? `read ${found.length} field${found.length > 1 ? "s" : ""} from your resume · check and submit` : "your details · check and submit"}
+                  </div>
+                </div>
+                {parseError && (
+                  <div className="mt-3 border border-amber-400/40 bg-amber-400/5 px-3 py-2 flex items-start gap-2" data-testid="pa-parse-error">
+                    <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                    <span className="text-[11px] text-white/80">{parseError}</span>
+                  </div>
+                )}
+                {found.length > 0 && (
+                  <div className="mt-2 text-[11px] text-white/40" data-testid="pa-found-summary">
+                    Please check everything below — anything we couldn't find is blank.
+                  </div>
+                )}
               </div>
               <div className="grid md:grid-cols-2 gap-6">
                 <FieldPA label="Full name" value={form.name} error={invalid.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />

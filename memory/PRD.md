@@ -8,12 +8,12 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 ## User choices captured
 - Scope: **Both** — interactive prototype **and** UX report page.
 - Screens: HR Onboarding · Job Setup · Candidate Dashboard · Candidate Profile · Public Apply link.
-- AI features: **Mocked** but realistic (Indian names / Indian salary ranges).
+- AI features: originally **mocked**. Now real where it matters — resume parsing (pypdf/python-docx) and weighted match scoring. Skill extraction from a JD is still a heuristic dictionary rather than an LLM; it is deterministic and works offline, and is the one remaining candidate for a model.
 - Visual direction: designer's call — chose **CRED-inspired dark, editorial, mono accents** with copper (#B28A5D) accents.
 
 ## Architecture
 - **Frontend**: React 18 (CRA) + Tailwind + Framer Motion + Radix UI + lucide-react. Routes: `/` (report), `/onboarding`, `/app`, `/app/jobs/new`, `/app/jobs/:id`, `/app/candidates/:cid`, `/apply/:slug`.
-- **Backend**: FastAPI + MongoDB (motor). Routes prefixed `/api`. Seeds 4 jobs + 20 realistic Indian candidates on startup.
+- **Backend**: FastAPI + MongoDB (motor). Routes prefixed `/api`. Optional demo seed (4 jobs + 20 sample candidates) behind `SEED_DEMO_DATA`, off by default.
 - **Design tokens** in `/app/design_guidelines.json`: Cormorant Garamond (editorial), Cabinet Grotesk (display), Satoshi (body), JetBrains Mono (labels/keyboard).
 
 ## What's been implemented (Jan 2026)
@@ -57,21 +57,29 @@ real pool and back off until they leave a shortlist (0 of 20 → 4 of 20 on the
 sample JD). Unknown education/notice/location no longer auto-reject — they are
 counted and surfaced instead, which matters once real resumes are parsed.
 
-**Remaining (P2, none launch-blocking):** dead sidebar nav and non-functional
-global search, no confirm on bulk reject, publish allowed with weights ≠ 100%,
-unusable on mobile, no pagination past 1000, share_slug uniqueness. Track B in
-the fix plan.
+**Nothing is mocked any more (Aug 2026).** Demo seed data is behind
+`SEED_DEMO_DATA` and off by default; candidate-side resume upload parses the
+real file instead of a hardcoded sample; the scoring weights actually compute
+the match score and rescore on edit; dashboard KPIs are computed and return null
+rather than inventing numbers; the activity feed is a real event log with actor
+and timestamp; onboarding persists and creates the first role. Sidebar tabs,
+global search and ⌘K work. Candidate lists are paginated.
+
+**Known gap:** the dashboard is desktop-only — 832px of content in a 390px
+viewport. Everything else on the P2 list is closed.
 
 ## Prioritized backlog
-- **P1** — Persist onboarding to backend (currently client-only; skip button jumps directly to app)
-- **P1** — Command palette (`⌘K`) — currently visual affordance only
-- **P2** — Real resume parsing (PDF.js on candidate side) instead of simulated scan
+- **P1** — Responsive dashboard. The only known non-working thing: 832px of
+  content in a 390px viewport, fixed 224px sidebar, overlapping KPI text.
+- **P2** — ⌘K opens a full command palette rather than only focusing search
 - **P2** — Interviewer assignment + calendar sync
 - **P2** — Analytics deep-dive page (funnel, time-in-stage, source ROI)
+- **P2** — Self-host fonts and imagery; today they load from Google Fonts,
+  Fontshare, Unsplash and Pexels with no fallback
 - **P3** — Email drip templates for candidates
 - **P3** — Multi-recruiter collaboration (mentions, approvals)
+- **P3** — LLM-backed skill extraction to replace the heuristic dictionary
 
-## Next tasks
-- User review of the prototype
-- Any refinement to specific screens the user wants
-- Integrate real Gemini/Claude for skill extraction if desired (currently heuristic dictionary)
+## Done, previously on this list
+- ✅ Persist onboarding to the backend
+- ✅ Real resume parsing on the candidate side

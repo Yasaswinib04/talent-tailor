@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
+os.environ["SEED_DEMO_DATA"] = "true"  # fixtures need the demo pool
 os.environ["ADMIN_EMAIL"] = "maya@cred.club"
 os.environ["ADMIN_PASSWORD"] = "correct horse battery staple"
 
@@ -28,8 +29,15 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 ADMIN = {"email": "maya@cred.club", "password": "correct horse battery staple"}
 
-# Open by design: a liveness probe and the two candidate-facing routes.
-PUBLIC_PATHS = {"/api/health", "/api/jobs/share/{slug}", "/api/apply/{slug}"}
+# Open by design: a liveness probe and the candidate-facing routes. Candidates
+# applying through a share link have no account, so these three must work
+# anonymously. Every other /api route must return 401 without a session.
+PUBLIC_PATHS = {
+    "/api/health",
+    "/api/jobs/share/{slug}",
+    "/api/apply/{slug}",
+    "/api/apply/{slug}/parse-resume",
+}
 
 
 @pytest.fixture()
@@ -252,3 +260,47 @@ def test_a_weak_admin_password_creates_no_account(monkeypatch):
     with TestClient(server.app, raise_server_exceptions=False) as c:
         assert c.post("/api/auth/login", json={**ADMIN, "password": "password"}).status_code == 401
     os.environ["ADMIN_PASSWORD"] = ADMIN["password"]
+
+
+# ---------- The public resume parser is open on purpose, and bounded ----------
+def test_a_candidate_can_parse_their_resume_without_an_account(client, signed_in):
+    import io
+
+    job = signed_in.get("/api/jobs").json()[0]
+    signed_in.post("/api/auth/logout")
+    r = client.post(
+        f"/api/apply/{job['share_slug']}/parse-resume",
+        files={"file": ("cv.txt", io.BytesIO(
+            b"Ritu Malhotra\nritu@cv.in\nBackend Engineer at Ola\n6 years\nGolang, Kafka\n"),
+            "text/plain")},
+    )
+    assert r.status_code == 200
+    assert r.json()["parsed"]["name"] == "Ritu Malhotra"
+    assert r.json()["parsed"]["email"] == "ritu@cv.in"
+
+
+def test_the_public_parser_is_rate_limited(client, signed_in):
+    import io
+
+    job = signed_in.get("/api/jobs").json()[0]
+    server._parse_history.clear()
+    codes = []
+    for _ in range(server.PARSE_RATE_LIMIT + 2):
+        codes.append(client.post(
+            f"/api/apply/{job['share_slug']}/parse-resume",
+            files={"file": ("cv.txt", io.BytesIO(b"A Person\na@b.in\n2 years\n"), "text/plain")},
+        ).status_code)
+    assert 429 in codes, "an unauthenticated file endpoint must be bounded"
+    server._parse_history.clear()
+
+
+def test_the_public_parser_refuses_unknown_slugs_and_bad_files(client, signed_in):
+    import io
+
+    job = signed_in.get("/api/jobs").json()[0]
+    server._parse_history.clear()
+    assert client.post("/api/apply/nope/parse-resume",
+                       files={"file": ("cv.txt", io.BytesIO(b"x"), "text/plain")}).status_code == 404
+    r = client.post(f"/api/apply/{job['share_slug']}/parse-resume",
+                    files={"file": ("virus.exe", io.BytesIO(b"MZ"), "application/octet-stream")})
+    assert r.status_code == 400

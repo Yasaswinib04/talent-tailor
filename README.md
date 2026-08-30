@@ -34,6 +34,7 @@ There are four:
 | `CORS_ORIGINS` | backend, runtime | Comma-separated allowed origins. **Required** when the app and API are on different origins — see below. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | backend, runtime | Used once on first startup to create the first admin. No default password; without these, nobody can sign in. |
 | `COOKIE_SECURE` | backend, runtime | Set to `true` on HTTPS. Marks the session cookie `Secure` + `SameSite=None`. |
+| `SEED_DEMO_DATA` | backend, runtime | `true` inserts 4 sample roles and 20 fabricated candidates on first boot. **Leave unset in production.** |
 | `REACT_APP_BACKEND_URL` | frontend, **build time** | Backend origin, no trailing slash, no `/api` suffix. |
 
 ### The one that bites
@@ -106,12 +107,12 @@ grep -o 'baseURL[^,]*' frontend/build/static/js/main.*.js   # must not contain "
 
 ```bash
 pip install -r backend/requirements.txt -r backend/tests/requirements.txt
-pytest backend/tests                    # 101 tests; integration ones skip without a server
+pytest backend/tests                    # 128 tests; integration ones skip without a server
 TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration tests
 ```
 
-- `test_auth.py`, `test_bulk_upload.py`, `test_p0_fixes.py` and
-  `test_pipeline_integrity.py` run fully locally
+- `test_auth.py`, `test_bulk_upload.py`, `test_p0_fixes.py`,
+  `test_pipeline_integrity.py` and `test_no_mocks.py` run fully locally
   against an in-memory Mongo — no server needed. `test_auth.py` walks the app's
   own route table, so a new endpoint added without a guard fails the build.
 - `backend_test.py` is an integration suite; point it at a running API with
@@ -122,6 +123,6 @@ TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration
 A full UAT was run on 2026-08-08. See
 [`specs/uat-report-2026-08-08.md`](specs/uat-report-2026-08-08.md) for findings
 and [`specs/launch-fix-plan.md`](specs/launch-fix-plan.md) for what is fixed and
-what remains. All P0s and the pipeline-integrity P1s are closed. What's left is
-cosmetic: some dead UI in the sidebar, no mobile layout, and no pagination past
-1000 candidates — see Track B in the fix plan.
+what remains. All P0s and P1s are closed, and everything that was previously
+mocked or decorative now works for real — see the fix plan. The one known gap
+is the mobile layout: the dashboard is built for desktop widths.

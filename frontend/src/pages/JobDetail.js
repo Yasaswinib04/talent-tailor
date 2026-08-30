@@ -11,13 +11,18 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [totalCands, setTotalCands] = useState(0);
   const [loadError, setLoadError] = useState("");
 
   const load = async () => {
     try {
-      const [j, c] = await Promise.all([api.get(`/jobs/${jobId}`), api.get(`/candidates?job_id=${jobId}`)]);
+      const [j, c] = await Promise.all([
+        api.get(`/jobs/${jobId}`),
+        api.get(`/candidates?job_id=${jobId}&limit=500`),
+      ]);
       setJob(j.data);
-      setCands(c.data);
+      setCands(c.data.items || []);
+      setTotalCands(c.data.total ?? (c.data.items || []).length);
       setLoadError("");
     } catch (err) {
       setLoadError(
@@ -188,7 +193,7 @@ export default function JobDetail() {
           <div className="flex items-center gap-3">
             <Users size={16} className="text-brand" />
             <h2 className="font-display text-xl font-semibold">Candidates for this role</h2>
-            <span className="font-mono-label">{cands.length} total</span>
+            <span className="font-mono-label">{totalCands} total</span>
           </div>
         </div>
         <div className="border hairline">
@@ -214,6 +219,11 @@ export default function JobDetail() {
               </div>
             </div>
           ))}
+          {totalCands > cands.length && (
+            <div className="p-3 text-center text-[11px] text-white/40 border-b hairline">
+              Showing {cands.length} of {totalCands}.
+            </div>
+          )}
           {cands.length === 0 && (
             <div className="p-12 text-center text-white/40 text-sm">
               No candidates yet. Share the public apply link →
