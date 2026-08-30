@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, field_validator
 
+import analytics
 import llm
 import security
 
@@ -334,6 +335,8 @@ async def signup(payload: SignupRequest):
         password_hash=security.hash_password(payload.password),
     )
     await db.users.insert_one(user.model_dump())
+    analytics.identify(user.id, company=user.company or None, signup_date=user.created_at)
+    analytics.capture(user.id, "signed_up", has_company=bool(user.company))
     return {"token": security.make_token(user.id), "user": _public_user(user.model_dump())}
 
 
@@ -558,6 +561,16 @@ async def create_job(payload: JobCreate, user: dict = Depends(current_user)):
     # Publishing a role runs its filters over the pool and attaches everyone who
     # clears them, so the "N will pass" preview is the shortlist the recruiter gets.
     matched = await _attach_matching_candidates(doc)
+    # jobs_total tells us whether this is their first role or their tenth —
+    # the difference between activation and habit.
+    analytics.capture(
+        user["id"],
+        "job_created",
+        job_id=job.id,
+        matched_candidates=matched,
+        has_filters=bool(payload.filters),
+        jobs_total=await db.jobs.count_documents({"owner_id": user["id"]}),
+    )
     out = job.model_dump()
     out["candidates_count"] = matched
     return out
@@ -638,6 +651,7 @@ async def unlock_job(job_id: str, payload: UnlockRequest, user: dict = Depends(c
     if (payload.code or "").strip() != UNLOCK_CODE:
         raise HTTPException(403, "That unlock code isn't valid")
     await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
+    analytics.capture(user["id"], "shortlist_unlocked", job_id=job_id, rail="code", amount_inr=UNLOCK_PRICE_INR)
     return {"ok": True}
 
 
@@ -720,6 +734,9 @@ async def verify_payment(job_id: str, payload: VerifyPaymentRequest, user: dict 
         {"$set": {"status": "paid", "payment_id": payload.razorpay_payment_id, "paid_at": now_iso()}},
     )
     await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
+    # Revenue. Verified server-side, so unlike the client-side payment_started
+    # this one cannot be faked or blocked.
+    analytics.capture(user["id"], "shortlist_unlocked", job_id=job_id, rail="razorpay", amount_inr=UNLOCK_PRICE_INR)
     return {"ok": True, "unlocked": True}
 
 
@@ -1216,6 +1233,17 @@ async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user:
         raise HTTPException(413, f"Up to {MAX_BULK_FILES} resumes per batch")
     results = await asyncio.gather(*[_ingest_resume_file(f, job) for f in files])
     created = [r for r in results if r.get("ok")]
+    # Parse failure rate is the number that decides whether the LLM tier is
+    # good enough. Reasons are enums from _ingest_resume_file, never filenames.
+    analytics.capture(
+        user["id"],
+        "resumes_uploaded",
+        job_id=job_id,
+        file_count=len(files),
+        parsed_count=len(created),
+        failed_count=len(files) - len(created),
+        failure_reasons=[r.get("error") for r in results if not r.get("ok")],
+    )
     await db.jobs.update_one(
         {"id": job_id},
         {"$set": {"candidates_count": await db.candidates.count_documents({"role_ids": job_id})}},

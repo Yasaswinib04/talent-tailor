@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx, getUser } from "../lib/api";
+import { track } from "../lib/analytics";
 import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload, Loader2 } from "lucide-react";
 
 export default function JobDetail() {
@@ -40,6 +41,13 @@ export default function JobDetail() {
 
   const openUnlock = async () => {
     setUnlockOpen(true);
+    // The top of the paid funnel. Everything after this — which rail they
+    // pick, whether they abandon at the price — hangs off this event.
+    track("unlock_modal_opened", {
+      job_id: jobId,
+      locked_count: cands.filter((c) => c.locked).length,
+      candidates_count: cands.length,
+    });
     if (!billing) {
       try {
         const res = await api.get("/billing/config");
@@ -55,6 +63,7 @@ export default function JobDetail() {
   const payWithRazorpay = async () => {
     setUnlockError(null);
     setPayBusy(true);
+    track("payment_started", { job_id: jobId, rail: "razorpay" });
     try {
       if (!window.Razorpay) {
         await new Promise((resolve, reject) => {
@@ -81,12 +90,21 @@ export default function JobDetail() {
             setUnlockOpen(false);
             await load();
           } catch {
+            // Money taken, shortlist still locked — the worst state the app
+            // has. Track it separately so it can be alerted on, not buried in
+            // a generic failure count.
+            track("payment_verification_failed", { job_id: jobId });
             setUnlockError("Payment made but verification failed — contact us with your payment id and we'll unlock it.");
           } finally {
             setPayBusy(false);
           }
         },
-        modal: { ondismiss: () => setPayBusy(false) },
+        modal: {
+          ondismiss: () => {
+            track("payment_abandoned", { job_id: jobId, rail: "razorpay" });
+            setPayBusy(false);
+          },
+        },
       });
       rzp.open();
     } catch (err) {
@@ -114,6 +132,7 @@ export default function JobDetail() {
   };
 
   const exportCsv = async () => {
+    track("shortlist_exported", { job_id: jobId });
     const res = await api.get(`/jobs/${jobId}/export`, { responseType: "blob" });
     const url = URL.createObjectURL(res.data);
     const a = document.createElement("a");
@@ -142,6 +161,7 @@ export default function JobDetail() {
       setUploadSummary(res.data);
       await load();
     } catch (err) {
+      track("bulk_upload_failed", { job_id: jobId, file_count: files.length });
       setUploadSummary({ total: files.length, ranked: 0, failed: [], error: "Upload failed — please try again." });
     } finally {
       setUploading(false);
@@ -346,7 +366,7 @@ export default function JobDetail() {
                 <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
               )}
               <div className="flex-1 min-w-0">
-                <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
+                <div data-private className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
                 <div className="text-xs text-white/72">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
               </div>
               <div className="text-xs text-white/72 hidden md:block">
