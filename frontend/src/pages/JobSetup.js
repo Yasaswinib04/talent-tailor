@@ -170,7 +170,7 @@ export default function JobSetup() {
   return (
     <div className="min-h-full">
       {/* Header */}
-      <div className="border-b hairline px-8 py-5 flex items-center justify-between sticky top-0 bg-app/90 backdrop-blur-sm z-20">
+      <div className="border-b hairline px-4 md:px-8 py-4 md:py-5 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-app/90 backdrop-blur-sm z-20">
         <div className="flex items-center gap-4">
           <button onClick={() => nav("/app")} data-testid="js-back-btn" className="text-white/50 hover:text-white transition-colors">
             <ChevronLeft size={18} />
@@ -200,9 +200,9 @@ export default function JobSetup() {
       </div>
 
       {/* Split layout */}
-      <div className="grid md:grid-cols-2 gap-0 min-h-[calc(100vh-8rem)]">
+      <div className="grid md:grid-cols-2 gap-0 md:min-h-[calc(100vh-8rem)]">
         {/* LEFT — JD & Basics + Advanced criteria */}
-        <div className="p-8 border-r hairline space-y-8 pb-24">
+        <div className="p-4 md:p-8 md:border-r hairline space-y-8 pb-12 md:pb-24">
           <div>
             <div className="font-mono-label mb-2">step 01 · role title</div>
             <input
@@ -210,11 +210,11 @@ export default function JobSetup() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Senior Frontend Engineer"
-              className="w-full bg-transparent text-3xl font-display font-medium border-b hairline focus:border-brand pb-3 outline-none placeholder:text-white/20 transition-colors"
+              className="w-full bg-transparent text-2xl md:text-3xl font-display font-medium border-b hairline focus:border-brand pb-3 outline-none placeholder:text-white/20 transition-colors"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <SmallField label="Department">
               <select
                 data-testid="js-dept-select"
@@ -287,7 +287,7 @@ export default function JobSetup() {
               badge={usingRecommended.filters && extracted ? "recommended · applied" : null}
               onRestore={extracted ? () => restoreRecommended("filters") : null}
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SmallField label={<span className="inline-flex items-center gap-1.5"><Briefcase size={11} /> Min experience</span>}>
                   <div className="flex items-center gap-2">
                     <input
@@ -430,7 +430,7 @@ export default function JobSetup() {
                   { key: "cultural_fit", label: "Cultural / signal", hint: "Preferred companies, gap tolerance, etc." },
                 ].map((row) => (
                   <div key={row.key} className="flex items-center gap-3">
-                    <div className="w-40 shrink-0">
+                    <div className="w-32 sm:w-40 shrink-0">
                       <div className="text-xs">{row.label}</div>
                       <div className="text-[10px] text-white/40">{row.hint}</div>
                     </div>
@@ -462,8 +462,8 @@ export default function JobSetup() {
         </div>
 
         {/* RIGHT — Live extraction */}
-        <div className="p-8 bg-surface/30 relative">
-          <div className="sticky top-24 space-y-8">
+        <div className="p-4 md:p-8 bg-surface/30 relative border-t md:border-t-0 hairline">
+          <div className="md:sticky md:top-24 space-y-8">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">

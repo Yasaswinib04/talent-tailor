@@ -121,26 +121,26 @@ export default function Dashboard() {
 
   if (error && !jobs.length && !candidates.length) {
     return (
-      <div className="p-8 max-w-[1400px] mx-auto">
+      <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
         <ErrorState message={error} onRetry={load} testid="dash-error" />
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
+    <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
       {error && (
         <div className="mb-6">
           <ErrorState message={error} onRetry={load} testid="dash-error-inline" />
         </div>
       )}
       {/* Header */}
-      <div className="flex items-end justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6 md:mb-8">
         <div>
           <div className="font-mono-label mb-2">
             {tab === "jobs" ? "roles" : tab === "candidates" ? "candidates" : "overview"}
           </div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">
+          <h1 className="font-display text-2xl md:text-4xl font-bold tracking-tight">
             {tab === "jobs" ? "Open roles" : tab === "candidates" ? "All candidates" : "Talent pipeline"}
           </h1>
         </div>
@@ -155,7 +155,7 @@ export default function Dashboard() {
 
       {/* KPI band */}
       {summary && tab === "overview" && (
-        <div className="grid grid-cols-2 md:grid-cols-5 border hairline mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-5 border hairline mb-6 md:mb-8">
           <Kpi label="open roles" value={summary.total_jobs} icon={<Briefcase size={14} />} testid="kpi-jobs" />
           <Kpi label="candidates" value={summary.total_candidates} icon={<Users size={14} />} testid="kpi-candidates" />
           <Kpi label="shortlisted" value={summary.funnel.Shortlisted} icon={<Star size={14} />} testid="kpi-shortlisted" />
@@ -177,7 +177,7 @@ export default function Dashboard() {
           <h2 className="font-display text-xl font-semibold">Open roles</h2>
           <div className="font-mono-label">{jobs.length} active</div>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {jobs.map((j) => (
             <div
               key={j.id}
@@ -213,8 +213,8 @@ export default function Dashboard() {
 
       {/* Candidate table */}
       <div className={cx(tab === "jobs" && "hidden")}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-display text-xl font-semibold">All candidates</h2>
             {(q || filterStage || filterJob) && (
               <span className="text-[10px] font-mono flex items-center gap-1.5">
@@ -249,15 +249,15 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 border hairline px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2 border hairline px-3 py-2 flex-1 sm:flex-none min-w-0">
               <Search size={12} className="text-white/40" />
               <input
                 data-testid="candidates-search"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Name, company, skill…"
-                className="bg-transparent focus:outline-none text-xs w-56"
+                className="bg-transparent focus:outline-none text-xs w-full sm:w-56 min-w-0"
               />
             </div>
             <select
@@ -284,16 +284,16 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="border hairline overflow-hidden">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="border hairline overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm min-w-[560px]">
             <thead>
               <tr className="border-b hairline bg-surface/60">
                 <th className="w-8 py-3 px-3"></th>
                 <th className="py-3 px-3 font-mono-label">candidate</th>
-                <th className="py-3 px-3 font-mono-label">current</th>
-                <th className="py-3 px-3 font-mono-label">exp</th>
-                <th className="py-3 px-3 font-mono-label">ctc</th>
-                <th className="py-3 px-3 font-mono-label">roles</th>
+                <th className="py-3 px-3 font-mono-label hidden md:table-cell">current</th>
+                <th className="py-3 px-3 font-mono-label hidden sm:table-cell">exp</th>
+                <th className="py-3 px-3 font-mono-label hidden lg:table-cell">ctc</th>
+                <th className="py-3 px-3 font-mono-label hidden lg:table-cell">roles</th>
                 <th className="py-3 px-3 font-mono-label">stage</th>
                 <th className="py-3 px-3 font-mono-label text-right">match</th>
               </tr>
@@ -325,19 +325,22 @@ export default function Dashboard() {
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-3">
                       <Avatar src={c.avatar} name={c.name} size={32} className="grayscale group-hover:grayscale-0 transition-all" />
-                      <div>
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-[11px] text-white/40">{c.location}</div>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{c.name}</div>
+                        <div className="text-[11px] text-white/40 truncate">
+                          <span className="md:hidden">{c.current_title || c.location}</span>
+                          <span className="hidden md:inline">{c.location}</span>
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3 hidden md:table-cell">
                     <div className="text-white/80">{c.current_title}</div>
                     <div className="text-[11px] text-white/40">{c.current_company}</div>
                   </td>
-                  <td className="py-3 px-3 font-mono text-xs">{c.experience_years}y</td>
-                  <td className="py-3 px-3 font-mono text-xs">{fmtINR(c.expected_ctc)}</td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3 font-mono text-xs hidden sm:table-cell">{c.experience_years}y</td>
+                  <td className="py-3 px-3 font-mono text-xs hidden lg:table-cell">{fmtINR(c.expected_ctc)}</td>
+                  <td className="py-3 px-3 hidden lg:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {c.role_ids.slice(0, 2).map((rid) => {
                         const j = jobs.find((jj) => jj.id === rid);
@@ -391,7 +394,7 @@ export default function Dashboard() {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 border border-brand/40 bg-surface shadow-[0_10px_40px_-10px_rgba(178,138,93,0.6)] flex items-center gap-2 px-3 py-2">
+        <div className="fixed bottom-4 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 border border-brand/40 bg-surface shadow-[0_10px_40px_-10px_rgba(178,138,93,0.6)] flex flex-wrap items-center justify-center gap-2 px-3 py-2">
           <div className="font-mono text-xs text-brand pr-3 border-r hairline">{selected.size} selected</div>
           <BulkBtn label="Shortlist" onClick={() => bulkStage("Shortlisted")} testid="bulk-shortlist" />
           <BulkBtn label="Interview" onClick={() => bulkStage("Interview")} testid="bulk-interview" />
@@ -407,12 +410,12 @@ export default function Dashboard() {
 
 function Kpi({ label, value, icon, testid, gold, hint }) {
   return (
-    <div className="p-5 border-r hairline last:border-r-0" data-testid={testid}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className={gold ? "text-brand" : "text-white/40"}>{icon}</span>
-        <span className="font-mono-label">{label}</span>
+    <div className="p-4 md:p-5 border-r border-b hairline last:border-r-0 lg:border-b-0 min-w-0" data-testid={testid}>
+      <div className="flex items-center gap-2 mb-2 min-w-0">
+        <span className={cx("shrink-0", gold ? "text-brand" : "text-white/40")}>{icon}</span>
+        <span className="font-mono-label truncate">{label}</span>
       </div>
-      <div className={cx("font-display text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
+      <div className={cx("font-display text-2xl md:text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
       {hint && <div className="text-[10px] text-white/35 mt-1 font-mono">{hint}</div>}
     </div>
   );

@@ -123,6 +123,6 @@ TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration
 A full UAT was run on 2026-08-08. See
 [`specs/uat-report-2026-08-08.md`](specs/uat-report-2026-08-08.md) for findings
 and [`specs/launch-fix-plan.md`](specs/launch-fix-plan.md) for what is fixed and
-what remains. All P0s and P1s are closed, and everything that was previously
-mocked or decorative now works for real — see the fix plan. The one known gap
-is the mobile layout: the dashboard is built for desktop widths.
+what remains. All P0s and P1s are closed, everything previously mocked or
+decorative now works for real, and the app is responsive down to 375px — see
+the fix plan. No known non-working features remain.

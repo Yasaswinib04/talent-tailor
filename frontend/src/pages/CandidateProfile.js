@@ -48,7 +48,7 @@ export default function CandidateProfile() {
 
   if (error) {
     return (
-      <div className="max-w-[1200px] mx-auto p-8">
+      <div className="max-w-[1200px] mx-auto p-4 md:p-8">
         <ErrorState
           message={error}
           onRetry={load}
@@ -109,7 +109,7 @@ export default function CandidateProfile() {
   const assignedJobs = jobs.filter((j) => c.role_ids.includes(j.id));
 
   return (
-    <div className="max-w-[1200px] mx-auto p-8">
+    <div className="max-w-[1200px] mx-auto p-4 md:p-8">
       <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back
       </button>
@@ -120,7 +120,7 @@ export default function CandidateProfile() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-3 gap-8">
+      <div className="grid md:grid-cols-3 gap-6 md:gap-8">
         {/* LEFT: Identity */}
         <div className="md:col-span-1 space-y-6">
           <div className="border hairline overflow-hidden bg-surface">
@@ -133,9 +133,9 @@ export default function CandidateProfile() {
                 className="absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
               />
             </div>
-            <div className="pt-16 px-6 pb-6">
+            <div className="pt-16 px-5 md:px-6 pb-6">
               <div className="font-mono-label mb-1">{c.current_title}</div>
-              <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
+              <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
               <div className="text-white/50 text-sm mb-6">at {c.current_company}</div>
 
               <div className="space-y-2 text-xs">
@@ -178,12 +178,12 @@ export default function CandidateProfile() {
         {/* RIGHT: Details */}
         <div className="md:col-span-2 space-y-6">
           {/* Match + Stage + Multi-role */}
-          <div className="border hairline p-6 bg-surface">
-            <div className="grid grid-cols-2 gap-6 items-center pb-6 mb-6 border-b hairline">
+          <div className="border hairline p-5 md:p-6 bg-surface">
+            <div className="grid sm:grid-cols-2 gap-5 sm:gap-6 sm:items-center pb-6 mb-6 border-b hairline">
               <div>
                 <div className="font-mono-label mb-2">match score</div>
                 <div className="flex items-baseline gap-3">
-                  <span className={cx("font-display text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
+                  <span className={cx("font-display text-5xl md:text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
                     {c.match_score}
                   </span>
                   <span className="text-white/40 text-sm">/ 100</span>
@@ -285,7 +285,7 @@ export default function CandidateProfile() {
 
           {/* Tabs */}
           <div className="border hairline bg-surface">
-            <div className="flex border-b hairline">
+            <div className="flex border-b hairline overflow-x-auto">
               {[
                 { id: "resume", label: "Resume" },
                 { id: "skills", label: "Skills" },
@@ -297,7 +297,7 @@ export default function CandidateProfile() {
                   onClick={() => setTab(t.id)}
                   data-testid={`cp-tab-${t.id}`}
                   className={cx(
-                    "px-5 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2",
+                    "px-4 md:px-5 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 whitespace-nowrap",
                     tab === t.id ? "border-brand text-white" : "border-transparent text-white/40 hover:text-white/70"
                   )}
                 >

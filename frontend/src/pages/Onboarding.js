@@ -53,7 +53,7 @@ export default function Onboarding() {
         className="absolute inset-0 opacity-20 pointer-events-none"
         style={{ background: "radial-gradient(circle at 50% 0%, #B28A5D 0%, transparent 50%)" }}
       />
-      <div className="max-w-3xl mx-auto px-8 py-16 relative">
+      <div className="max-w-3xl mx-auto px-5 md:px-8 py-10 md:py-16 relative">
         {/* Brand */}
         <div className="flex items-center justify-between mb-16">
           <div className="font-editorial text-2xl leading-none">
@@ -69,7 +69,7 @@ export default function Onboarding() {
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-4 mb-16">
+        <div className="flex items-center gap-2 md:gap-4 mb-10 md:mb-16 overflow-x-auto">
           {steps.map((s, i) => (
             <React.Fragment key={s.id}>
               <div className="flex items-center gap-3">
@@ -80,7 +80,7 @@ export default function Onboarding() {
                 >
                   {step > s.id ? <Check size={14} /> : <span className="font-mono text-xs">0{s.id}</span>}
                 </div>
-                <div className={`text-sm ${step >= s.id ? "text-white" : "text-white/40"}`}>{s.title}</div>
+                <div className={`text-sm whitespace-nowrap hidden sm:block ${step >= s.id ? "text-white" : "text-white/40"}`}>{s.title}</div>
               </div>
               {i < steps.length - 1 && <div className={`flex-1 h-px ${step > s.id ? "bg-brand" : "bg-white/10"}`} />}
             </React.Fragment>
@@ -88,12 +88,12 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="border hairline p-10 bg-surface/40 backdrop-blur-sm min-h-[420px]">
+        <div className="border hairline p-5 md:p-10 bg-surface/40 backdrop-blur-sm min-h-[380px] md:min-h-[420px]">
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div key="s1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 01 · takes 30 seconds</div>
-                <h2 className="font-editorial text-4xl mb-2">Tell us where you work.</h2>
+                <h2 className="font-editorial text-3xl md:text-4xl mb-2">Tell us where you work.</h2>
                 <p className="text-white/50 mb-8">We use this to shape the templates for your team.</p>
                 <div className="space-y-5">
                   <Field label="Company name">
@@ -105,7 +105,7 @@ export default function Onboarding() {
                       className="w-full bg-transparent border-b hairline pb-2 text-lg focus:border-white outline-none"
                     />
                   </Field>
-                  <div className="grid grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8">
                     <Field label="Team size">
                       <select
                         data-testid="onb-company-size"
@@ -140,7 +140,7 @@ export default function Onboarding() {
             {step === 2 && (
               <motion.div key="s2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 02 · we'll set the rest for you</div>
-                <h2 className="font-editorial text-4xl mb-2">What's your first hire?</h2>
+                <h2 className="font-editorial text-3xl md:text-4xl mb-2">What's your first hire?</h2>
                 <p className="text-white/50 mb-8">Just a title. You'll add the JD & skills next — it's fast.</p>
                 <div className="space-y-5">
                   <Field label="Role title">
@@ -152,7 +152,7 @@ export default function Onboarding() {
                       className="w-full bg-transparent border-b hairline pb-2 text-lg focus:border-white outline-none"
                     />
                   </Field>
-                  <div className="grid grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8">
                     <Field label="Department">
                       <select
                         data-testid="onb-role-dept"
@@ -182,7 +182,7 @@ export default function Onboarding() {
             {step === 3 && (
               <motion.div key="s3" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="font-mono-label mb-4">step 03 · optional</div>
-                <h2 className="font-editorial text-4xl mb-2">Bring the crew.</h2>
+                <h2 className="font-editorial text-3xl md:text-4xl mb-2">Bring the crew.</h2>
                 <p className="text-white/50 mb-8">Add teammate emails to collaborate. Skip if it's just you.</p>
                 <Field label="Team emails (comma separated)">
                   <textarea

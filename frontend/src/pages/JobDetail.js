@@ -37,7 +37,7 @@ export default function JobDetail() {
 
   if (loadError) {
     return (
-      <div className="max-w-[1200px] mx-auto p-8">
+      <div className="max-w-[1200px] mx-auto p-4 md:p-8">
         <div className="border border-danger/50 bg-danger/10 p-8 text-center" data-testid="jd-load-error">
           <AlertTriangle size={20} className="text-danger mx-auto mb-3" />
           <div className="text-sm mb-4">{loadError}</div>
@@ -65,15 +65,15 @@ export default function JobDetail() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto p-8">
+    <div className="max-w-[1200px] mx-auto p-4 md:p-8">
       <button onClick={() => nav("/app")} data-testid="jd-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back to overview
       </button>
 
-      <div className="grid md:grid-cols-3 gap-8 mb-10">
+      <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-10">
         <div className="md:col-span-2">
           <div className="font-mono-label mb-3">{job.department} · {job.location} · {job.seniority}</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight mb-4">{job.title}</h1>
+          <h1 className="font-display text-2xl md:text-4xl font-bold tracking-tight mb-4">{job.title}</h1>
           <div className="flex items-baseline gap-4 mb-6">
             <span className="font-editorial text-2xl text-brand">{fmtINR(job.salary_min)} – {fmtINR(job.salary_max)}</span>
             <span className="font-mono-label">annually</span>
@@ -202,14 +202,14 @@ export default function JobDetail() {
               key={c.id}
               onClick={() => nav(`/app/candidates/${c.id}`)}
               data-testid={`jd-cand-${c.id}`}
-              className="flex items-center gap-4 p-4 border-b hairline last:border-b-0 hover:bg-white/[0.02] cursor-pointer transition-colors group"
+              className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border-b hairline last:border-b-0 hover:bg-white/[0.02] cursor-pointer transition-colors group"
             >
               <Avatar src={c.avatar} name={c.name} size={40} className="grayscale group-hover:grayscale-0 transition-all" />
               <div className="flex-1 min-w-0">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-xs text-white/50">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
+                <div className="font-medium truncate">{c.name}</div>
+                <div className="text-xs text-white/50 truncate">{c.current_title} · {c.current_company} · {c.experience_years}y · {fmtINR(c.expected_ctc)}</div>
               </div>
-              <div className="text-xs text-white/50 hidden md:block">
+              <div className="text-xs text-white/50 hidden lg:block">
                 {c.skills.slice(0, 3).join(" · ")}
               </div>
               <div className="w-20 text-right">

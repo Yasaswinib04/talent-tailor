@@ -65,12 +65,12 @@ rather than inventing numbers; the activity feed is a real event log with actor
 and timestamp; onboarding persists and creates the first role. Sidebar tabs,
 global search and ⌘K work. Candidate lists are paginated.
 
-**Known gap:** the dashboard is desktop-only — 832px of content in a 390px
-viewport. Everything else on the P2 list is closed.
+**Responsive (Aug 2026).** The sidebar is an off-canvas drawer below `md`; the
+candidate table scrolls in its own container and sheds columns by breakpoint;
+every screen fits 375/390/768px with no horizontal page scroll. Desktop layout
+is unchanged. No known non-working features remain.
 
 ## Prioritized backlog
-- **P1** — Responsive dashboard. The only known non-working thing: 832px of
-  content in a 390px viewport, fixed 224px sidebar, overlapping KPI text.
 - **P2** — ⌘K opens a full command palette rather than only focusing search
 - **P2** — Interviewer assignment + calendar sync
 - **P2** — Analytics deep-dive page (funnel, time-in-stage, source ROI)
@@ -83,3 +83,4 @@ viewport. Everything else on the P2 list is closed.
 ## Done, previously on this list
 - ✅ Persist onboarding to the backend
 - ✅ Real resume parsing on the candidate side
+- ✅ Responsive layout down to 375px

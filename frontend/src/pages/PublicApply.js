@@ -128,17 +128,17 @@ export default function PublicApply() {
     <div className="min-h-screen bg-app text-white">
       {/* Header */}
       <div className="border-b hairline">
-        <div className="max-w-4xl mx-auto px-8 py-5 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-5 md:px-8 py-5 flex items-center justify-between gap-3">
           <Link to="/" className="font-editorial text-xl">cred<span className="text-brand">.</span>hr</Link>
           <div className="font-mono-label">apply · in 30 seconds</div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 py-12">
+      <div className="max-w-4xl mx-auto px-5 md:px-8 py-8 md:py-12">
         {/* Job header */}
         <div className="mb-10">
           <div className="font-mono-label mb-3">{job.department} · {job.location}</div>
-          <h1 className="font-editorial text-5xl md:text-6xl leading-[0.95] mb-4">{job.title}</h1>
+          <h1 className="font-editorial text-3xl sm:text-5xl md:text-6xl leading-[1.05] sm:leading-[0.95] mb-4">{job.title}</h1>
           <div className="flex items-baseline gap-4">
             <span className="font-editorial text-2xl text-brand">{fmtINR(job.salary_min)} – {fmtINR(job.salary_max)}</span>
             <span className="font-mono-label">per annum</span>
@@ -151,7 +151,7 @@ export default function PublicApply() {
         {/* Flow */}
         <AnimatePresence mode="wait">
           {stage === "upload" && (
-            <motion.div key="u" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="border-2 border-dashed hairline p-12 text-center bg-surface/30 hover:border-brand/50 transition-colors">
+            <motion.div key="u" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="border-2 border-dashed hairline p-6 md:p-12 text-center bg-surface/30 hover:border-brand/50 transition-colors">
               <Upload size={28} className="text-brand mx-auto mb-4" />
               <h2 className="font-display text-2xl font-medium mb-2">Drop your resume — we do the rest</h2>
               <p className="text-white/50 text-sm mb-6 max-w-sm mx-auto">
@@ -207,7 +207,7 @@ export default function PublicApply() {
           )}
 
           {stage === "review" && (
-            <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-8 bg-surface/30">
+            <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-5 md:p-8 bg-surface/30">
               <div className="mb-6">
                 <div className="flex items-center gap-2">
                   <Sparkles size={14} className="text-brand" />
@@ -227,7 +227,7 @@ export default function PublicApply() {
                   </div>
                 )}
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid sm:grid-cols-2 gap-5 md:gap-6">
                 <FieldPA label="Full name" value={form.name} error={invalid.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
                 <FieldPA label="Email" value={form.email} error={invalid.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />
                 <FieldPA label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} testid="pa-phone" />
@@ -242,7 +242,7 @@ export default function PublicApply() {
                   <span className="text-xs text-white/80">{submitError}</span>
                 </div>
               )}
-              <div className="mt-8 flex items-center justify-between">
+              <div className="mt-8 flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 sm:justify-between">
                 <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/50 hover:text-white transition-colors">
                   ← Upload a different resume
                 </button>
@@ -270,7 +270,7 @@ export default function PublicApply() {
               <p className="text-white/60 max-w-md mx-auto mb-8" data-testid="pa-result-message">
                 {result.message || "Our team will review your profile. Your match score for this role is:"}
               </p>
-              <div className="font-editorial text-8xl text-brand mb-2">{result.match_score}</div>
+              <div className="font-editorial text-6xl md:text-8xl text-brand mb-2">{result.match_score}</div>
               <div className="font-mono-label">match / 100</div>
               <div className="mt-10 text-xs text-white/40">You may safely close this tab.</div>
             </motion.div>

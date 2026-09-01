@@ -25,6 +25,42 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
+### Responsive — P2-7 closed, the last open item
+
+The dashboard rendered 832px of content into a 390px viewport. The cause was a
+fixed 224px sidebar plus an eight-column table, neither of which had a small
+breakpoint.
+
+- **Sidebar is a drawer below `md`.** Off-canvas by default, opened by a menu
+  button in the top bar, with a scrim. It closes on navigation, on Escape, and
+  on tapping outside — a drawer left open over the page is worse than no drawer.
+  Desktop is untouched: the permanent sidebar stays and the menu button is hidden.
+- **Candidate table scrolls inside its own container** rather than widening the
+  page, and drops the columns a phone cannot use (current role, experience, CTC,
+  role chips) at progressive breakpoints. Because the "current" column is hidden
+  on a phone, the candidate's title is surfaced under their name instead.
+- **KPI band** goes two-up with truncating labels; they previously overlapped
+  their own values.
+- Header, filter row, bulk-action bar, job setup's two-column split, the
+  candidate profile, onboarding's stepper and the public apply page all stack or
+  wrap, with padding and display type scaled down.
+
+**Verification:** 30 browser cases across iPhone SE (375), iPhone 14 (390) and
+iPad mini (768). Every screen — dashboard, all three tabs, job setup, role page,
+candidate profile, login, onboarding and public apply — reports
+`scrollWidth === clientWidth`, i.e. no horizontal page scroll anywhere. The
+drawer's open/close/navigate behaviour is covered, and two cases assert desktop
+still has its permanent sidebar and no menu button.
+
+Also fixed: `backend_test.py` was still reading `/api/candidates` as a list and
+asserting the demo seed data exists. My earlier update globbed `test_*.py`, which
+does not match `backend_test.py` — it only surfaced when run against a live
+server. It now handles the paginated shape and skips cleanly against an empty
+instance.
+
+---
+
+
 ### Nothing is mocked any more
 
 An audit for anything still decorative or fabricated found six things producing

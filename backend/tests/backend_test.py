@@ -1,5 +1,7 @@
 """Backend API tests for CRED HR app."""
 import os
+import uuid
+
 import pytest
 import requests
 
@@ -42,9 +44,10 @@ def jobs(client):
 
 @pytest.fixture(scope="session")
 def candidates(client):
-    r = client.get(f"{BASE_URL}/api/candidates")
+    # /api/candidates is paginated: {items, total, limit, offset, has_more}.
+    r = client.get(f"{BASE_URL}/api/candidates", params={"limit": 500})
     assert r.status_code == 200
-    return r.json()
+    return r.json()["items"]
 
 
 # ---------- Health ----------
@@ -57,17 +60,19 @@ def test_health(client):
 
 
 # ---------- Jobs ----------
-def test_jobs_seeded(jobs):
-    assert len(jobs) >= 4
-    titles = {j["title"] for j in jobs}
-    expected = {"Senior Frontend Engineer", "Product Manager - Payments", "Backend Engineer - Platform", "UX Researcher"}
-    assert expected.issubset(titles), f"Missing seeded jobs. Got: {titles}"
+def test_jobs_have_the_expected_shape(jobs):
+    # Demo seed data is opt-in now (SEED_DEMO_DATA), so don't require it here —
+    # only that whatever roles exist are well-formed.
+    if not jobs:
+        pytest.skip("no roles on the target server")
     for j in jobs:
         assert "id" in j and "share_slug" in j
-        assert len(j["share_slug"]) == 8
+        assert len(j["share_slug"]) >= 12
 
 
 def test_get_job_by_id(client, jobs):
+    if not jobs:
+        pytest.skip("no roles on the target server")
     j = jobs[0]
     r = client.get(f"{BASE_URL}/api/jobs/{j['id']}")
     assert r.status_code == 200
@@ -75,6 +80,8 @@ def test_get_job_by_id(client, jobs):
 
 
 def test_get_job_by_share_slug(client, jobs):
+    if not jobs:
+        pytest.skip("no roles on the target server")
     j = jobs[0]
     r = client.get(f"{BASE_URL}/api/jobs/share/{j['share_slug']}")
     assert r.status_code == 200
@@ -103,25 +110,27 @@ def test_create_job(client):
 
 
 # ---------- Candidates ----------
-def test_candidates_seeded(candidates):
-    assert len(candidates) >= 20
-    # sorted by match_score desc
-    scores = [c["match_score"] for c in candidates[:20]]
+def test_candidates_are_sorted_by_match_score(candidates):
+    if not candidates:
+        pytest.skip("no candidates on the target server")
+    scores = [c["match_score"] for c in candidates]
     assert scores == sorted(scores, reverse=True), f"Not sorted desc: {scores}"
 
 
 def test_candidates_filter_by_stage(client):
-    r = client.get(f"{BASE_URL}/api/candidates", params={"stage": "Shortlisted"})
+    r = client.get(f"{BASE_URL}/api/candidates", params={"stage": "Shortlisted", "limit": 500})
     assert r.status_code == 200
-    for c in r.json():
+    for c in r.json()["items"]:
         assert c["stage"] == "Shortlisted"
 
 
 def test_candidates_filter_by_job(client, jobs):
+    if not jobs:
+        pytest.skip("no roles on the target server")
     j = jobs[0]
-    r = client.get(f"{BASE_URL}/api/candidates", params={"job_id": j["id"]})
+    r = client.get(f"{BASE_URL}/api/candidates", params={"job_id": j["id"], "limit": 500})
     assert r.status_code == 200
-    for c in r.json():
+    for c in r.json()["items"]:
         assert j["id"] in c["role_ids"]
 
 
@@ -151,6 +160,8 @@ def test_extract_skills_empty(client):
 
 # ---------- Stage update ----------
 def test_stage_update(client, candidates):
+    if not candidates:
+        pytest.skip("no candidates on the target server")
     cid = candidates[0]["id"]
     original_stage = candidates[0]["stage"]
     r = client.post(f"{BASE_URL}/api/candidates/{cid}/stage", json={"stage": "Interview"})
@@ -165,6 +176,8 @@ def test_stage_update(client, candidates):
 
 # ---------- Assign roles (multiple) ----------
 def test_assign_multiple_roles(client, candidates, jobs):
+    if not candidates:
+        pytest.skip("no candidates on the target server")
     cid = candidates[0]["id"]
     original_roles = candidates[0]["role_ids"]
     role_ids = [jobs[0]["id"], jobs[1]["id"]]
@@ -180,6 +193,8 @@ def test_assign_multiple_roles(client, candidates, jobs):
 
 # ---------- Public Apply ----------
 def test_public_apply(client, jobs):
+    if not jobs:
+        pytest.skip("no roles on the target server")
     # find frontend Engineer job
     fe_job = next((j for j in jobs if "Frontend" in j["title"]), jobs[0])
     slug = fe_job["share_slug"]
@@ -187,7 +202,7 @@ def test_public_apply(client, jobs):
     assert r.status_code == 200
     payload = {
         "name": "TEST_Auto Applicant",
-        "email": "TEST_auto@example.com",
+        "email": f"test_auto_{uuid.uuid4().hex[:8]}@example.com",
         "phone": "+91 9000000000",
         "current_title": "Senior React Developer",
         "current_company": "TestCo",
