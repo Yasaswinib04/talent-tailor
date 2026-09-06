@@ -1,7 +1,7 @@
-# CRED HR — Talent Engine (Redesign)
+# Talent Tailor — Talent Engine (Redesign)
 
 ## Original problem statement
-Principal Product Designer at CRED launching an HR app to evaluate 100s of candidates faster. The current design isn't good from a UX perspective. Onboarding is chaotic. Setting up a job role is confusing (e.g. Extract Skills button is hidden). Beta users asked for: (1) auto-apply from the shareable link and (2) one profile assignable to multiple roles.
+Principal Product Designer launching an HR app to evaluate 100s of candidates faster. The current design isn't good from a UX perspective. Onboarding is chaotic. Setting up a job role is confusing (e.g. Extract Skills button is hidden). Beta users asked for: (1) auto-apply from the shareable link and (2) one profile assignable to multiple roles.
 
 Expected outcome: a UX report on the changes + a new, easy-to-use template prototype.
 
@@ -9,7 +9,7 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 - Scope: **Both** — interactive prototype **and** UX report page.
 - Screens: HR Onboarding · Job Setup · Candidate Dashboard · Candidate Profile · Public Apply link.
 - AI features: **Mocked** but realistic (Indian names / Indian salary ranges).
-- Visual direction: designer's call — chose **CRED-inspired dark, editorial, mono accents** with copper (#B28A5D) accents.
+- Visual direction: designer's call — chose **dark, editorial, mono accents** with copper (#B28A5D) accents.
 
 ## Architecture
 - **Frontend**: React 18 (CRA) + Tailwind + Framer Motion + Radix UI + lucide-react. Routes: `/` (report), `/onboarding`, `/app`, `/app/jobs/new`, `/app/jobs/:id`, `/app/candidates/:cid`, `/apply/:slug`.

@@ -1,7 +1,7 @@
-# UAT Test Plan — Talent Tailor (CRED HR Talent Engine)
+# UAT Test Plan — Talent Tailor (Talent Engine)
 
 **Build under test:** `main` @ 8141bb8
-**Environment:** local — backend `http://localhost:8000`, frontend `http://localhost:3000`, MongoDB `localhost:27017` / db `cred_hr`
+**Environment:** local — backend `http://localhost:8000`, frontend `http://localhost:3000`, MongoDB `localhost:27017` / db `talent_tailor`
 **Auth:** none in this build
 **Date:** 2026-08-08
 **Goal:** clear the product for a live HR conversation on 2026-08-09.
@@ -21,7 +21,7 @@ Out of scope: real resume parsing, ⌘K command palette, interviewer/calendar, e
 
 ## TC-01 — Backend boots and seeds
 
-**Precondition:** Mongo running, `cred_hr` database empty.
+**Precondition:** Mongo running, `talent_tailor` database empty.
 **Steps**
 1. Start uvicorn on port 8000.
 2. `GET /api/health`

@@ -1,4 +1,4 @@
-"""Backend API tests for CRED HR app."""
+"""Backend API tests for Talent Tailor."""
 import os
 import pytest
 import requests

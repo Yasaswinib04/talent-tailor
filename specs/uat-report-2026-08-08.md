@@ -1,4 +1,4 @@
-# UAT Report — Talent Tailor (CRED HR Talent Engine)
+# UAT Report — Talent Tailor (Talent Engine)
 
 > **Status: all findings below were fixed and retested on 2026-08-08.**
 > See [Retest](#retest--2026-08-08) at the end for verified results. The original findings are
@@ -6,7 +6,7 @@
 
 **Date:** 2026-08-08
 **Build:** `main` @ 8141bb8
-**Environment:** local — FastAPI `:8000`, React `:3000`, MongoDB `localhost:27017` / db `cred_hr`
+**Environment:** local — FastAPI `:8000`, React `:3000`, MongoDB `localhost:27017` / db `talent_tailor`
 **Tested by:** QA pass against `specs/uat-test-plan.md`
 
 ---

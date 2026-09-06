@@ -227,8 +227,8 @@ export default function Report() {
 
       <footer className="border-t hairline py-8 px-8">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-white/65">
-          <div>© 2026 cred.hr — principal design review</div>
-          <div className="font-mono-label">crafted for the CRED talent org.</div>
+          <div>© 2026 talent tailor — principal design review</div>
+          <div className="font-mono-label">crafted for talent teams.</div>
         </div>
       </footer>
     </div>

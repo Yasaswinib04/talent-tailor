@@ -155,7 +155,7 @@ export default function Onboarding() {
                 <Field label="Team emails (comma separated)">
                   <textarea
                     data-testid="onb-invite-emails"
-                    placeholder="anita@cred.club, kunal@cred.club"
+                    placeholder="anita@yourcompany.com, kunal@yourcompany.com"
                     value={invites}
                     onChange={(e) => setInvites(e.target.value)}
                     className="w-full bg-transparent border hairline p-3 focus:border-white outline-none min-h-[120px] text-sm"

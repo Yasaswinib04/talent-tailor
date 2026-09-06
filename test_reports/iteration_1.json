@@ -1,5 +1,5 @@
 {
-  "summary": "Ran comprehensive backend (pytest, 14 tests) and end-to-end frontend (Playwright) tests for CRED HR app. All backend APIs work correctly. All frontend flows (Report landing, Onboarding, Dashboard, JobSetup, JobDetail, CandidateProfile with multi-role assignment, PublicApply auto-apply) work end-to-end.",
+  "summary": "Ran comprehensive backend (pytest, 14 tests) and end-to-end frontend (Playwright) tests for Talent Tailor. All backend APIs work correctly. All frontend flows (Report landing, Onboarding, Dashboard, JobSetup, JobDetail, CandidateProfile with multi-role assignment, PublicApply auto-apply) work end-to-end.",
   "backend_issues": {
     "critical": [],
     "minor": []
