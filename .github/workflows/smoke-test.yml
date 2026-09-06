@@ -2,12 +2,18 @@ name: Smoke test deployed API
 
 # Runs after Render finishes deploying a backend change, and tells you if the
 # deploy silently broke something. Render's own health check only proves the
-# process booted — this proves the data is actually there.
+# process booted — this proves the data is actually there, the paywall still
+# redacts, and one workspace still can't read another's.
 #
-# Setup: repo Settings → Secrets and variables → Actions → Variables → New,
-#   name  API_URL
-#   value https://talent-tailor-api.onrender.com   (no trailing slash)
-# Until that variable exists this workflow skips itself instead of failing.
+# One-time setup (repo Settings → Secrets and variables → Actions):
+#   Variables → API_URL         https://talent-tailor-api.onrender.com   (no trailing slash)
+#   Variables → TT_TEST_EMAIL   qa@yourdomain.com   (a throwaway address — the
+#                               account is created on first run and reused after)
+#   Secrets   → TT_TEST_PASSWORD  any password, 8+ characters
+#
+# Missing configuration FAILS this job rather than skipping it. An earlier
+# version skipped silently, so every run went green for months without ever
+# testing anything — a red X you can fix beats a green tick you can't trust.
 
 on:
   push:
@@ -22,29 +28,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check API_URL is configured
-        id: guard
+      - name: Check the workflow is configured
         env:
           API_URL: ${{ vars.API_URL }}
+          TT_TEST_EMAIL: ${{ vars.TT_TEST_EMAIL }}
+          TT_TEST_PASSWORD: ${{ secrets.TT_TEST_PASSWORD }}
         run: |
-          if [ -z "$API_URL" ]; then
-            echo "::notice::API_URL variable not set — skipping smoke test."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
+          missing=""
+          [ -z "$API_URL" ] && missing="$missing API_URL(variable)"
+          [ -z "$TT_TEST_EMAIL" ] && missing="$missing TT_TEST_EMAIL(variable)"
+          [ -z "$TT_TEST_PASSWORD" ] && missing="$missing TT_TEST_PASSWORD(secret)"
+          if [ -n "$missing" ]; then
+            echo "::error::Not configured — missing:$missing. See the comment at the top of this file."
+            exit 1
           fi
 
       - uses: actions/setup-python@v5
-        if: steps.guard.outputs.run == 'true'
         with:
           python-version: "3.13"
 
       - name: Install test dependencies
-        if: steps.guard.outputs.run == 'true'
         run: pip install pytest requests
 
       - name: Wait for the deploy to go live
-        if: steps.guard.outputs.run == 'true'
         env:
           API_URL: ${{ vars.API_URL }}
         run: |
@@ -63,16 +69,13 @@ jobs:
           echo "::error::$API_URL/api/health never returned 200. Check the Render logs."
           exit 1
 
-      - name: Run read-only checks against production
-        if: steps.guard.outputs.run == 'true'
+      - name: Run the suite against production
         env:
           REACT_APP_BACKEND_URL: ${{ vars.API_URL }}
+          TT_TEST_EMAIL: ${{ vars.TT_TEST_EMAIL }}
+          TT_TEST_PASSWORD: ${{ secrets.TT_TEST_PASSWORD }}
         run: |
-          # Deliberately excluded: these four tests write to the database.
-          # create_job, stage_update and assign_multiple_roles clean up after
-          # themselves, but public_apply does not — running it on every push
-          # would drip fake applicants into the demo data. The remaining ten
-          # cover health, seeding, lookups, filtering, extraction and analytics,
-          # which is what actually catches a broken deploy.
-          pytest backend/tests/backend_test.py -q \
-            -k "not create_job and not stage_update and not assign_multiple_roles and not public_apply"
+          # No -k exclusions any more. Every test signs in and writes only
+          # inside the QA account's own workspace, so a production run can no
+          # longer drip fake applicants into real data the way it used to.
+          pytest backend/tests/backend_test.py -q

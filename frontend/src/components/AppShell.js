@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { LayoutGrid, Briefcase, Users, Plus, Search, LogOut } from "lucide-react";
 import { getUser, clearSession } from "../lib/api";
 
@@ -8,14 +8,13 @@ export default function AppShell() {
   return (
     <div className="min-h-screen flex bg-app text-white">
       {/* Sidebar */}
-      <aside className="w-56 border-r hairline flex flex-col shrink-0">
+      <aside className="w-56 border-r hairline flex flex-col shrink-0 h-screen sticky top-0">
         <div className="px-5 py-6 border-b hairline">
           <div className="font-editorial text-2xl leading-none tracking-tight">
             talent<span className="text-brand">.</span>tailor
           </div>
-          <div className="font-mono-label mt-2">talent · engine</div>
         </div>
-        <nav className="p-3 flex-1 space-y-1">
+        <nav className="p-3 flex-1 min-h-0 overflow-y-auto space-y-1">
           <SideLink to="/app" icon={<LayoutGrid size={16} />} label="Overview" testid="nav-overview" />
           <SideLink to="/app?tab=jobs" icon={<Briefcase size={16} />} label="Roles" testid="nav-roles" />
           <SideLink to="/app?tab=candidates" icon={<Users size={16} />} label="Candidates" testid="nav-candidates" />
@@ -44,12 +43,16 @@ export default function AppShell() {
 }
 
 function SideLink({ to, icon, label, testid }) {
+  const loc = useLocation();
+  const tabOf = (search) => new URLSearchParams(search).get("tab") || "overview";
+  const isActive =
+    loc.pathname === "/app" && tabOf(loc.search) === tabOf(to.split("?")[1] ? `?${to.split("?")[1]}` : "");
   return (
     <NavLink
       to={to}
       end
       data-testid={testid}
-      className={({ isActive }) =>
+      className={
         `flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
           isActive ? "bg-white/5 text-white border-l-2 border-brand" : "text-white/78 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
         }`

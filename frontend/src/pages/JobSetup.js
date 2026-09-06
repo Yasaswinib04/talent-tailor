@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, fmtINR } from "../lib/api";
 import {
@@ -30,6 +30,14 @@ const NOTICE_OPTIONS = [
   { value: 180, label: "Flexible" },
 ];
 
+const SENIORITY_LEVELS = [
+  { value: "Junior", label: "Junior (0–2 yrs)" },
+  { value: "Mid", label: "Mid (2–5 yrs)" },
+  { value: "Senior", label: "Senior (5–8 yrs)" },
+  { value: "Lead", label: "Lead (8–12 yrs)" },
+  { value: "Principal", label: "Principal (12+ yrs)" },
+];
+
 const DEFAULT_WEIGHTS = { skills: 40, experience: 25, education: 15, notice: 10, cultural_fit: 10 };
 
 export default function JobSetup() {
@@ -45,12 +53,15 @@ export default function JobSetup() {
     salary_max: 3000000,
     screening_questions: [],
     filters: {
-      min_experience_years: 3,
-      education_preference: "Bachelor's degree or equivalent",
-      notice_period_max_days: 90,
+      // Filters start open. Anything here rejects candidates, and a default
+      // nobody chose should never do that — the JD extraction recommends real
+      // values a moment later, which the recruiter can accept or edit.
+      min_experience_years: 0,
+      education_preference: "No preference",
+      notice_period_max_days: 180,
       must_have_skills: [],
       preferred_companies: [],
-      locations: ["Bengaluru"],
+      locations: [],
     },
     scoring_weights: DEFAULT_WEIGHTS,
   });
@@ -63,6 +74,9 @@ export default function JobSetup() {
   const [recommendedSnapshot, setRecommendedSnapshot] = useState({ filters: null, weights: null });
   const [filterPreview, setFilterPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  // UAT-01: the button stays clickable and explains itself instead of sitting dead.
+  const [titleError, setTitleError] = useState(false);
+  const titleRef = useRef(null);
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -144,7 +158,14 @@ export default function JobSetup() {
   const weightsTotal = Object.values(form.scoring_weights).reduce((a, b) => a + b, 0);
 
   const publish = async () => {
-    if (!form.title.trim()) return alert("Add a role title first");
+    if (!form.title.trim()) {
+      // Never a dead control: point at the field that is missing and focus it.
+      setTitleError(true);
+      titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      titleRef.current?.focus();
+      return;
+    }
+    setTitleError(false);
     setSaving(true);
     try {
       const res = await api.post("/jobs", form);
@@ -171,7 +192,7 @@ export default function JobSetup() {
           <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/72 hover:text-white transition-colors">Cancel</button>
           <button
             onClick={publish}
-            disabled={saving || !form.title}
+            disabled={saving}
             data-testid="js-publish-btn"
             className="btn btn-primary"
           >
@@ -186,14 +207,33 @@ export default function JobSetup() {
         {/* LEFT — JD & Basics + Advanced criteria */}
         <div className="p-8 border-r hairline space-y-8 pb-24">
           <div>
-            <div className="font-mono-label mb-2">step 01 · role title</div>
+            <div className="font-mono-label mb-2">
+              step 01 · role title <span className="text-amber-400">· required</span>
+            </div>
+            {/* An example list, not one plausible answer — a lone job title here
+                reads as a value the recruiter already typed. */}
             <input
+              ref={titleRef}
               data-testid="js-title-input"
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="Senior Frontend Engineer"
-              className="w-full bg-transparent text-3xl font-display font-medium border-b hairline focus:border-brand pb-3 outline-none placeholder:text-white/20 transition-colors"
+              onChange={(e) => {
+                setForm({ ...form, title: e.target.value });
+                if (titleError) setTitleError(false);
+              }}
+              placeholder="e.g. SDE II · Product Manager · UX Designer"
+              className={`w-full bg-transparent text-3xl font-display font-medium border-b pb-3 outline-none placeholder:text-white/20 placeholder:italic placeholder:text-2xl transition-colors ${
+                titleError ? "border-amber-400" : "hairline focus:border-brand"
+              }`}
             />
+            {titleError && (
+              <div
+                data-testid="js-title-error"
+                className="mt-2 flex items-start gap-2 text-[11px] text-amber-400 border border-amber-400/40 bg-amber-400/5 px-3 py-2"
+              >
+                <Info size={11} className="mt-0.5 shrink-0" />
+                <span>Add a role title. It is the only field we need before you can publish.</span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -222,7 +262,7 @@ export default function JobSetup() {
                 onChange={(e) => setForm({ ...form, seniority: e.target.value })}
                 className="w-full bg-transparent border hairline px-3 py-2 text-sm focus:border-brand outline-none"
               >
-                {["Junior", "Mid", "Senior", "Lead", "Principal"].map((x) => <option key={x} className="bg-app">{x}</option>)}
+                {SENIORITY_LEVELS.map((x) => <option key={x.value} value={x.value} className="bg-app">{x.label}</option>)}
               </select>
             </SmallField>
           </div>
@@ -245,10 +285,6 @@ export default function JobSetup() {
               placeholder="Paste or write the job description. Skills, salary, filters and scoring weights will appear on the right as you type."
               className="w-full bg-transparent border hairline p-4 focus:border-brand outline-none min-h-[280px] text-sm leading-relaxed transition-colors"
             />
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-white/65">
-              <Sparkles size={10} className="text-brand" />
-              <span>Everything on the right runs the moment you pause. No buttons to press.</span>
-            </div>
           </div>
 
           {/* Advanced Criteria — Progressive disclosure */}
@@ -260,7 +296,7 @@ export default function JobSetup() {
               step="step 03 · optional"
               title="Mandatory criteria & filters"
               subtitle={
-                filterPreview
+                filterPreview && filterPreview.total > 0
                   ? `${filterPreview.passing} of ${filterPreview.total} candidates in your pool would pass these.`
                   : "Any candidate below these bars is auto-filtered out."
               }
@@ -429,7 +465,7 @@ export default function JobSetup() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Sparkles size={12} className="text-brand" />
-                  <span className="font-mono-label">live extraction</span>
+                  <span className="font-mono-label">reading your JD</span>
                 </div>
                 {extracting && (
                   <span className="text-[10px] font-mono text-brand inline-flex items-center gap-1">
@@ -540,10 +576,18 @@ export default function JobSetup() {
                   {form.filters.locations.map((l) => <Chip key={l}>📍 {l}</Chip>)}
                   {form.filters.must_have_skills.slice(0, 3).map((s) => <Chip key={s} strong>{s}</Chip>)}
                 </div>
-                {filterPreview && filterPreview.passing === 0 && (
+                {/* "Nobody passes" has innocent causes. Only blame the filters when
+                    loosening them would actually change the answer. */}
+                {filterPreview && filterPreview.total === 0 && (
+                  <div className="mt-3 text-[11px] text-white/72 border border-brand/30 bg-brand/5 px-3 py-2 flex items-start gap-2">
+                    <Info size={11} className="mt-0.5 shrink-0 text-brand" />
+                    <span>You have no candidates yet. These filters apply automatically as people apply to this role — nothing to fix here.</span>
+                  </div>
+                )}
+                {filterPreview && filterPreview.total > 0 && filterPreview.passing === 0 && (
                   <div className="mt-3 text-[11px] text-amber-400/80 border border-amber-400/30 bg-amber-400/5 px-3 py-2 flex items-start gap-2">
                     <Info size={11} className="mt-0.5 shrink-0" />
-                    <span>No candidates in your current pool pass these filters. Try relaxing must-have skills or education.</span>
+                    <span>None of your {filterPreview.total} candidates pass these filters — or your pool may simply not include this kind of role yet.</span>
                   </div>
                 )}
               </div>

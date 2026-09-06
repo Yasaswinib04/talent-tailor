@@ -114,8 +114,12 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <div className="font-mono-label mb-2">overview · jan 2026</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">Talent pipeline</h1>
+          <div className="font-mono-label mb-2">
+            {tab === "jobs" ? "roles" : tab === "candidates" ? "candidates" : "overview · jan 2026"}
+          </div>
+          <h1 className="font-display text-4xl font-bold tracking-tight">
+            {tab === "jobs" ? "Open roles" : tab === "candidates" ? "All candidates" : "Talent pipeline"}
+          </h1>
         </div>
         <button
           onClick={() => nav("/app/jobs/new")}
@@ -146,7 +150,7 @@ export default function Dashboard() {
       )}
 
       {/* KPI band */}
-      {summary && (
+      {tab === "overview" && summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 border hairline mb-8">
           <Kpi label="open roles" value={summary.total_jobs} icon={<Briefcase size={14} />} testid="kpi-jobs" />
           <Kpi label="candidates" value={summary.total_candidates} icon={<Users size={14} />} testid="kpi-candidates" />
@@ -157,6 +161,7 @@ export default function Dashboard() {
       )}
 
       {/* Roles grid */}
+      {(tab === "overview" || tab === "jobs") && (
       <div className="mb-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-xl font-semibold">Open roles</h2>
@@ -208,7 +213,10 @@ export default function Dashboard() {
         </div>
       </div>
 
+      )}
+
       {/* Candidate table */}
+      {(tab === "overview" || tab === "candidates") && (
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -370,6 +378,8 @@ export default function Dashboard() {
           <span><span className="kbd">N</span> new role</span>
         </div>
       </div>
+
+      )}
 
       {/* Bulk action bar */}
       {selected.size > 0 && (

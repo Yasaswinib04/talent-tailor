@@ -715,11 +715,20 @@ async def verify_payment(job_id: str, payload: VerifyPaymentRequest, user: dict 
     ).hexdigest()
     if not hmac.compare_digest(expected, payload.razorpay_signature):
         raise HTTPException(403, "Payment verification failed")
-    await db.payments.update_one(
-        {"order_id": payload.razorpay_order_id},
+    # Claim the order atomically. A signed callback is replayable from the
+    # browser console, and today the grant is idempotent (setting a boolean
+    # twice is harmless) — but the moment it becomes "add 30 days of access",
+    # every replay would buy another month for one payment. Guard it now, while
+    # the guard is free, rather than the day the grant starts accumulating.
+    claim = await db.payments.update_one(
+        {"order_id": payload.razorpay_order_id, "status": {"$ne": "paid"}},
         {"$set": {"status": "paid", "payment_id": payload.razorpay_payment_id, "paid_at": now_iso()}},
     )
-    await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
+    if claim.modified_count == 1:
+        await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
+    # Already claimed: the caller refreshed or double-submitted. The job is
+    # unlocked either way, so report success rather than an error the recruiter
+    # cannot act on.
     return {"ok": True, "unlocked": True}
 
 
@@ -752,6 +761,22 @@ async def _revealed_ids(owner_id: str) -> set:
             ranked = sorted(cands, key=lambda c: _score_candidate(c, job), reverse=True)
             revealed.update(c["id"] for c in ranked[:FREE_REVEAL])
     return revealed
+
+
+async def _visible_candidate(c: dict, user: dict) -> dict:
+    """One candidate as this workspace is entitled to see them.
+
+    Every endpoint that hands back a single candidate goes through here. A
+    locked identity leaking out of a PATCH or a stage change is the same leak
+    as one on the list page — and the write endpoints are the easier door,
+    because moving someone to "Interview" costs nothing.
+    """
+    revealed = await _revealed_ids(user["id"])
+    if c["id"] in revealed:
+        return c
+    c = _redact(c, 0)
+    c["name"] = "Locked candidate"
+    return c
 
 
 # --------- Skill Extraction: LLM with keyword-dictionary fallback ---------
@@ -1076,12 +1101,7 @@ async def get_candidate(cid: str, user: dict = Depends(current_user)):
     c = await db.candidates.find_one({"id": cid, "owner_id": user["id"]})
     if not c:
         raise HTTPException(404, "Candidate not found")
-    c = strip_mongo(c)
-    revealed = await _revealed_ids(user["id"])
-    if c["id"] not in revealed:
-        c = _redact(c, 0)
-        c["name"] = "Locked candidate"
-    return c
+    return await _visible_candidate(strip_mongo(c), user)
 
 
 async def _owned_candidate(cid: str, user: dict) -> dict:
@@ -1105,7 +1125,7 @@ async def update_candidate(cid: str, payload: dict, user: dict = Depends(current
     # update job candidate counts if role_ids changed
     if "role_ids" in changes:
         await _refresh_job_counts(user["id"])
-    return strip_mongo(c)
+    return await _visible_candidate(strip_mongo(c), user)
 
 
 async def _refresh_job_counts(owner_id: str):
@@ -1124,7 +1144,7 @@ async def assign_roles(cid: str, payload: RoleAssignment, user: dict = Depends(c
     await db.candidates.update_one({"id": cid}, {"$set": {"role_ids": role_ids}})
     await _refresh_job_counts(user["id"])
     c = await db.candidates.find_one({"id": cid})
-    return strip_mongo(c)
+    return await _visible_candidate(strip_mongo(c), user)
 
 
 @app.post("/api/candidates/{cid}/stage")
@@ -1132,7 +1152,7 @@ async def set_stage(cid: str, payload: StageUpdate, user: dict = Depends(current
     await _owned_candidate(cid, user)
     await db.candidates.update_one({"id": cid}, {"$set": {"stage": payload.stage}})
     c = await db.candidates.find_one({"id": cid})
-    return strip_mongo(c)
+    return await _visible_candidate(strip_mongo(c), user)
 
 
 # ---------- Bulk resume upload (recruiter-side) ----------
