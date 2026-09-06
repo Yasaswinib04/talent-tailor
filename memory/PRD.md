@@ -90,6 +90,49 @@ is unchanged. No known non-working features remain.
 - **P3** — LLM-backed skill extraction as a *supplement* to the taxonomy, for
   skills outside it and for reading unusual phrasing
 
+### Deferred: finer skill classification and role-level mapping
+
+**Decision (Aug 2026): wait for real role data before designing this.** Not
+because it lacks value — because the right shape depends on which roles
+actually arrive, and guessing now is expensive to unwind.
+
+The question was whether to tag skills as tool / language / technical skill /
+other, and whether to map skills to role archetypes the way an older version
+reportedly did. (Checked the git history: no prior role→skill mapping exists to
+restore. The old `role_map` was a title→id lookup used when seeding candidates.
+This would be built fresh.)
+
+**What tagging would unlock, when we do it:**
+- Warn when must-haves are tool-heavy. Tools are learnable in weeks;
+  capabilities are not. Requiring four specific tools is what produced the
+  "0 of 20 candidates pass" bug this app already had.
+- Claim equivalence only where it is honest. `React ≈ Vue` is confident.
+  `Qualitative Research ≈ Survey Design` is not — different capabilities. Both
+  are currently offered with the same confidence.
+- Weight a missing tool differently from a missing capability when scoring.
+- Group the "Skills detected" panel, which is currently a flat list of 8–12 chips.
+
+**Why the shape is still unknown.** A first pass splits cleanly — 83 tools /
+31 skills / 5 domains, with about three needing per-skill overrides (Pandas
+sits in a skill group but is a tool; MLOps and CI/CD are practices whose
+aliases are all tools). But that split only holds for software roles.
+
+**SAP is the live example.** A cousin of the owner hires SAP, and if that kind
+of role arrives the model is wrong, not merely incomplete: SAP hiring is
+organised by module (FICO, MM, SD, ABAP, S/4HANA, BASIS), not by tool versus
+skill. `backend/skills.py` currently has zero SAP coverage. The same is true of
+most non-engineering functional hiring.
+
+**What this implies for the design.** The taxonomy probably needs to be
+*extensible per domain* — pluggable skill packs with their own internal
+structure — rather than one flat list with a `kind` column bolted on. That is a
+different piece of work from adding a field, and worth designing once we know
+which domains are real.
+
+**Cost of waiting: low.** `kind` is additive, `group` already carries most of
+the signal, and the extractor and editor both work today. Nothing about the
+current design blocks it.
+
 ## Done, previously on this list
 - ✅ Persist onboarding to the backend
 - ✅ Real resume parsing on the candidate side
