@@ -65,6 +65,7 @@ export default function JobSetup() {
   const [previewing, setPreviewing] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [extractError, setExtractError] = useState("");
+  const [suggestedSkills, setSuggestedSkills] = useState([]);
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -85,6 +86,7 @@ export default function JobSetup() {
           filters: usingRecommended.filters ? { ...f.filters, ...res.data.recommended_filters } : f.filters,
           scoring_weights: usingRecommended.weights ? res.data.recommended_weights : f.scoring_weights,
         }));
+        setSuggestedSkills(res.data.suggested_skills || []);
         setRecommendedSnapshot({
           filters: res.data.recommended_filters,
           weights: res.data.recommended_weights,
@@ -122,10 +124,23 @@ export default function JobSetup() {
     setForm((f) => ({ ...f, skills: f.skills.map((s, i) => (i === idx ? { ...s, weight: w } : s)) }));
   const removeSkill = (idx) =>
     setForm((f) => ({ ...f, skills: f.skills.filter((_, i) => i !== idx) }));
-  const addSkill = (name) => {
-    if (!name.trim()) return;
-    setForm((f) => ({ ...f, skills: [...f.skills, { name: name.trim(), weight: 3 }] }));
+  const addSkill = (name, weight = 3) => {
+    const clean = (name || "").trim();
+    if (!clean) return;
+    setForm((f) =>
+      f.skills.some((s) => s.name.toLowerCase() === clean.toLowerCase())
+        ? f
+        : { ...f, skills: [...f.skills, { name: clean, weight }] }
+    );
+    setSuggestedSkills((prev) => prev.filter((s) => s.name.toLowerCase() !== clean.toLowerCase()));
   };
+
+  // A recruiter must be able to correct what the extractor got wrong, in place.
+  const renameSkill = (idx, name) =>
+    setForm((f) => ({ ...f, skills: f.skills.map((s, i) => (i === idx ? { ...s, name } : s)) }));
+
+  const dismissSuggestion = (name) =>
+    setSuggestedSkills((prev) => prev.filter((s) => s.name !== name));
 
   const setFilter = (k, v) => {
     setUsingRecommended((u) => ({ ...u, filters: false }));
@@ -501,7 +516,14 @@ export default function JobSetup() {
                     className="flex items-center gap-3 border hairline p-2 pl-3 bg-app group"
                     data-testid={`js-skill-${idx}`}
                   >
-                    <span className="font-mono text-xs text-white/90 flex-1">{s.name}</span>
+                    <input
+                      value={s.name}
+                      onChange={(e) => renameSkill(idx, e.target.value)}
+                      data-testid={`js-skill-name-${idx}`}
+                      aria-label={`Skill ${idx + 1} name`}
+                      title={s.matched_as ? `Found "${s.matched_as}" in the description` : "Added by you"}
+                      className="font-mono text-xs text-white/90 flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-white/20 focus:border-brand outline-none transition-colors"
+                    />
                     <div className="flex items-center gap-1">
                       {[1, 2, 3, 4, 5].map((n) => (
                         <button
@@ -519,6 +541,46 @@ export default function JobSetup() {
                   </motion.div>
                 ))}
                 {form.skills.length > 0 && <AddSkillInput onAdd={addSkill} />}
+              </div>
+
+              {suggestedSkills.length > 0 && (
+                <div className="mt-5" data-testid="js-suggested-skills">
+                  <div className="font-mono-label mb-2">also acceptable?</div>
+                  <div className="text-[11px] text-white/40 mb-3">
+                    Skills that do the same job, or usually come with the ones above.
+                    Add any you'd accept from a candidate.
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedSkills.map((sg) => (
+                      <span
+                        key={sg.name}
+                        className="inline-flex items-center gap-1.5 border border-dashed border-white/20 bg-white/[0.02] pl-2.5 pr-1 py-1 text-[11px] group"
+                        title={sg.reason}
+                        data-testid={`js-suggestion-${sg.name}`}
+                      >
+                        <button
+                          onClick={() => addSkill(sg.name, sg.kind === "equivalent" ? 3 : 2)}
+                          className="inline-flex items-center gap-1.5 hover:text-brand transition-colors"
+                        >
+                          <Plus size={10} />
+                          <span className="font-mono">{sg.name}</span>
+                          <span className={sg.kind === "equivalent" ? "text-brand/70" : "text-white/30"}>
+                            {sg.kind === "equivalent" ? "≈" : "+"}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => dismissSuggestion(sg.name)}
+                          className="text-white/20 hover:text-white/60 px-1"
+                          aria-label={`Dismiss ${sg.name}`}
+                        >
+                          <X size={9} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="hidden">
               </div>
             </div>
 
@@ -671,22 +733,64 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
 
 function AddSkillInput({ onAdd }) {
   const [v, setV] = useState("");
+  const [matches, setMatches] = useState([]);
+
+  // Type-ahead against the same taxonomy the extractor uses, so a recruiter's
+  // free text lands on the canonical name rather than a near-miss spelling.
+  useEffect(() => {
+    if (!v.trim()) {
+      setMatches([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get(`/skills/suggest?q=${encodeURIComponent(v)}`);
+        setMatches(r.data.matches || []);
+      } catch {
+        setMatches([]);
+      }
+    }, 180);
+    return () => clearTimeout(t);
+  }, [v]);
+
+  const commit = (name) => {
+    onAdd(name);
+    setV("");
+    setMatches([]);
+  };
+
   return (
-    <div className="flex items-center gap-2 border border-dashed hairline p-2 pl-3">
-      <Plus size={12} className="text-white/40" />
-      <input
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            onAdd(v);
-            setV("");
-          }
-        }}
-        data-testid="js-add-skill-input"
-        placeholder="Add a skill and press Enter"
-        className="bg-transparent focus:outline-none text-xs flex-1 font-mono"
-      />
+    <div className="relative">
+      <div className="flex items-center gap-2 border border-dashed hairline p-2 pl-3">
+        <Plus size={12} className="text-white/40" />
+        <input
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit(matches[0] && matches[0].toLowerCase().startsWith(v.toLowerCase()) ? matches[0] : v);
+            if (e.key === "Escape") setMatches([]);
+          }}
+          data-testid="js-add-skill-input"
+          placeholder="Add a skill and press Enter"
+          className="bg-transparent focus:outline-none text-xs flex-1 min-w-0 font-mono"
+        />
+      </div>
+      {matches.length > 0 && (
+        <div
+          className="absolute z-30 left-0 right-0 mt-1 border hairline bg-app shadow-xl max-h-56 overflow-auto"
+          data-testid="js-skill-autocomplete"
+        >
+          {matches.map((m) => (
+            <button
+              key={m}
+              onClick={() => commit(m)}
+              className="w-full text-left px-3 py-2 text-xs font-mono hover:bg-brand/10 hover:text-brand transition-colors"
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

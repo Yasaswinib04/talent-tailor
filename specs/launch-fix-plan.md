@@ -25,6 +25,60 @@ worth taking for one day of schedule, and it isn't fixable properly overnight.
 
 ## Done since this plan was written
 
+### Skill extraction rebuilt
+
+The old extractor was 56 aliases matched with `alias in text.lower()`. Substring
+matching on a job description fails badly and *silently* — the phantom skills it
+invented flowed straight into `must_have_skills` and scored real candidates
+against requirements the role never had.
+
+Measured on realistic JDs before the rewrite:
+
+| Job description | Old output | Why |
+|---|---|---|
+| "HTML, CSS and JavaScript… maintain… available" | `Java`, `Machine Learning`, `AI/ML` | `ml` inside **HTML**, `ai` inside "m**ai**ntain", `java` inside "**Java**Script" |
+| Plain-English PM prose, no technology at all | `Golang`, `AI/ML` | "you will **go** deep", "det**ai**l" |
+| "Rust, C++, gRPC, low-latency" | *nothing* | none of it was in the dictionary |
+| "Svelte, Tailwind, Vite, Playwright, GitHub Actions" | `AI/ML` only | every real skill missed |
+| "PyTorch, TensorFlow, LLM, RAG, MLOps" | `Machine Learning` | four of five missed |
+
+Replaced with `backend/skills.py`: **119 canonical skills, 365 aliases, 50
+groups**.
+
+- **Token-boundary matching**, longest alias first, with claimed spans — so
+  "React Native" never also yields "React", and "machine learning" is consumed
+  before "ml".
+- **Genuinely ambiguous aliases** (`Go`, `ML`, `AI`, `C#`, `C++`, `Rust`) are
+  case-sensitive and pattern-guarded: `Go` is the language, `go` is a verb.
+  "Go and Kubernetes" resolves; "Go deep on customers" does not. `go-to-market`
+  is claimed by its own skill first.
+- **Weighting from context.** A cue on the skill's own line wins, and
+  "nice to have" beats a `Requirements:` heading further up — a fixed character
+  window had made every bullet under that heading read as must-have.
+- **Equivalents and adjacency.** Each skill carries a group, so same-group
+  skills are near-equivalents ("does the same job as React" → Vue, Angular,
+  Svelte) and `related` covers pairings ("usually goes with React" →
+  TypeScript). Returned as `suggested_skills` with a reason.
+- **Resume parsing uses the same engine**, so a JD and a CV finally agree on
+  what a skill is called.
+
+**The recruiter stays in charge.** In the role editor a skill's name is an
+editable field (with the matched text as a tooltip — you can see *why* it was
+picked up), suggestions are one click to accept or dismiss, and the manual add
+box has type-ahead over the taxonomy so "k8s" resolves to Kubernetes. New
+endpoints: `/api/skills/suggest`, `/api/skills/related`, `/api/skills/canonicalise`.
+An unknown skill is still allowed through as typed — the taxonomy is not a gate
+on what a recruiter may ask for.
+
+**Verification:** 45 extraction tests, each old false positive pinned as a
+regression case, plus taxonomy hygiene checks (no alias claimed by two skills —
+which caught `bigquery` belonging to both GCP and BigQuery). 11 browser cases
+cover editing, suggestions, type-ahead and that the edited list is what gets
+saved. 173 backend tests pass.
+
+---
+
+
 ### Responsive — P2-7 closed, the last open item
 
 The dashboard rendered 832px of content into a 390px viewport. The cause was a

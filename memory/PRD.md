@@ -8,7 +8,7 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 ## User choices captured
 - Scope: **Both** — interactive prototype **and** UX report page.
 - Screens: HR Onboarding · Job Setup · Candidate Dashboard · Candidate Profile · Public Apply link.
-- AI features: originally **mocked**. Now real where it matters — resume parsing (pypdf/python-docx) and weighted match scoring. Skill extraction from a JD is still a heuristic dictionary rather than an LLM; it is deterministic and works offline, and is the one remaining candidate for a model.
+- AI features: originally **mocked**. Now real — resume parsing (pypdf/python-docx), weighted match scoring, and a proper skill taxonomy (`backend/skills.py`: 119 skills, 365 aliases, 50 groups) with token-boundary matching, context-aware weighting and equivalent/adjacent suggestions. Deterministic and offline; an LLM would add nuance but is no longer needed for correctness.
 - Visual direction: designer's call — chose **CRED-inspired dark, editorial, mono accents** with copper (#B28A5D) accents.
 
 ## Architecture
@@ -65,6 +65,15 @@ rather than inventing numbers; the activity feed is a real event log with actor
 and timestamp; onboarding persists and creates the first role. Sidebar tabs,
 global search and ⌘K work. Candidate lists are paginated.
 
+**Skill extraction rebuilt (Aug 2026).** The old 56-alias substring matcher
+produced phantom skills on nearly every JD — "HTML" yielded Machine Learning,
+"JavaScript" yielded Java, "you will go deep" yielded Golang — and those fed
+straight into must_have_skills. Replaced with `backend/skills.py`: token-boundary
+matching, case-sensitive guards for ambiguous aliases (Go/ML/AI/C#/C++),
+line-scoped must-have vs nice-to-have weighting, and equivalent/adjacent skill
+suggestions. The role editor lets a recruiter rename any extracted skill, accept
+or dismiss suggestions, and type-ahead against the taxonomy.
+
 **Responsive (Aug 2026).** The sidebar is an off-canvas drawer below `md`; the
 candidate table scrolls in its own container and sheds columns by breakpoint;
 every screen fits 375/390/768px with no horizontal page scroll. Desktop layout
@@ -78,7 +87,8 @@ is unchanged. No known non-working features remain.
   Fontshare, Unsplash and Pexels with no fallback
 - **P3** — Email drip templates for candidates
 - **P3** — Multi-recruiter collaboration (mentions, approvals)
-- **P3** — LLM-backed skill extraction to replace the heuristic dictionary
+- **P3** — LLM-backed skill extraction as a *supplement* to the taxonomy, for
+  skills outside it and for reading unusual phrasing
 
 ## Done, previously on this list
 - ✅ Persist onboarding to the backend

@@ -107,12 +107,13 @@ grep -o 'baseURL[^,]*' frontend/build/static/js/main.*.js   # must not contain "
 
 ```bash
 pip install -r backend/requirements.txt -r backend/tests/requirements.txt
-pytest backend/tests                    # 128 tests; integration ones skip without a server
+pytest backend/tests                    # 173 tests; integration ones skip without a server
 TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration tests
 ```
 
 - `test_auth.py`, `test_bulk_upload.py`, `test_p0_fixes.py`,
-  `test_pipeline_integrity.py` and `test_no_mocks.py` run fully locally
+  `test_pipeline_integrity.py`, `test_no_mocks.py` and `test_skills.py` run
+  fully locally
   against an in-memory Mongo — no server needed. `test_auth.py` walks the app's
   own route table, so a new endpoint added without a guard fails the build.
 - `backend_test.py` is an integration suite; point it at a running API with

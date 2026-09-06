@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 import auth
+import skills as skills_lib
 
 load_dotenv()
 
@@ -766,68 +767,52 @@ async def delete_job(job_id: str, user: dict = Depends(require_user)):
     }
 
 
-# --------- AI Skill Extraction (mocked heuristic) ---------
-SKILL_DICTIONARY = {
-    "react": "React", "typescript": "TypeScript", "next.js": "Next.js", "nextjs": "Next.js",
-    "javascript": "JavaScript", "graphql": "GraphQL", "redux": "Redux", "vue": "Vue.js",
-    "angular": "Angular", "node": "Node.js", "python": "Python", "django": "Django",
-    "flask": "Flask", "fastapi": "FastAPI", "golang": "Golang", "go": "Golang",
-    "java": "Java", "spring": "Spring Boot", "kotlin": "Kotlin", "swift": "Swift",
-    "postgres": "PostgreSQL", "postgresql": "PostgreSQL", "mysql": "MySQL", "mongodb": "MongoDB",
-    "redis": "Redis", "kafka": "Kafka", "rabbitmq": "RabbitMQ", "aws": "AWS", "gcp": "GCP",
-    "azure": "Azure", "docker": "Docker", "kubernetes": "Kubernetes", "terraform": "Terraform",
-    "figma": "Figma", "sketch": "Sketch", "design system": "Design Systems", "design systems": "Design Systems",
-    "usability": "Usability Testing", "user research": "Qualitative Research", "qualitative": "Qualitative Research",
-    "survey": "Survey Design", "a/b test": "A/B Testing", "a/b testing": "A/B Testing",
-    "sql": "SQL", "product strategy": "Product Strategy", "roadmap": "Product Strategy",
-    "fintech": "Fintech", "upi": "UPI / Payments", "payments": "UPI / Payments",
-    "performance": "Performance Optimization", "distributed": "Distributed Systems",
-    "machine learning": "Machine Learning", "ml": "Machine Learning", "ai": "AI/ML",
-    "data science": "Data Science", "analytics": "Analytics",
-}
-
-
 @app.post("/api/extract-skills")
 async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(require_user)):
-    text = (payload.jd or "").lower()
-    found = {}
-    for k, v in SKILL_DICTIONARY.items():
-        if k in text:
-            found[v] = found.get(v, 0) + 1
-    # sort by count desc, then original order
-    skills = []
-    for name, count in sorted(found.items(), key=lambda x: -x[1]):
-        weight = min(5, max(2, 2 + count))
-        skills.append({"name": name, "weight": weight})
-    # default suggestions if nothing detected
+    text = payload.jd or ""
+    found = skills_lib.extract_skills(text)
+    skills = [{"name": s["name"], "weight": s["weight"],
+               "matched_as": s["matched_as"], "count": s["count"]} for s in found]
+
+    # Skills a recruiter could reasonably also accept — same-group equivalents
+    # ("does the same job as React") and common pairings.
+    suggested = skills_lib.related_skills([s["name"] for s in skills])
+
     if not skills:
         skills = [
-            {"name": "Communication", "weight": 4},
-            {"name": "Problem Solving", "weight": 4},
-            {"name": "Collaboration", "weight": 3},
+            {"name": "Communication", "weight": 4, "matched_as": None, "count": 0},
+            {"name": "Problem Solving", "weight": 4, "matched_as": None, "count": 0},
+            {"name": "Stakeholder Management", "weight": 3, "matched_as": None, "count": 0},
         ]
-    # salary suggestion based on seniority keywords
-    salary_min = 1500000
-    salary_max = 3000000
-    if any(k in text for k in ["senior", "lead", "principal", "staff"]):
+
+    lower = text.lower()
+    salary_min, salary_max = 1500000, 3000000
+    if any(k in lower for k in ["senior", "lead", "principal", "staff"]):
         salary_min, salary_max = 3500000, 6500000
-    elif any(k in text for k in ["junior", "entry", "intern"]):
+    elif any(k in lower for k in ["junior", "entry", "intern"]):
         salary_min, salary_max = 600000, 1500000
 
     suggested_questions = []
-    if "react" in text or "frontend" in text:
-        suggested_questions.append("How many years of production React experience do you have?")
-    if "backend" in text or "distributed" in text:
-        suggested_questions.append("Describe the largest distributed system you have built.")
-    if "product" in text and ("manager" in text or "management" in text):
+    top = [s["name"] for s in skills[:3]]
+    if top:
+        suggested_questions.append(f"Tell us about your hands-on experience with {top[0]}.")
+    if any(s in {"Distributed Systems", "Microservices", "System Design"} for s in top):
+        suggested_questions.append("Describe the largest system you have designed end-to-end.")
+    if any(s in {"Product Strategy", "Product Discovery", "Go-to-Market"} for s in top):
         suggested_questions.append("Describe a 0→1 product you shipped end-to-end.")
     if not suggested_questions:
         suggested_questions = ["Why are you excited about this role?"]
 
-    # Seniority detection for filter defaults
-    is_senior = any(k in text for k in ["senior", "lead", "principal", "staff"])
-    is_junior = any(k in text for k in ["junior", "entry", "intern"])
+    is_senior = any(k in lower for k in ["senior", "lead", "principal", "staff"])
+    is_junior = any(k in lower for k in ["junior", "entry", "intern"])
     min_exp = 5 if is_senior else (0 if is_junior else 2)
+
+    if is_senior:
+        recommended_weights = {"skills": 45, "experience": 30, "education": 5, "notice": 10, "cultural_fit": 10}
+    elif is_junior:
+        recommended_weights = {"skills": 35, "experience": 15, "education": 25, "notice": 10, "cultural_fit": 15}
+    else:
+        recommended_weights = {"skills": 40, "experience": 25, "education": 15, "notice": 10, "cultural_fit": 10}
 
     # Recommended mandatory filters, strictest first. A recommendation that
     # leaves nobody is worse than no recommendation: the previous version took
@@ -878,6 +863,8 @@ async def extract_skills(payload: ExtractSkillsRequest, user: dict = Depends(req
         "screening_questions": suggested_questions,
         "recommended_filters": recommended_filters,
         "recommended_weights": recommended_weights,
+        # Equivalent / adjacent skills the recruiter can accept with one click.
+        "suggested_skills": suggested,
         # What these defaults do to the current pool, so the UI can say so up
         # front instead of the recruiter discovering it by opening the section.
         "filter_impact": filter_impact,
@@ -1018,8 +1005,7 @@ def _parse_resume(text: str) -> dict:
         token = n_m.group(1).lower()
         notice = "Immediate" if token == "immediate" else f"{token} days"
 
-    lower = text.lower()
-    skills = sorted({v for k, v in SKILL_DICTIONARY.items() if k in lower})
+    found = sorted({s["name"] for s in skills_lib.extract_skills(text)})
 
     return {
         "name": _guess_name(text, email),
@@ -1031,7 +1017,7 @@ def _parse_resume(text: str) -> dict:
         "expected_ctc": ctc,
         "education": education,
         "notice_period": notice,
-        "skills": skills,
+        "skills": found,
     }
 
 
@@ -1577,8 +1563,8 @@ async def apply_to_job(slug: str, payload: CandidateApply):
         raise HTTPException(404, "Job not found")
 
     # mock: derive skills from resume_text using dictionary
-    text = ((payload.resume_text or "") + " " + payload.current_title).lower()
-    matched_skills = sorted({v for k, v in SKILL_DICTIONARY.items() if k in text})
+    text = (payload.resume_text or "") + " " + payload.current_title
+    matched_skills = sorted({s["name"] for s in skills_lib.extract_skills(text)})
     score = _score_against_job(matched_skills, job, {
         "experience_years": payload.experience_years,
         "current_company": payload.current_company,
@@ -1656,6 +1642,33 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     await record_event(c.id, "applied", f"Applied to {job['title']} via the public link.", "candidate")
     await db.jobs.update_one({"id": job["id"]}, {"$inc": {"candidates_count": 1}})
     return {"ok": True, "candidate_id": c.id, "match_score": score, "duplicate": False}
+
+
+# ---------- Skill taxonomy (for the role editor) ----------
+@app.get("/api/skills/suggest")
+async def skill_suggest(q: str = "", user: dict = Depends(require_user)):
+    """Type-ahead over the known taxonomy, so a recruiter's free text lands on
+    the same canonical name the extractor uses."""
+    return {"matches": skills_lib.suggest_completions(q)}
+
+
+@app.post("/api/skills/related")
+async def skill_related(payload: dict, user: dict = Depends(require_user)):
+    """Equivalent and adjacent skills for a set the recruiter already picked."""
+    names = [str(n) for n in (payload.get("skills") or []) if str(n).strip()][:50]
+    return {"suggested": skills_lib.related_skills(names)}
+
+
+@app.post("/api/skills/canonicalise")
+async def skill_canonicalise(payload: dict, user: dict = Depends(require_user)):
+    """Resolve a typed skill ("reactjs", "k8s") to its canonical name.
+
+    Unknown skills are allowed through as typed — the taxonomy should not be a
+    gate on what a recruiter is permitted to ask for.
+    """
+    raw = str(payload.get("skill", "")).strip()
+    canonical = skills_lib.canonicalise(raw)
+    return {"input": raw, "canonical": canonical, "known": canonical is not None}
 
 
 # ---------- Onboarding ----------
