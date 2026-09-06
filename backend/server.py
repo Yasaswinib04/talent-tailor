@@ -8,24 +8,28 @@ import csv
 import hashlib
 import hmac
 import io
+import logging
 import os
 import re
+import time
 import uuid
 import zlib
 
 import httpx
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Optional
 
 import certifi
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, field_validator
 
 import llm
 import security
+
+logger = logging.getLogger("talent_tailor")
 
 load_dotenv()
 
@@ -39,6 +43,29 @@ DB_NAME = os.environ["DB_NAME"]
 FREE_REVEAL = int(os.environ.get("FREE_REVEAL", "3"))
 UNLOCK_CODE = os.environ.get("UNLOCK_CODE", "")
 UNLOCK_PRICE_INR = int(os.environ.get("UNLOCK_PRICE_INR", "1999"))
+
+# ---- Access model (see specs/PRICING.md) ----------------------------------
+# Recruiters rotate pools: a candidate passed over in January fits a role in
+# March. So the meter is TIME, never the role and never the person — entitlement
+# is a date on the user, not a boolean on a job. Every plan is sold through the
+# one-time Razorpay order rail that already works; `access_until` is simply a
+# date that rail knows how to move forward. When Razorpay Subscriptions
+# eventually lands it becomes a second writer to this same field.
+PLANS = {
+    "monthly": {"code": "monthly", "label": "Talent Tailor · 30 days", "days": 30,
+                "price_inr": int(os.environ.get("PLAN_MONTHLY_INR", "1999"))},
+}
+DEFAULT_PLAN = "monthly"
+# Full access from signup, no card. At zero users the bottleneck is proof, not
+# conversion: three names behind a paywall is a demo, a finished shortlist is
+# evidence.
+TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "14"))
+# Nobody banks years of access at the launch price and holds it to 2031.
+MAX_BANKED_DAYS = 400
+# What a lapsed (or trial-expired) workspace can still do. Roles are capped
+# because unlimited free role creation is the pool-harvesting mechanism; the
+# public apply link is deliberately NOT capped (see create_job).
+FREE_ROLE_LIMIT = int(os.environ.get("FREE_ROLE_LIMIT", "2"))
 
 # Payment rails, in order of preference at runtime:
 #   1. Razorpay checkout (both keys set) — verified server-side, auto-unlocks.
@@ -98,6 +125,20 @@ class User(BaseModel):
     company: str = ""
     password_hash: str = ""
     created_at: str = Field(default_factory=now_iso)
+    # UTC ISO. Empty means never had access.
+    access_until: str = ""
+    # The ratchet. Anyone un-redacted while access was live stays un-redacted
+    # forever, including after it lapses — lapsing withholds NEW work, it never
+    # re-hides people already paid for. That is the whole answer to pool
+    # rotation, and it is the difference between a renewal and a hostage.
+    revealed_candidate_ids: List[str] = []
+    # Free preview slots, assigned once and frozen. Deliberately separate from
+    # revealed_candidate_ids: a preview is not something you earned, so it must
+    # never ratchet.
+    preview_candidate_ids: List[str] = []
+    # Lifetime, never decremented — a free-tier cap counting live rows is
+    # defeated by delete-and-recreate.
+    jobs_created_total: int = 0
 
 
 class SignupRequest(BaseModel):
@@ -135,6 +176,10 @@ class LoginRequest(BaseModel):
 
 class UnlockRequest(BaseModel):
     code: str
+
+
+class CreateOrderRequest(BaseModel):
+    plan: Optional[str] = None
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -307,7 +352,10 @@ class StageUpdate(BaseModel):
 
 # ---------- Auth ----------
 def _public_user(u: dict) -> dict:
-    return {k: u.get(k) for k in ("id", "name", "email", "company", "created_at")}
+    out = {k: u.get(k) for k in ("id", "name", "email", "company", "created_at")}
+    out["access_until"] = u.get("access_until") or None
+    out["has_access"] = _has_access(u)
+    return out
 
 
 async def current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -333,8 +381,11 @@ async def signup(payload: SignupRequest):
         company=(payload.company or "").strip(),
         password_hash=security.hash_password(payload.password),
     )
-    await db.users.insert_one(user.model_dump())
-    return {"token": security.make_token(user.id), "user": _public_user(user.model_dump())}
+    doc = user.model_dump()
+    # The trial is the proof. Full access from signup, no card asked for.
+    doc["access_until"] = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat().replace("+00:00", "Z")
+    await db.users.insert_one(doc)
+    return {"token": security.make_token(user.id), "user": _public_user(doc)}
 
 
 @app.post("/api/auth/login")
@@ -519,6 +570,78 @@ async def load_sample_data(user: dict = Depends(current_user)):
     return await _insert_sample_data(user["id"])
 
 
+async def _backfill_trials():
+    """Accounts that predate the access model have no `access_until`, so they
+    would lapse the moment this deploys — someone who signed up yesterday would
+    open the app to a paywall. Give them the same trial a new signup gets."""
+    stamp = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat().replace("+00:00", "Z")
+    res = await db.users.update_many(
+        {"$or": [{"access_until": {"$exists": False}}, {"access_until": ""}, {"access_until": None}]},
+        {"$set": {"access_until": stamp}},
+    )
+    if res.modified_count:
+        logger.info("backfilled %s pre-existing account(s) with a %s-day trial",
+                    res.modified_count, TRIAL_DAYS)
+
+
+async def _migrate_unlocked_jobs_to_access():
+    """One-pass, idempotent: carry per-role unlocks over to the access model.
+
+    Anyone who paid ₹1,999 for a role keeps what they bought — the candidates on
+    that role are seeded into the permanent reveal set, and the workspace is
+    given a plan's worth of days so nothing they could see yesterday is hidden
+    today. Marked on the user so a restart cannot grant it twice.
+    """
+    unlocked = await db.jobs.find({"unlocked": True}).to_list(1000)
+    by_owner: Dict[str, List[str]] = {}
+    for job in unlocked:
+        by_owner.setdefault(job.get("owner_id", ""), []).append(job["id"])
+    for owner_id, job_ids in by_owner.items():
+        if not owner_id:
+            continue
+        # Claim atomically. Two workers booting together would otherwise both
+        # read "not migrated" and both grant a month.
+        claim = await db.users.update_one(
+            {"id": owner_id, "access_migrated_at": {"$exists": False}},
+            {"$set": {"access_migrated_at": now_iso()}},
+        )
+        if claim.modified_count != 1:
+            continue
+        # No to_list cap: a truncated seed would silently drop candidates this
+        # workspace already paid to see, and the flag above says "done".
+        cand_ids = [c["id"] async for c in db.candidates.find({"role_ids": {"$in": job_ids}}, {"id": 1})]
+        await db.users.update_one(
+            {"id": owner_id},
+            {"$addToSet": {"revealed_candidate_ids": {"$each": cand_ids}}},
+        )
+        await grant_access(owner_id, PLANS[DEFAULT_PLAN]["days"])
+        cands = cand_ids
+        logger.info("access migration: %s job(s), %s candidate(s) for owner %s",
+                    len(job_ids), len(cands), owner_id)
+
+
+# Public, unauthenticated, 5 MB uploads, and it calls the LLM before any
+# candidate exists. Under per-role pricing token spend was loosely bounded by
+# roles sold; under a flat monthly plan it is bounded by nothing. In-memory is
+# adequate on a single instance — revisit if this ever runs more than one.
+_PARSE_HITS: Dict[str, List[float]] = {}
+PARSE_RATE_LIMIT = int(os.environ.get("PARSE_RATE_LIMIT", "10"))
+PARSE_RATE_WINDOW_S = 600
+
+
+def _rate_limited(key: str) -> bool:
+    now = time.monotonic()
+    hits = [t for t in _PARSE_HITS.get(key, []) if now - t < PARSE_RATE_WINDOW_S]
+    if len(_PARSE_HITS) > 5000:  # crude bound; keys are IPs and slugs
+        _PARSE_HITS.clear()
+    if len(hits) >= PARSE_RATE_LIMIT:
+        _PARSE_HITS[key] = hits
+        return True
+    hits.append(now)
+    _PARSE_HITS[key] = hits
+    return False
+
+
 @app.on_event("startup")
 async def seed():
     await db.users.create_index("email")
@@ -526,6 +649,9 @@ async def seed():
     await db.jobs.create_index("share_slug")
     await db.candidates.create_index("owner_id")
     await db.candidates.create_index("role_ids")
+    await db.payments.create_index("order_id")
+    await _backfill_trials()
+    await _migrate_unlocked_jobs_to_access()
     if SEED_DEMO_DATA and await db.jobs.count_documents({}) == 0:
         await _insert_sample_data("demo")
 
@@ -550,11 +676,29 @@ async def list_jobs(user: dict = Depends(current_user)):
 
 @app.post("/api/jobs")
 async def create_job(payload: JobCreate, user: dict = Depends(current_user)):
+    # Roles are capped without a plan, because unlimited free role creation is
+    # the pool-harvesting mechanism. Note what is deliberately NOT capped: the
+    # public apply link. A candidate's application must never fail because the
+    # recruiter's billing lapsed — those candidates simply arrive redacted.
+    if not _has_access(user):
+        # Lifetime, not live. Counting current rows is defeated by creating a
+        # role, reading what it surfaces, deleting it, and repeating.
+        existing = max(
+            int(user.get("jobs_created_total") or 0),
+            await db.jobs.count_documents({"owner_id": user["id"]}),
+        )
+        if existing >= FREE_ROLE_LIMIT:
+            raise HTTPException(
+                402,
+                f"Free workspaces can keep {FREE_ROLE_LIMIT} roles. "
+                f"Start a plan (₹{PLANS[DEFAULT_PLAN]['price_inr']}/month) to add more.",
+            )
     # Drop unset optionals so Job's own defaults apply — filters and scoring_weights
     # arrive as None when omitted, which its dict fields reject.
     job = Job(**{k: v for k, v in payload.model_dump().items() if v is not None}, owner_id=user["id"])
     doc = job.model_dump()
     await db.jobs.insert_one(doc)  # mutates doc, adding a non-serialisable _id
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"jobs_created_total": 1}})
     # Publishing a role runs its filters over the pool and attaches everyone who
     # clears them, so the "N will pass" preview is the shortlist the recruiter gets.
     matched = await _attach_matching_candidates(doc)
@@ -626,26 +770,46 @@ async def delete_job(job_id: str, user: dict = Depends(current_user)):
 
 
 # ---------- Paywall ----------
-@app.post("/api/jobs/{job_id}/unlock")
-async def unlock_job(job_id: str, payload: UnlockRequest, user: dict = Depends(current_user)):
-    """Manual-payment bridge: operator shares the unlock code once paid.
-    Replace the code check with a Razorpay webhook to go fully self-serve."""
-    job = await _owned_job(job_id, user)
-    if job.get("unlocked"):
-        return {"ok": True, "already": True}
+@app.post("/api/billing/redeem")
+async def redeem_code(payload: UnlockRequest, user: dict = Depends(current_user)):
+    """Manual-payment bridge: buyer pays by UPI or invoice, operator shares the
+    code, workspace gets a plan's worth of days. Grants access to the whole
+    workspace — there is no per-job unlock any more."""
     if not UNLOCK_CODE:
-        raise HTTPException(503, "Unlocking isn't live yet — contact the Talent Tailor team")
-    if (payload.code or "").strip() != UNLOCK_CODE:
-        raise HTTPException(403, "That unlock code isn't valid")
-    await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
-    return {"ok": True}
+        raise HTTPException(503, "Redeeming isn't live yet — contact the Talent Tailor team")
+    if _rate_limited(f"redeem:{user['id']}"):
+        raise HTTPException(429, "Too many attempts — try again in a few minutes.")
+    if not hmac.compare_digest((payload.code or "").strip(), UNLOCK_CODE):
+        raise HTTPException(403, "That code isn't valid")
+    # Single use per workspace, claimed atomically. Under the old model this
+    # code flipped one boolean on one job the caller already owned, so replaying
+    # it did nothing. It now grants DAYS, which makes an unguarded loop worth
+    # MAX_BANKED_DAYS for one payment — and the code is a shared string anyone
+    # can forward. Same lesson as verify_payment; it just arrived later.
+    claim = await db.users.update_one(
+        {"id": user["id"], "redeemed_codes": {"$ne": UNLOCK_CODE}},
+        {"$addToSet": {"redeemed_codes": UNLOCK_CODE}},
+    )
+    if claim.modified_count != 1:
+        raise HTTPException(409, "You've already redeemed this code.")
+    until = await grant_access(user["id"], PLANS[DEFAULT_PLAN]["days"])
+    return {"ok": True, "access_until": until}
 
 
 @app.get("/api/billing/config")
 async def billing_config(user: dict = Depends(current_user)):
     """What payment rails the frontend should offer, without leaking secrets."""
     return {
-        "price_inr": UNLOCK_PRICE_INR,
+        # The frontend must never hardcode a price; changing one should not need
+        # a deploy.
+        "plans": list(PLANS.values()),
+        "default_plan": DEFAULT_PLAN,
+        "trial_days": TRIAL_DAYS,
+        "access_until": user.get("access_until") or None,
+        "has_access": _has_access(user),
+        "free_role_limit": FREE_ROLE_LIMIT,
+        "free_reveal": FREE_REVEAL,
+        "price_inr": PLANS[DEFAULT_PLAN]["price_inr"],
         "razorpay": _razorpay_enabled(),
         "razorpay_key_id": RAZORPAY_KEY_ID if _razorpay_enabled() else None,
         "upi_vpa": UPI_VPA or None,
@@ -654,12 +818,12 @@ async def billing_config(user: dict = Depends(current_user)):
     }
 
 
-@app.post("/api/jobs/{job_id}/create-order")
-async def create_payment_order(job_id: str, user: dict = Depends(current_user)):
-    """Create a Razorpay order for unlocking this job's shortlist."""
-    job = await _owned_job(job_id, user)
-    if job.get("unlocked"):
-        raise HTTPException(409, "This shortlist is already unlocked")
+@app.post("/api/billing/create-order")
+async def create_payment_order(payload: CreateOrderRequest, user: dict = Depends(current_user)):
+    """Create a Razorpay order for a plan's worth of workspace access."""
+    plan = PLANS.get((payload.plan or DEFAULT_PLAN).strip())
+    if not plan:
+        raise HTTPException(400, "Unknown plan")
     if not _razorpay_enabled():
         raise HTTPException(503, "Online payment isn't configured — use the UPI/code option")
     try:
@@ -667,10 +831,12 @@ async def create_payment_order(job_id: str, user: dict = Depends(current_user)):
             resp = await rp.post(
                 "https://api.razorpay.com/v1/orders",
                 json={
-                    "amount": UNLOCK_PRICE_INR * 100,  # paise
+                    # Server-side price, always. A client-supplied amount is a
+                    # client-supplied discount.
+                    "amount": plan["price_inr"] * 100,  # paise
                     "currency": "INR",
-                    "receipt": job_id[:40],
-                    "notes": {"job_id": job_id, "owner_id": user["id"], "product": "shortlist-unlock"},
+                    "receipt": f"{plan['code']}-{user['id'][:24]}",
+                    "notes": {"plan": plan["code"], "owner_id": user["id"], "product": "workspace-access"},
                 },
             )
             resp.raise_for_status()
@@ -680,9 +846,10 @@ async def create_payment_order(job_id: str, user: dict = Depends(current_user)):
     await db.payments.insert_one({
         "id": str(uuid.uuid4()),
         "order_id": order["id"],
-        "job_id": job_id,
+        "plan": plan["code"],
+        "days": plan["days"],
         "owner_id": user["id"],
-        "amount_inr": UNLOCK_PRICE_INR,
+        "amount_inr": plan["price_inr"],
         "status": "created",
         "created_at": now_iso(),
     })
@@ -692,22 +859,23 @@ async def create_payment_order(job_id: str, user: dict = Depends(current_user)):
         "currency": order["currency"],
         "key_id": RAZORPAY_KEY_ID,
         "name": "Talent Tailor",
-        "description": f"Full shortlist unlock — {job.get('title', 'role')}",
+        "description": plan["label"],
         "prefill": {"name": user.get("name", ""), "email": user.get("email", "")},
     }
 
 
-@app.post("/api/jobs/{job_id}/verify-payment")
-async def verify_payment(job_id: str, payload: VerifyPaymentRequest, user: dict = Depends(current_user)):
+@app.post("/api/billing/verify-payment")
+async def verify_payment(payload: VerifyPaymentRequest, user: dict = Depends(current_user)):
     """Razorpay checkout handed the client a signature; verify it server-side
-    and unlock. The signature is HMAC-SHA256(order_id|payment_id, key_secret),
-    so a client can't forge an unlock without the secret."""
-    await _owned_job(job_id, user)
+    and grant access. The signature is HMAC-SHA256(order_id|payment_id,
+    key_secret), so a client can't forge a grant without the secret."""
     if not _razorpay_enabled():
         raise HTTPException(503, "Online payment isn't configured")
-    record = await db.payments.find_one({"order_id": payload.razorpay_order_id, "job_id": job_id})
+    record = await db.payments.find_one(
+        {"order_id": payload.razorpay_order_id, "owner_id": user["id"]}
+    )
     if not record:
-        raise HTTPException(404, "No payment order found for this job")
+        raise HTTPException(404, "No payment order found")
     expected = hmac.new(
         RAZORPAY_KEY_SECRET.encode(),
         f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode(),
@@ -725,11 +893,11 @@ async def verify_payment(job_id: str, payload: VerifyPaymentRequest, user: dict 
         {"$set": {"status": "paid", "payment_id": payload.razorpay_payment_id, "paid_at": now_iso()}},
     )
     if claim.modified_count == 1:
-        await db.jobs.update_one({"id": job_id}, {"$set": {"unlocked": True, "unlocked_at": now_iso()}})
-    # Already claimed: the caller refreshed or double-submitted. The job is
-    # unlocked either way, so report success rather than an error the recruiter
-    # cannot act on.
-    return {"ok": True, "unlocked": True}
+        await grant_access(user["id"], int(record.get("days") or PLANS[DEFAULT_PLAN]["days"]))
+    # Already claimed: the caller refreshed or double-submitted. Report the
+    # access they hold rather than an error they cannot act on.
+    fresh = await db.users.find_one({"id": user["id"]}) or {}
+    return {"ok": True, "access_until": fresh.get("access_until")}
 
 
 def _redact(c: dict, rank: int) -> dict:
@@ -748,19 +916,112 @@ def _redact(c: dict, rank: int) -> dict:
     return c
 
 
-async def _revealed_ids(owner_id: str) -> set:
-    """Candidate ids visible in full: everyone on unlocked jobs, plus the
-    top-FREE_REVEAL of every locked job."""
-    jobs = await db.jobs.find({"owner_id": owner_id}).to_list(1000)
-    revealed = set()
-    for job in jobs:
-        cands = await db.candidates.find({"role_ids": job["id"]}).to_list(1000)
-        if job.get("unlocked"):
-            revealed.update(c["id"] for c in cands)
-        else:
+def _has_access(user: dict) -> bool:
+    """Is this workspace inside a paid (or trial) window right now?
+
+    Parsed, not string-compared. now_iso() and grant_access write different ISO
+    spellings ("+00:00" vs "Z"), and a lexical compare on mixed spellings can
+    grant access indefinitely.
+    """
+    until = (user or {}).get("access_until") or ""
+    if not until:
+        return False
+    try:
+        parsed = datetime.fromisoformat(until.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed > datetime.now(timezone.utc)
+
+
+async def grant_access(user_id: str, days: int) -> str:
+    """Extend access by `days`, from now or from the existing expiry, whichever
+    is later — so buying early never burns the remainder of what you hold.
+    Capped so nobody banks years at a launch price."""
+    user = await db.users.find_one({"id": user_id}) or {}
+    now = datetime.now(timezone.utc)
+    current = now
+    if user.get("access_until"):
+        try:
+            parsed = datetime.fromisoformat(user["access_until"].replace("Z", "+00:00"))
+            current = max(now, parsed)
+        except ValueError:
+            pass  # unparseable stored value: treat as expired rather than crash
+    ceiling = now + timedelta(days=MAX_BANKED_DAYS)
+    new_until = min(current + timedelta(days=days), ceiling)
+    if new_until < current + timedelta(days=days):
+        # Clamped. The customer paid for days we are not granting, so leave a
+        # trail rather than swallowing it — this should be refunded or extended
+        # by hand, and it must never be invisible.
+        logger.warning("access grant for %s clamped at %s days; %s days not granted",
+                       user_id, MAX_BANKED_DAYS, days)
+    stamp = new_until.isoformat().replace("+00:00", "Z")
+    # Only ever move the expiry forward. Two concurrent grants both read the old
+    # value; without this guard the slower write would silently drop a paid month.
+    await db.users.update_one(
+        {"id": user_id, "$or": [{"access_until": {"$lt": stamp}}, {"access_until": {"$in": [None, ""]}}]},
+        {"$set": {"access_until": stamp}},
+    )
+    fresh = await db.users.find_one({"id": user_id}) or {}
+    return fresh.get("access_until") or stamp
+
+
+async def _visible_ids(user: dict) -> set:
+    """The one paywall path. Every read of candidate identity goes through here.
+
+    There used to be two disagreeing paths — a rank-slice when a job_id was
+    given, and a workspace-wide union otherwise — so the same person could show
+    a full name on one screen and "Candidate #7" on another.
+    """
+    owner_id = user["id"]
+    persisted = set(user.get("revealed_candidate_ids") or [])
+
+    if _has_access(user):
+        # No to_list cap here. This is the "you paid, you see everything" path;
+        # truncating it would redact a paying workspace's newest candidates,
+        # which is the single worst bug this system could have.
+        ids = {c["id"] async for c in db.candidates.find({"owner_id": owner_id}, {"id": 1})}
+        # Ratchet, and ONLY here. Free previews below are computed per request
+        # and never persisted — otherwise free role creation plus auto-attach
+        # would let a script harvest the whole pool three names at a time.
+        fresh = list(ids - persisted)
+        if fresh:
+            await db.users.update_one(
+                {"id": owner_id}, {"$addToSet": {"revealed_candidate_ids": {"$each": fresh}}}
+            )
+        return persisted | ids
+
+    # Lapsed or never paid: everything already earned, plus a free preview.
+    #
+    # The preview slots are ASSIGNED ONCE AND PERSISTED, never recomputed. That
+    # is not an optimisation, it is the whole defence. Recomputing a top-N from
+    # live state let a lapsed workspace walk the entire pool three names at a
+    # time, because every inbound to that ranking is client-controlled:
+    # `role_ids` is patchable, `scoring_weights` and `skills` are patchable, and
+    # roles can be deleted and recreated. Rotate any of them, re-read, repeat.
+    # A frozen, globally capped set has nothing to rotate.
+    preview = list(user.get("preview_candidate_ids") or [])
+    budget = FREE_REVEAL * FREE_ROLE_LIMIT
+    if len(preview) < budget:
+        taken = set(preview) | persisted
+        jobs = await db.jobs.find({"owner_id": owner_id}).to_list(200)
+        for job in jobs:
+            if len(preview) >= budget:
+                break
+            cands = await db.candidates.find({"role_ids": job["id"]}).to_list(1000)
             ranked = sorted(cands, key=lambda c: _score_candidate(c, job), reverse=True)
-            revealed.update(c["id"] for c in ranked[:FREE_REVEAL])
-    return revealed
+            for c in ranked[:FREE_REVEAL]:
+                if len(preview) >= budget:
+                    break
+                if c["id"] not in taken:
+                    preview.append(c["id"])
+                    taken.add(c["id"])
+        if preview != (user.get("preview_candidate_ids") or []):
+            await db.users.update_one(
+                {"id": owner_id}, {"$set": {"preview_candidate_ids": preview[:budget]}}
+            )
+    return persisted | set(preview[:budget])
 
 
 async def _visible_candidate(c: dict, user: dict) -> dict:
@@ -771,7 +1032,7 @@ async def _visible_candidate(c: dict, user: dict) -> dict:
     as one on the list page — and the write endpoints are the easier door,
     because moving someone to "Interview" costs nothing.
     """
-    revealed = await _revealed_ids(user["id"])
+    revealed = await _visible_ids(user)
     if c["id"] in revealed:
         return c
     c = _redact(c, 0)
@@ -1085,11 +1346,10 @@ async def list_candidates(
                 c["match_score"] = _score_candidate(c, job)
                 c["score_breakdown"] = _score_components(c, job)
             result.sort(key=lambda c: c["match_score"], reverse=True)
-            if not job.get("unlocked"):
-                result = [c if i < FREE_REVEAL else _redact(c, i + 1) for i, c in enumerate(result)]
-    else:
-        revealed = await _revealed_ids(user["id"])
-        result = [c if c["id"] in revealed else _redact(c, i + 1) for i, c in enumerate(result)]
+    # One rule, whether or not a role was named: entitlement is a property of the
+    # workspace, never of the job being looked at.
+    revealed = await _visible_ids(user)
+    result = [c if c["id"] in revealed else _redact(c, i + 1) for i, c in enumerate(result)]
     if q:
         ql = q.lower()
         result = [c for c in result if ql in c["name"].lower() or ql in c["current_company"].lower() or any(ql in s.lower() for s in c["skills"])]
@@ -1111,7 +1371,10 @@ async def _owned_candidate(cid: str, user: dict) -> dict:
     return c
 
 
-CANDIDATE_PATCHABLE_FIELDS = {"notes", "rating", "tags", "stage", "role_ids"}
+# role_ids deliberately NOT patchable. Role membership is an input to scoring
+# and to the free preview, and it is also how a candidate reaches a paid CSV
+# export — so it changes only through assign-roles, which validates ownership.
+CANDIDATE_PATCHABLE_FIELDS = {"notes", "rating", "tags", "stage"}
 
 
 @app.patch("/api/candidates/{cid}")
@@ -1234,6 +1497,16 @@ async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user:
     job = await _owned_job(job_id, user)
     if len(files) > MAX_BULK_FILES:
         raise HTTPException(413, f"Up to {MAX_BULK_FILES} resumes per batch")
+    # Every file here is an LLM call. Under per-role pricing that spend was
+    # loosely bounded by roles sold; under a flat monthly plan it is bounded by
+    # nothing, and a lapsed workspace could run the bill up for free.
+    if not _has_access(user):
+        raise HTTPException(
+            402,
+            f"Bulk resume upload needs an active plan (₹{PLANS[DEFAULT_PLAN]['price_inr']}/month).",
+        )
+    if _rate_limited(f"bulk:{user['id']}"):
+        raise HTTPException(429, "Too many resume batches just now — try again shortly.")
     results = await asyncio.gather(*[_ingest_resume_file(f, job) for f in files])
     created = [r for r in results if r.get("ok")]
     await db.jobs.update_one(
@@ -1252,8 +1525,12 @@ async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user:
 @app.get("/api/jobs/{job_id}/export")
 async def export_shortlist(job_id: str, user: dict = Depends(current_user)):
     job = await _owned_job(job_id, user)
-    if not job.get("unlocked"):
-        raise HTTPException(402, f"Unlock this shortlist (₹{UNLOCK_PRICE_INR}) to export it")
+    if not _has_access(user):
+        raise HTTPException(
+            402,
+            f"Export needs an active plan (₹{PLANS[DEFAULT_PLAN]['price_inr']}/month). "
+            "Everyone you unlocked while subscribed stays visible either way.",
+        )
     cands = await db.candidates.find({"role_ids": job_id}).to_list(1000)
     for c in cands:
         c["match_score"] = _score_candidate(c, job)
@@ -1282,12 +1559,16 @@ async def export_shortlist(job_id: str, user: dict = Depends(current_user)):
 
 # ---------- Public Apply (auto-apply from shareable link) ----------
 @app.post("/api/apply/{slug}/parse-resume")
-async def parse_resume(slug: str, file: UploadFile = File(...)):
+async def parse_resume(slug: str, request: Request, file: UploadFile = File(...)):
     """Read the uploaded resume and extract structured fields for the apply
     form. Public — it's part of the candidate flow."""
     job = await db.jobs.find_one({"share_slug": slug})
     if not job:
         raise HTTPException(404, "Job not found")
+    client_ip = (request.client.host if request.client else "?")
+    for key in (f"ip:{client_ip}", f"slug:{slug}"):
+        if _rate_limited(key):
+            raise HTTPException(429, "Too many resume uploads just now — please try again shortly.")
     data = await file.read()
     if len(data) > 5 * 1024 * 1024:
         raise HTTPException(413, "Resume file is larger than 5 MB")

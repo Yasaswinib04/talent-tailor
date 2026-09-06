@@ -76,6 +76,7 @@ export default function JobSetup() {
   const [previewing, setPreviewing] = useState(false);
   // UAT-01: the button stays clickable and explains itself instead of sitting dead.
   const [titleError, setTitleError] = useState(false);
+  const [publishError, setPublishError] = useState(null);
   const titleRef = useRef(null);
 
   useEffect(() => {
@@ -167,9 +168,20 @@ export default function JobSetup() {
     }
     setTitleError(false);
     setSaving(true);
+    setPublishError(null);
     try {
       const res = await api.post("/jobs", form);
       nav(`/app/jobs/${res.data.id}`);
+    } catch (err) {
+      // The free-role cap answers 402 here. Without this the button spins and
+      // does nothing — the same dead control UAT-01 was about, arriving by a
+      // different route.
+      const detail = err?.response?.data?.detail;
+      setPublishError(
+        typeof detail === "string"
+          ? detail
+          : "Couldn't publish this role. Check your connection and try again."
+      );
     } finally {
       setSaving(false);
     }
@@ -201,6 +213,16 @@ export default function JobSetup() {
           </button>
         </div>
       </div>
+
+      {publishError && (
+        <div
+          data-testid="js-publish-error"
+          className="mx-8 mt-4 flex items-start gap-2 text-[12px] text-amber-400 border border-amber-400/40 bg-amber-400/5 px-4 py-3"
+        >
+          <Info size={13} className="mt-0.5 shrink-0" />
+          <span>{publishError}</span>
+        </div>
+      )}
 
       {/* Split layout */}
       <div className="grid md:grid-cols-2 gap-0 min-h-[calc(100vh-8rem)]">

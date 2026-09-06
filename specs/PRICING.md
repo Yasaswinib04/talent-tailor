@@ -122,6 +122,7 @@ a 500-person pool three names at a time, for free.
 | # | Work | Why it is in this position |
 |---|------|---------------------------|
 | 1 | **Idempotency guard on `verify_payment`** | Prerequisite. See below — the pricing change is what makes it exploitable. **Shipped 2026-09-06.** |
+| — | **Steps 2, 3, 4, 6, 7, 8, 9, 10 shipped 2026-09-06**, then adversarially reviewed (39 agents, 5 lenses, every claim independently verified). Seven confirmed criticals fixed and regression-tested — see "Review findings" below. **Step 5 (webhook) remains open.** |
 | 2 | **One paywall path** — collapse `list_candidates`' `job.unlocked` rank-slice (server.py:1079) and `_revealed_ids` (server.py:742) onto a single `_visible_ids(user)` | They currently disagree: a recruiter can see a full name on one screen and "Candidate #7" on another. Skipping this shows paying customers top-3-only on the page they just bought |
 | 3 | **Entitlement primitive** — `access_until` + `revealed_candidate_ids` on the user; `grant_access(user_id, days)`, `_has_access(user)` | Persist reveals rather than recomputing; `_revealed_ids` is O(jobs × candidates) per single-candidate fetch, and "unlimited roles" is the headline benefit |
 | 4 | **Plan-based orders** — generalise `/api/jobs/{job_id}/create-order` (server.py:657) to `/api/billing/create-order` taking a plan code, amounts from a server-side PLANS dict | Never trust a client-supplied amount |
@@ -183,3 +184,43 @@ Instrument **roles created** and **candidates added** per workspace per month
 from day one. Treat a workspace with no role created in 60 days as churned *now*.
 Monthly billing gives an honest signal — don't let prepaid cash, whenever annual
 arrives, disguise it.
+
+---
+
+## Review findings (2026-09-06)
+
+The implementation was attacked across five lenses — payment path, identity
+leaks, free-tier economics, migration safety, frontend behaviour — with every
+claimed defect independently verified before it counted. 34 claims raised, 7
+criticals confirmed and fixed.
+
+**The root cause behind three of them.** The free preview was *recomputed* from
+live state on every request, and every input to that ranking is client-writable:
+`role_ids` was patchable, `scoring_weights` and `skills` are patchable, and roles
+can be deleted and recreated. So a lapsed workspace could walk the entire pool
+three names at a time by rotating any of them. Persisting the reveal set was
+never enough — the recomputation path had to go. Preview slots are now assigned
+once, frozen in `preview_candidate_ids`, and globally capped at
+`FREE_REVEAL × FREE_ROLE_LIMIT`. There is nothing left to rotate.
+
+| Fixed | Was |
+|---|---|
+| Redeem is single-use per workspace, claimed atomically, rate limited | The code granted 30 days *per call* with no cap — 14 calls bought the full 400-day ceiling for one ₹1,999 payment, and the code is a shared string anyone can forward. The same boolean-to-time conversion that made `verify_payment` dangerous applied here and was missed |
+| Free preview frozen and capped; `role_ids` removed from patchable fields | A lapsed workspace de-redacted any candidate by parking them on a decoy role via PATCH and reading the identity out of the response. Reproduced 8/8 against a live server |
+| Role cap counts lifetime creations | Counting live rows was defeated by create → read → delete → repeat |
+| Paid branch has no `to_list` cap | A paying workspace past 1,000 candidates saw its newest people redacted — the worst possible bug in this system |
+| `_has_access` parses the timestamp | It string-compared mixed ISO spellings (`+00:00` vs `Z`), which can grant access indefinitely |
+| `grant_access` only moves the expiry forward, and logs a clamp | Concurrent grants silently dropped a paid month; hitting the 400-day ceiling silently swallowed days someone paid for |
+| Frontend gates on `has_access`, loads billing on mount | Export and the badge still read `job.unlocked`, which nothing sets any more — **paying customers would have had no export button at all** |
+| `publish()` catches and surfaces the error | The new 402 role cap made "Publish role" spin and do nothing — the exact dead-control bug UAT-01 existed to kill, arriving by a different route |
+| Bulk resume upload requires a plan, rate limited | Unbounded LLM spend at zero rupees |
+| Migration claims atomically, no doc cap, and `_backfill_trials` runs first | Two workers booting together both granted a month; a truncated seed marked itself complete; and every pre-existing account would have lapsed the instant this deployed |
+
+Regression-tested against a live server: redeem loop closed, rubric rotation and
+PATCH de-redaction both dead, delete-and-recreate capped, paid workspace fully
+visible, publish 402 surfaces a readable message, legacy accounts backfilled.
+
+**Still open, deliberately:** the `payment.captured` webhook (step 5). The
+browser handler is still the only path from a captured payment to access, so
+closing the tab after paying takes the money and grants nothing. This is the top
+of the list and should land before real money moves.

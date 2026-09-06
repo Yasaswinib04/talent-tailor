@@ -28,6 +28,18 @@ export default function JobDetail() {
     load();
   }, [jobId]);
 
+  // Whether the export button and the "plan active" badge render depends on
+  // this, so it can't wait for the unlock modal to be opened. Must sit above
+  // the early return below — hooks run on every render or none.
+  useEffect(() => {
+    api
+      .get("/billing/config")
+      .then((res) => setBilling(res.data))
+      .catch(() =>
+        setBilling({ price_inr: null, has_access: false, razorpay: false, upi_vpa: null, unlock_code_enabled: false })
+      );
+  }, []);
+
   if (!job) return <div className="p-8 text-white/65">Loading…</div>;
 
   const shareUrl = `${window.location.origin}/apply/${job.share_slug}`;
@@ -38,16 +50,18 @@ export default function JobDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const loadBilling = async () => {
+    try {
+      const res = await api.get("/billing/config");
+      setBilling(res.data);
+    } catch {
+      setBilling({ price_inr: null, has_access: false, razorpay: false, upi_vpa: null, unlock_code_enabled: false });
+    }
+  };
+
   const openUnlock = async () => {
     setUnlockOpen(true);
-    if (!billing) {
-      try {
-        const res = await api.get("/billing/config");
-        setBilling(res.data);
-      } catch {
-        setBilling({ price_inr: 1999, razorpay: false, upi_vpa: null, unlock_code_enabled: true });
-      }
-    }
+    if (!billing) await loadBilling();
   };
 
   // Razorpay checkout: order created server-side, payment verified server-side
@@ -65,7 +79,7 @@ export default function JobDetail() {
           document.body.appendChild(s);
         });
       }
-      const { data: order } = await api.post(`/jobs/${jobId}/create-order`);
+      const { data: order } = await api.post("/billing/create-order", { plan: billing?.default_plan || "monthly" });
       const rzp = new window.Razorpay({
         key: order.key_id,
         amount: order.amount,
@@ -77,7 +91,7 @@ export default function JobDetail() {
         theme: { color: "#b28a5d" },
         handler: async (resp) => {
           try {
-            await api.post(`/jobs/${jobId}/verify-payment`, resp);
+            await api.post("/billing/verify-payment", resp);
             setUnlockOpen(false);
             await load();
           } catch {
@@ -101,7 +115,7 @@ export default function JobDetail() {
     setUnlockError(null);
     setUnlockBusy(true);
     try {
-      await api.post(`/jobs/${jobId}/unlock`, { code: unlockCode });
+      await api.post("/billing/redeem", { code: unlockCode });
       setUnlockOpen(false);
       setUnlockCode("");
       await load();
@@ -280,10 +294,10 @@ export default function JobDetail() {
             {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
             {uploading ? "Parsing & ranking…" : "Upload resumes"}
           </label>
-          {job.unlocked ? (
+          {billing?.has_access ? (
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-mono text-success flex items-center gap-1.5" data-testid="jd-unlocked-badge">
-                <Unlock size={12} /> full shortlist unlocked
+                <Unlock size={12} /> plan active
               </span>
               <button
                 onClick={exportCsv}
@@ -378,10 +392,11 @@ export default function JobDetail() {
             <Lock size={16} className="text-brand shrink-0" />
             <div className="flex-1 min-w-[240px]">
               <div className="font-display text-lg font-semibold mb-1">
-                Top {cands.length - lockedCount} revealed free — {lockedCount} more ranked candidate{lockedCount > 1 ? "s" : ""} hidden
+                {cands.length - lockedCount} visible — {lockedCount} more ranked candidate{lockedCount > 1 ? "s" : ""} hidden
               </div>
               <p className="text-sm text-white/72">
-                Unlock the full shortlist for this role: every name, contact detail, and the CSV export. ₹1,999, one-time, per role.
+                Every name, contact detail and CSV export — across every role, not just this one.
+                Anyone you unlock stays visible to you permanently, even if you stop paying later.
               </p>
             </div>
             <button onClick={openUnlock} data-testid="jd-paywall-unlock-btn" className="btn btn-primary">
@@ -398,9 +413,10 @@ export default function JobDetail() {
             <button onClick={() => setUnlockOpen(false)} data-testid="unlock-close" className="absolute top-4 right-4 text-white/55 hover:text-white">
               <X size={16} />
             </button>
-            <div className="font-mono-label mb-2">unlock this shortlist</div>
+            <div className="font-mono-label mb-2">start your plan</div>
             <div className="font-editorial text-3xl mb-1">
-              ₹{(billing?.price_inr ?? 1999).toLocaleString("en-IN")} <span className="text-base text-white/55">· one-time · this role</span>
+              {billing?.price_inr ? `₹${billing.price_inr.toLocaleString("en-IN")}` : "—"}{" "}
+              <span className="text-base text-white/55">· per month · every role</span>
             </div>
             <p className="text-sm text-white/72 mt-3 mb-6">
               You get every ranked candidate's name and contact details, plus the CSV export —
@@ -414,19 +430,23 @@ export default function JobDetail() {
                 data-testid="unlock-pay-btn"
                 className="btn btn-primary w-full justify-center mb-4 disabled:opacity-50"
               >
-                {payBusy ? "Opening payment…" : `Pay ₹${(billing?.price_inr ?? 1999).toLocaleString("en-IN")} & unlock instantly`}
+                {payBusy
+                  ? "Opening payment…"
+                  : billing?.price_inr
+                  ? `Start plan — ₹${billing.price_inr.toLocaleString("en-IN")}/month`
+                  : "Start plan"}
               </button>
             )}
 
             {!billing?.razorpay && billing?.upi_vpa && (
               <div className="border hairline bg-app p-4 text-sm text-white/78 mb-4 leading-relaxed" data-testid="unlock-upi-block">
                 <div className="font-mono-label mb-2">pay via upi</div>
-                Pay ₹{(billing?.price_inr ?? 1999).toLocaleString("en-IN")} to{" "}
+                Pay ₹{(billing?.price_inr ?? 0).toLocaleString("en-IN")} to{" "}
                 <span className="text-brand font-mono">{billing.upi_vpa}</span>
                 {billing.upi_payee ? ` (${billing.upi_payee})` : ""}, then WhatsApp the payment screenshot
                 with this role's name — you'll get your unlock code within minutes.
                 <a
-                  href={`upi://pay?pa=${encodeURIComponent(billing.upi_vpa)}&pn=${encodeURIComponent(billing.upi_payee || "Talent Tailor")}&am=${billing?.price_inr ?? 1999}&cu=INR&tn=${encodeURIComponent("Shortlist unlock - " + job.title)}`}
+                  href={`upi://pay?pa=${encodeURIComponent(billing.upi_vpa)}&pn=${encodeURIComponent(billing.upi_payee || "Talent Tailor")}&am=${billing?.price_inr ?? 0}&cu=INR&tn=${encodeURIComponent("Talent Tailor - 30 days")}`}
                   className="block mt-3 text-brand underline underline-offset-2"
                 >
                   Open UPI app →
