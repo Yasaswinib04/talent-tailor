@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, field_validator
 
 import llm
 import security
+import skills as skills_lib
 
 load_dotenv()
 
@@ -761,44 +762,30 @@ async def _revealed_ids(owner_id: str) -> set:
     return revealed
 
 
-# --------- Skill Extraction: LLM with keyword-dictionary fallback ---------
-SKILL_DICTIONARY = {
-    "react": "React", "typescript": "TypeScript", "next.js": "Next.js", "nextjs": "Next.js",
-    "javascript": "JavaScript", "graphql": "GraphQL", "redux": "Redux", "vue": "Vue.js",
-    "angular": "Angular", "node": "Node.js", "python": "Python", "django": "Django",
-    "flask": "Flask", "fastapi": "FastAPI", "golang": "Golang", "go": "Golang",
-    "java": "Java", "spring": "Spring Boot", "kotlin": "Kotlin", "swift": "Swift",
-    "postgres": "PostgreSQL", "postgresql": "PostgreSQL", "mysql": "MySQL", "mongodb": "MongoDB",
-    "redis": "Redis", "kafka": "Kafka", "rabbitmq": "RabbitMQ", "aws": "AWS", "gcp": "GCP",
-    "azure": "Azure", "docker": "Docker", "kubernetes": "Kubernetes", "terraform": "Terraform",
-    "figma": "Figma", "sketch": "Sketch", "design system": "Design Systems", "design systems": "Design Systems",
-    "usability": "Usability Testing", "user research": "Qualitative Research", "qualitative": "Qualitative Research",
-    "survey": "Survey Design", "a/b test": "A/B Testing", "a/b testing": "A/B Testing",
-    "sql": "SQL", "product strategy": "Product Strategy", "roadmap": "Product Strategy",
-    "fintech": "Fintech", "upi": "UPI / Payments", "payments": "UPI / Payments",
-    "performance": "Performance Optimization", "distributed": "Distributed Systems",
-    "machine learning": "Machine Learning", "ml": "Machine Learning", "ai": "AI/ML",
-    "data science": "Data Science", "analytics": "Analytics",
-}
+# --------- Skill Extraction: LLM with taxonomy fallback ---------
+# The fallback used to be a flat dict matched with `alias in text`. Substring
+# matching has no word boundaries, so "HTML" produced Machine Learning, "ML"
+# being inside it; "JavaScript" produced Java; "available" produced AI; and
+# "going to" produced Golang. Those phantoms fed straight into the shortlist.
+# backend/skills.py matches on token boundaries against 119 canonical skills,
+# with case-sensitive guards for the genuinely ambiguous aliases (Go, ML, AI,
+# C#, C++).
 
 
 def _dictionary_skills(text: str) -> List[str]:
-    text = (text or "").lower()
-    return sorted({v for k, v in SKILL_DICTIONARY.items() if k in text})
+    """Skill names in a free-text blob. Boundary-matched, so no phantoms."""
+    return sorted({s["name"] for s in skills_lib.extract_skills(text or "")})
 
 
 def _extract_skills_heuristic(text: str) -> dict:
     """Keyword-dictionary JD extraction — the pre-LLM behavior, kept as the
     fallback so an OpenRouter outage degrades quality, not availability."""
+    # Taxonomy first — it already weights by repetition and by whether the
+    # skill sat under "Requirements" or "Nice to have", which the old
+    # count-only weighting could not see.
+    skills = [{"name": s["name"], "weight": s["weight"]}
+              for s in skills_lib.extract_skills(text or "")]
     text = (text or "").lower()
-    found = {}
-    for k, v in SKILL_DICTIONARY.items():
-        if k in text:
-            found[v] = found.get(v, 0) + 1
-    skills = []
-    for name, count in sorted(found.items(), key=lambda x: -x[1]):
-        weight = min(5, max(2, 2 + count))
-        skills.append({"name": name, "weight": weight})
     if not skills:
         skills = [
             {"name": "Communication", "weight": 4},
@@ -887,19 +874,32 @@ def _is_unknown(v: str) -> bool:
 # Education is a *floor*, not an exact match: a master's satisfies a
 # "bachelor's or equivalent" requirement. Levels: 0 none, 1 bachelor, 2 master, 3 doctorate.
 DOCTORATE_TOKENS = ["phd", "ph.d", "doctorate", "d.phil"]
-MASTERS_TOKENS = ["m.tech", "m.e.", "m.sc", "m.des", "m.a.", "m.com", "mba", "pgdm", "master", "ms "]
+MASTERS_TOKENS = ["m.tech", "m.e.", "m.sc", "m.des", "m.a.", "m.com", "mba", "pgdm", "master", "ms"]
 BACHELORS_TOKENS = ["b.tech", "b.e.", "b.sc", "b.des", "b.a.", "b.com", "bba", "bachelor"]
 TIER1_TOKENS = ["iit", "nit", "iiit", "bits", "iim", "isb", "nid"]
 CS_TOKENS = ["b.tech", "b.e.", "m.tech", "cs", "computer", "engineering", "iit", "nit", "iiit", "bits"]
 
 
+def _edu_has(edu: str, tokens: List[str]) -> bool:
+    """Whether any token appears in `edu` as a whole word.
+
+    Plain `token in edu` is wrong here and quietly inflates degrees: "mba" sits
+    inside "IIT Bo(mba)y", so a B.Tech read as a Master's and cleared a
+    "Master's or higher" filter. Trailing "." and "+" in tokens like "m.e." and
+    "b.tech" make \\b unusable, so assert on the adjacent characters instead.
+    """
+    return any(
+        re.search(rf"(?<![a-z]){re.escape(t.strip())}(?![a-z])", edu or "", re.I)
+        for t in tokens
+    )
+
 def _education_level(candidate_edu: str) -> int:
     edu = (candidate_edu or "").lower()
-    if any(t in edu for t in DOCTORATE_TOKENS):
+    if _edu_has(edu, DOCTORATE_TOKENS):
         return 3
-    if any(t in edu for t in MASTERS_TOKENS):
+    if _edu_has(edu, MASTERS_TOKENS):
         return 2
-    if any(t in edu for t in BACHELORS_TOKENS):
+    if _edu_has(edu, BACHELORS_TOKENS):
         return 1
     return 0
 
@@ -914,11 +914,11 @@ def _matches_education(candidate_edu: str, pref: str) -> bool:
     p = pref.lower()
     level = _education_level(candidate_edu)
     if "tier-1" in p or "tier 1" in p:
-        return any(t in edu for t in TIER1_TOKENS)
+        return _edu_has(edu, TIER1_TOKENS)
     if "master" in p:
         return level >= 2
     if "cs" in p or "engineering" in p:
-        return level >= 1 and any(t in edu for t in CS_TOKENS)
+        return level >= 1 and _edu_has(edu, CS_TOKENS)
     if "bachelor" in p:
         return level >= 1
     return True
@@ -983,7 +983,7 @@ def _score_components(c: dict, job: dict) -> dict:
         education = 50  # unknown, not zero
     else:
         education = {0: 40, 1: 70, 2: 90, 3: 100}[_education_level(edu_raw)]
-        if any(t in edu_raw.lower() for t in TIER1_TOKENS):
+        if _edu_has(edu_raw, TIER1_TOKENS):
             education = min(100, education + 10)
 
     # Notice period — sooner is better. Unknown scores neutral rather than best:
@@ -1146,7 +1146,126 @@ async def set_stage(cid: str, payload: StageUpdate, user: dict = Depends(current
 # The activation feature: a recruiter already has a pile of resumes; this turns
 # that pile into a ranked shortlist in one request, instead of waiting for
 # candidates to arrive through the apply link.
-MAX_BULK_FILES = 20
+# Ten per batch is a product decision, not a technical ceiling: a recruiter
+# who drops 200 resumes in gets a wall of results they never read, and each
+# file costs an LLM call. Enforced here as well as in the UI, because the UI
+# limit is only a courtesy — a hand-rolled fetch bypasses it.
+MAX_BULK_FILES = 10
+
+# Batches per minute, per user. Guards the OpenRouter bill and the free-tier
+# Render worker, both of which a loop over a resume folder would exhaust.
+BULK_BATCHES_PER_MINUTE = 12
+_bulk_batch_log: dict = {}
+
+
+def _bulk_rate_limited(user_id: str) -> bool:
+    now = datetime.now(timezone.utc).timestamp()
+    recent = [t for t in _bulk_batch_log.get(user_id, []) if now - t < 60]
+    if len(recent) >= BULK_BATCHES_PER_MINUTE:
+        _bulk_batch_log[user_id] = recent
+        return True
+    recent.append(now)
+    _bulk_batch_log[user_id] = recent
+    return False
+
+
+# ---------- Deterministic resume parsing (the no-LLM fallback) ----------
+# OPENROUTER_API_KEY is optional, and on the free tier it is often unset. Without
+# this, a resume with no LLM behind it became a stub named after its own filename
+# with a synthetic e-mail — which also defeats de-duplication, since dedupe keys
+# on the address. Regexes read far less than a model does, but they read the
+# things a shortlist is actually built from.
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+PHONE_RE = re.compile(r"(?:\+91[\s-]?)?(?:\d[\s-]?){9,12}\d")
+EXP_RE = re.compile(r"(\d{1,2}(?:\.\d)?)\s*\+?\s*(?:years?|yrs?)", re.I)
+CTC_RE = re.compile(r"(?:expected|ctc|salary)[^\n]{0,40}?(\d{1,3}(?:\.\d+)?)\s*(lpa|lakh|l\b|cr)", re.I)
+TITLE_AT_RE = re.compile(r"^(.{3,60}?)\s+(?:at|@|,)\s+([A-Z][\w&.\- ]{1,40})\s*$", re.M)
+# The single-letter forms must keep their trailing dot, otherwise "B.E." happily
+# matches the "Be" in "Bengaluru".
+DEGREE_RE = re.compile(
+    r"\b((?:B\.?Tech|B\.?E\.|B\.?Sc|B\.?Des|B\.?A\.|M\.?Tech|M\.?Sc|M\.?Des|MBA|Ph\.?D|Bachelor|Master)"
+    r"[^\n]{0,60})",
+    re.I,
+)
+NOTICE_RE = re.compile(r"notice[^\n]{0,20}?(immediate|\d{1,3})", re.I)
+NAME_STOPWORDS = {"resume", "curriculum", "vitae", "cv", "profile", "summary", "contact"}
+
+
+def _guess_name(text: str, email: str) -> str:
+    """Resumes almost always lead with the name. Fall back to the email local part."""
+    for line in [l.strip() for l in text.splitlines()[:12] if l.strip()]:
+        if len(line) > 50 or any(ch.isdigit() for ch in line) or "@" in line:
+            continue
+        words = line.replace(",", " ").split()
+        if not 2 <= len(words) <= 4:
+            continue
+        if any(w.lower().strip(".:") in NAME_STOPWORDS for w in words):
+            continue
+        if all(w[:1].isupper() for w in words):
+            return " ".join(words)
+    if email:
+        local = email.split("@")[0]
+        return " ".join(p.capitalize() for p in re.split(r"[._-]+", local) if p)
+    return ""
+
+
+def _parse_resume(text: str) -> dict:
+    """Best-effort structured fields from resume text. Never raises."""
+    email_m = EMAIL_RE.search(text)
+    email = email_m.group(0) if email_m else ""
+
+    phone = ""
+    for m in PHONE_RE.finditer(text):
+        digits = re.sub(r"\D", "", m.group(0))
+        if 10 <= len(digits) <= 12:
+            phone = m.group(0).strip()
+            break
+
+    exp = 0.0
+    exp_m = EXP_RE.search(text)
+    if exp_m:
+        try:
+            exp = min(60.0, float(exp_m.group(1)))
+        except ValueError:
+            exp = 0.0
+
+    title, company = "", ""
+    t_m = TITLE_AT_RE.search(text)
+    if t_m:
+        title, company = t_m.group(1).strip(), t_m.group(2).strip()
+
+    ctc = 0
+    ctc_m = CTC_RE.search(text)
+    if ctc_m:
+        try:
+            amount = float(ctc_m.group(1))
+            ctc = int(amount * (10000000 if ctc_m.group(2).lower() == "cr" else 100000))
+        except ValueError:
+            ctc = 0
+
+    edu_m = DEGREE_RE.search(text)
+    education = edu_m.group(1).strip() if edu_m else ""
+
+    notice = ""
+    n_m = NOTICE_RE.search(text)
+    if n_m:
+        token = n_m.group(1).lower()
+        notice = "Immediate" if token == "immediate" else f"{token} days"
+
+    found = sorted({s["name"] for s in skills_lib.extract_skills(text)})
+
+    return {
+        "name": _guess_name(text, email),
+        "email": email,
+        "phone": phone,
+        "current_title": title,
+        "current_company": company,
+        "experience_years": exp,
+        "expected_ctc": ctc,
+        "education": education,
+        "notice_period": notice,
+        "skills": found,
+    }
 
 
 async def _ingest_resume_file(file: UploadFile, job: dict) -> dict:
@@ -1165,16 +1284,17 @@ async def _ingest_resume_file(file: UploadFile, job: dict) -> dict:
     fields = await llm.parse_resume(text)
     needs_review = False
     if not fields:
-        # LLM off or down: keep the pile moving with a stub the recruiter can
-        # fix by hand, rather than dropping the file on the floor.
-        stem = re.sub(r"\.[A-Za-z0-9]+$", "", filename).replace("_", " ").replace("-", " ").strip() or "Unknown"
-        fields = {
-            "name": stem[:60].title(),
-            "email": "", "phone": "", "current_title": "", "current_company": "",
-            "experience_years": 0.0, "location": "", "education": "", "notice_period": "",
-            "expected_ctc": 0, "skills": _dictionary_skills(text), "summary": text[:300],
-        }
-        needs_review = True
+        # LLM off or down. Read what can be read deterministically rather than
+        # naming the candidate after their filename: an address recovered here
+        # is what lets de-duplication work at all.
+        fields = _parse_resume(text)
+        fields.setdefault("location", "")
+        fields["summary"] = text[:300]
+        if not fields.get("name"):
+            stem = re.sub(r"\.[A-Za-z0-9]+$", "", filename).replace("_", " ").replace("-", " ").strip()
+            fields["name"] = (stem[:60].title() or "Unknown")
+        # Flag only what the recruiter genuinely has to open and check.
+        needs_review = not (fields.get("email") and fields.get("skills"))
 
     email = (fields.get("email") or "").strip().lower()
     # Same person, second role: attach, don't duplicate.
@@ -1221,6 +1341,8 @@ async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user:
     job = await _owned_job(job_id, user)
     if len(files) > MAX_BULK_FILES:
         raise HTTPException(413, f"Up to {MAX_BULK_FILES} resumes per batch")
+    if _bulk_rate_limited(user["id"]):
+        raise HTTPException(429, "Too many uploads in a row. Give it a minute and try again.")
     results = await asyncio.gather(*[_ingest_resume_file(f, job) for f in files])
     created = [r for r in results if r.get("ok")]
     await db.jobs.update_one(
@@ -1311,9 +1433,7 @@ async def apply_to_job(slug: str, payload: CandidateApply):
     # manual applications that skipped or failed parsing.
     skills = [s.strip() for s in (payload.skills or []) if s and s.strip()]
     if not skills:
-        text = ((payload.resume_text or "") + " " + payload.current_title).lower()
-        skills = [v for k, v in SKILL_DICTIONARY.items() if k in text]
-        skills = sorted(set(skills))
+        skills = _dictionary_skills((payload.resume_text or "") + " " + payload.current_title)
     c = Candidate(
         owner_id=job.get("owner_id", ""),
         name=payload.name,

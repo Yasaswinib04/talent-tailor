@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx, getUser } from "../lib/api";
-import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload, Loader2 } from "lucide-react";
+import BulkResumeUpload from "../components/BulkResumeUpload";
+import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload } from "lucide-react";
 
 // SUPPORT_CONTACT is operator-configured and may be an email or a phone number.
 // Phone numbers open WhatsApp — wa.me needs digits only, country code included,
@@ -17,9 +18,8 @@ export default function JobDetail() {
   const nav = useNavigate();
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadSummary, setUploadSummary] = useState(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [unlockCode, setUnlockCode] = useState("");
   const [unlockError, setUnlockError] = useState(null);
@@ -133,29 +133,6 @@ export default function JobDetail() {
   };
 
   const lockedCount = cands.filter((c) => c.locked).length;
-
-  // The activation path: turn the resume pile the recruiter already has into a
-  // ranked shortlist now, instead of waiting for the apply link to fill up.
-  const onBulkUpload = async (e) => {
-    const files = [...(e.target.files || [])].slice(0, 20);
-    e.target.value = "";
-    if (!files.length) return;
-    setUploadSummary(null);
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
-      const res = await api.post(`/jobs/${jobId}/upload-resumes`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setUploadSummary(res.data);
-      await load();
-    } catch (err) {
-      setUploadSummary({ total: files.length, ranked: 0, failed: [], error: "Upload failed — please try again." });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <div className="max-w-[1200px] mx-auto p-8">
@@ -284,11 +261,13 @@ export default function JobDetail() {
             <span className="font-mono-label">{cands.length} total</span>
           </div>
           <div className="flex items-center gap-3">
-          <label className={cx("btn btn-light !py-2 text-xs cursor-pointer", uploading && "opacity-50 pointer-events-none")}>
-            <input type="file" multiple accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={onBulkUpload} data-testid="jd-bulk-upload-input" />
-            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-            {uploading ? "Parsing & ranking…" : "Upload resumes"}
-          </label>
+          <button
+            onClick={() => setShowUpload((v) => !v)}
+            data-testid="jd-bulk-upload-toggle"
+            className="btn btn-light !py-2 text-xs"
+          >
+            <Upload size={12} /> {showUpload ? "Hide upload" : "Upload resumes"}
+          </button>
           {job.unlocked ? (
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-mono text-success flex items-center gap-1.5" data-testid="jd-unlocked-badge">
@@ -316,27 +295,9 @@ export default function JobDetail() {
           </div>
         </div>
 
-        {uploadSummary && (
-          <div data-testid="jd-upload-summary" className={cx(
-            "mb-4 border px-5 py-4 text-sm flex items-start gap-3",
-            uploadSummary.error || uploadSummary.ranked === 0 ? "border-red-500/40 bg-red-500/5" : "border-success/40 bg-success/5"
-          )}>
-            <Check size={14} className={uploadSummary.error ? "text-red-400 mt-0.5" : "text-success mt-0.5"} />
-            <div className="flex-1">
-              {uploadSummary.error ? (
-                uploadSummary.error
-              ) : (
-                <>
-                  <span className="font-medium">{uploadSummary.ranked} of {uploadSummary.total} resumes parsed and ranked.</span>
-                  {uploadSummary.failed?.length > 0 && (
-                    <div className="mt-1 text-white/72 text-xs">
-                      Couldn't read: {uploadSummary.failed.map((f) => `${f.filename} (${f.error})`).join(", ")}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <button onClick={() => setUploadSummary(null)} className="text-white/55 hover:text-white"><X size={13} /></button>
+        {showUpload && (
+          <div className="mb-4">
+            <BulkResumeUpload jobId={jobId} jobTitle={job.title} onComplete={load} />
           </div>
         )}
         <div className="border hairline">

@@ -38,6 +38,20 @@ Copy the two blocks in [.env.example](.env.example) into `backend/.env` and `fro
 Neither file is committed, and **both are required** — the backend reads `MONGO_URL` and
 `DB_NAME` at import time and will not start without them.
 
+`REACT_APP_BACKEND_URL` is the one to get right. CRA inlines it at *build* time, so an
+unset value produces a bundle that calls `undefined/api` — it compiles clean and fails
+only once deployed. `npm run build` therefore refuses to run without it
+([scripts/check-env.js](frontend/scripts/check-env.js)); pass it on the command line, or
+put it in an uncommitted `frontend/.env.development` for `npm start`:
+
+```bash
+REACT_APP_BACKEND_URL=https://your-api.example.com npm run build
+```
+
+There is deliberately no committed default: one would let a deploy that forgot the
+variable build successfully with `localhost` baked in, which fails more quietly than
+not building at all.
+
 ## Run
 
 Backend (port 8000):
