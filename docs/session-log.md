@@ -38,6 +38,117 @@ the second session simply forgot the first.
 
 ---
 
+## Entry 004 — Branding cleanup, repo drift
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 19:35 UTC |
+| **Session window** | 2026-09-08 |
+| **Session** | `c2824133-43b4-4ddc-9c74-b7557275771d` (local Claude Code session; no claude.ai link recorded) |
+| **Commits** | `dcf50a1` — pushed straight to `main`, no PR. Its git author date reads `2026-09-06`; the machine clock is skewed and the commit was made during this session |
+| **Production at close** | `253182f` (moved from `4605cd6` via three merges *during* this session — PRs #8, #1, #9) |
+| **Supersedes** | Entry 003 §3 — "Production is now workspace-wide time-boxed access". It is not. See §3 |
+
+Opened as a one-line status check — "did we push the design changes and remove
+the CRED references?" — and the check was worth more than the cleanup.
+
+### 1. Problems at hand
+- Unclear whether earlier design work (readability pass, CRED de-branding) had
+  actually been pushed or was still sitting on the laptop.
+- CRED branding believed removed. Residue unmeasured.
+
+### 2. What was discussed
+- Push state of the two design commits.
+- Which surviving references a user can actually see, versus internal docs.
+- Whether a seed candidate's *employer* counts as branding.
+- An uncommitted paywall fix found in the working tree that belonged to nobody
+  in this conversation.
+
+### 3. What was concluded
+- **The design work was already pushed.** `c2fd444` (real landing page at `/`,
+  design report moved to `/report`) and `cdf26f4` (capture at activation, drop
+  CRED branding) were both on `origin`. Nothing was stranded.
+- **The de-branding was partial, not done.** 16 references survived. PR #3 had
+  silently finished part of the job — README, `frontend/package.json`, and the
+  `.env.example` DB name were already clean — so the residue was smaller than a
+  stale grep suggested, and re-measuring beat trusting the earlier report.
+- **Only 3 of the 16 were user-visible.** The rest were docs, specs, and test
+  fixtures. Still worth removing: internal docs are how branding gets re-seeded
+  by the next person who greps for a pattern and copies what they find.
+- **A seed candidate's employer is demo data, not branding.** Two seed
+  candidates list CRED as a *previous employer*. That reads as a plausible
+  Bengaluru résumé, not as a logo, and it stays.
+- **The repo has several sessions writing to it at once, and the drift is fast
+  enough to invalidate facts mid-conversation.** Inside this one session:
+  `main` went from "behind 1" to in-sync without a pull; `.env.example` fixed
+  itself; an unattributed paywall fix appeared in the working tree and later
+  vanished into a commit; three PRs merged to `main`; Entry 003 appeared on this
+  branch; and the primary working directory was switched off `main` onto this
+  branch. **Any session that reads repo state at the start and acts on it at the
+  end is acting on stale facts.**
+- **`07954d1` was never pushed, so the workspace access model is not in
+  production.** This corrects Entry 003 §3, which states that production is
+  "workspace-wide time-boxed access: ₹1,999 / 30 days, 14-day full trial". It is
+  not. `origin/main` still runs the per-role `UNLOCK_CODE` model — `access_until`
+  appears **zero** times in `backend/server.py` on the remote and 16 times
+  locally. `CLAUDE.md` documents the access model as current architecture and is
+  wrong in the same direction. The pricing shape Entry 003 reasoned from is
+  written but not shipped.
+- **`main` has diverged.** Local `main` carries two unpushed commits (`1e494b5`,
+  `07954d1`); `origin/main` carries three the laptop does not (`5b2f96d`,
+  `8a630f7`, `253182f`). A plain `git push` will be rejected, and the workspace
+  access model exists on exactly one disk.
+
+### 4. What we achieved
+- `dcf50a1` pushed to `main`: eight files de-branded. User-visible — the
+  `/report` footer no longer signs off as `cred.hr` / "the CRED talent org", and
+  the onboarding invite placeholder uses a neutral domain. Internal —
+  `design_guidelines.json` (brand is now "Talent Tailor"), `memory/PRD.md`, both
+  `specs/uat-*` files, the backend test docstring, `test_reports/iteration_1.json`.
+- Verified rather than assumed: both edited JSON files still parse, the edited
+  test file still compiles, and a full grep now returns only the two seed
+  employer entries.
+- `backend/server.py` deliberately left out of the commit (§6).
+- This entry.
+
+### 5. Open questions — for Yasaswini
+| Question | Why it matters | Next action |
+|---|---|---|
+| Push local `main`, and how? | `07954d1` — the workspace access model, and the architecture `CLAUDE.md` describes as current — exists only on this laptop. `origin/main` has moved three commits since, so the branches have diverged and a plain push is refused | Rebase local `main` onto `origin/main` and push. Do this before any more work lands on either side |
+| Is production supposed to be on the access model or the unlock-code model? | Entry 003's whole pricing argument assumes ₹1,999/30 days is live. It is not — the deployed API sells per-role unlocks | Decide, then either push `07954d1` or correct Entry 003's premise |
+| Should `CLAUDE.md` be corrected now or after the push? | It documents `access_until` as the one paywall path. Any session reading it will write code against an architecture the remote does not have | Fix as part of the rebase |
+| Are the parallel sessions coordinated? | Four sessions touched this repo today, two of them writing to the same files. The `_visible_candidate` paywall fix was witnessed as an unattributed working-tree diff before it was committed — that could as easily have been lost as landed | Decide on a convention: one session per branch, or one at a time |
+| Is PR #5 (this branch) still mergeable? | It is now several commits behind a `main` that gained analytics, a UAT port, and this cleanup | Rebase before merging |
+| Should `/report` stay publicly routed? | It is a design-review artefact, reachable by anyone and now signed "talent tailor" | Decide whether it is a portfolio asset or noise |
+
+### 6. Decisions made
+
+**Scoped out (deliberate no — revisit only on evidence):**
+- **Seed employer names in `backend/server.py`.** Left as-is. They read as a
+  candidate's job history, not as branding. Revisit if a demo audience misreads
+  them.
+- **`test_reports/` as a historical record.** Edited anyway, so the grep stays
+  clean; it is regenerated output, so nothing is lost if a future run overwrites it.
+
+**Feature calls:**
+- **De-brand internal docs, not just the visible surface.** The user-visible
+  three were the point; the other five were the prevention.
+
+**Prioritisation:**
+- **Verify push state before editing anything.** The session's opening question
+  was answered by `git`, not by memory, and the answer ("already pushed, but the
+  cleanup was partial and the remote has moved") was not what either side
+  assumed.
+- **Never bundle an unattributed change into an unrelated commit.** The
+  `_visible_candidate` paywall fix — locked candidate names leaking out of
+  `update_candidate` / `assign_roles` / `set_stage`, so moving someone to
+  "Interview" unmasked them for free — was found unstaged in the working tree and
+  left exactly where it was found. It has since been committed by its owner as
+  part of `1e494b5`. Leaving it alone cost nothing and kept the branding commit
+  reviewable.
+
+---
+
 ## Entry 003 — Revenue motion, not breakeven
 
 | | |
@@ -100,6 +211,9 @@ breakeven"; most of the value was in rejecting that framing.
     signup, lapsed workspaces capped at 2 roles.** Entry 002 scoped a
     subscription model *out*; it shipped anyway in a session that was never
     logged. **That commit, not this session, is what supersedes Entry 002 §6.**
+    → **Corrected by Entry 004 §3:** `07954d1` was never pushed. `origin/main`
+    still runs the per-role `UNLOCK_CODE` model, so the time-boxed access model
+    is written but *not* in production.
 - **Consequence of the above:** the per-role pricing shape argued for early in
   this session is already contradicted by shipped code. The live product is
   subscription-shaped, which — usefully — is the shape that *fits agencies* and
