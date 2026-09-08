@@ -5,26 +5,55 @@ and what is still open. The point is not minutes; it is **not re-litigating
 decisions six months from now** because nobody wrote down why we said no.
 
 **How to use it:** at the end of a working session, copy the template at the
-bottom, fill it in, and add it to the top of the entries (newest first). The
-sections that earn their keep are §5 and §6 — open questions and decisions.
-Everything above them is context for reading those two correctly.
+bottom, fill it in, and add it to the top of the entries. The sections that
+earn their keep are §5 and §6 — open questions and decisions. Everything above
+them is context for reading those two correctly.
 
-**Two rules that keep this honest:**
-1. Record the *no* decisions, not just the *yes* ones. A feature deliberately
-   scoped out is the entry you will want most later.
-2. An open question belongs to a person with a next action. "We should think
-   about pricing" is not an open question; "Ask 10 HRs how many roles they
-   hire per quarter" is.
+### Rules that keep this usable
+
+1. **Newest first.** Scanning top-down, the first entry that mentions a topic
+   is the current position on it. No exceptions to the ordering.
+2. **All timestamps are UTC**, `YYYY-MM-DD HH:MM`. One timezone, sortable, no
+   date-rollover confusion. Convert when reading, not when writing.
+3. **Every entry carries its session id and link**, so any decision can be
+   traced back to the conversation that produced it.
+4. **Record the *no* decisions, not just the *yes* ones.** A feature
+   deliberately scoped out is the entry you will want most later.
+5. **An open question belongs to a person with a next action.** "We should
+   think about pricing" is not an open question; "Ask 10 HRs how many roles
+   they hire per quarter" is.
+
+### Resolving conflicting decisions
+
+When a session reverses an earlier call, do both of these:
+
+- Fill the new entry's **Supersedes** field: `Entry 002 §6 — model default`.
+- Add a one-line pointer under the old decision: `→ Superseded by Entry 004`.
+
+That way the conflict is visible from either direction. If two entries disagree
+and neither declares supersession, the later **Recorded** timestamp wins — but
+treat that as a defect in the log and add the markers retroactively, because
+recency alone doesn't tell you whether the reversal was deliberate or whether
+the second session simply forgot the first.
 
 ---
 
-## Entry 002 — 8 Sep 2026 · Cost visibility, model tier, pricing shape
+## Entry 002 — Cost visibility, model tier, pricing shape
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 18:59 UTC |
+| **Session window** | 2026-08-28 → 2026-09-08 |
+| **Session** | `session_0179T2yRdNCGRtT5o6sDGp4A` · [open](https://claude.ai/code/session_0179T2yRdNCGRtT5o6sDGp4A) |
+| **Commits** | `2c1eb7c` (2026-08-28), `0860fe7` (2026-09-08) — draft PR #5 |
+| **Production at close** | `4605cd6` (unchanged this session) |
+| **Supersedes** | Entry 001 §6 — the two-tier model split |
 
 ### 1. Problems at hand
 - No visibility into what AI actually costs — per call, per role, or per customer. Impossible to reason about unit economics or answer "how good a model can I afford?"
 - Model selection unsettled and repeatedly wrong (three rejected defaults before landing).
-- ₹1,999/role pricing suspected to be the wrong number *and* possibly the wrong shape.
-- Launch readiness for a UAT with 10 HRs: unclear what was actually ready vs. still config.
+- ₹1,999/role suspected to be the wrong number *and* possibly the wrong shape.
+- Launch readiness for a UAT with 10 HRs: unclear what was ready vs. still config.
 - No single reference for where AI lives in the product — every conversation restarted from scratch.
 
 ### 2. What was discussed
@@ -49,7 +78,7 @@ Everything above them is context for reading those two correctly.
 - Three new views: Dashboard AI-spend tile, `GET /api/analytics/llm-usage` (per account, split by step), `GET /api/admin/llm-usage` (operator rollup per customer, `ADMIN_KEY`-gated).
 - Model defaults moved to `anthropic/claude-opus-5` for both jobs.
 - Test suite 47 → 55, all passing; frontend builds.
-- Draft PR #5 opened. Production unchanged at 4605cd6.
+- Draft PR #5 opened. Production unchanged.
 - Published a living architecture reference (LLM inventory, non-AI decisions, model swap playbook, failure ladder).
 
 ### 5. Open questions — for Yasaswini
@@ -76,7 +105,7 @@ Everything above them is context for reading those two correctly.
 - **Razorpay webhook automation, sticky reveals, free-tier caps, anti-abuse.** All deferred in favour of price discovery.
 
 **Feature calls:**
-- **One model, not two.** `claude-opus-5` for both resume parsing and JD extraction.
+- **One model, not two.** `claude-opus-5` for both resume parsing and JD extraction. *(Supersedes Entry 001's fast/big split.)*
 - **No AI for file→text, match scoring, paywall redaction, or auth/payments.** Scoring stays deterministic so recruiters can trust and explain a rank; revenue and security logic must not be probabilistic.
 - **Degrade quality, never availability.** Every LLM call site has an automatic fallback; an outage produces worse shortlists, never an error page.
 - **Cost is tracked from OpenRouter's own accounting**, not a local price table that would drift.
@@ -87,9 +116,19 @@ Everything above them is context for reading those two correctly.
 
 ---
 
-## Entry 001 — Aug 2026 · Demo → sellable product
+## Entry 001 — Demo → sellable product
 
-Recorded retrospectively; earlier sessions predate this log.
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 18:59 UTC (retrospective) |
+| **Session window** | 2026-08-08 → 2026-08-19 |
+| **Session** | `session_0179T2yRdNCGRtT5o6sDGp4A` · [open](https://claude.ai/code/session_0179T2yRdNCGRtT5o6sDGp4A) |
+| **Commits** | `0dc1de9` … `4605cd6` (2026-08-19) — PR #3, merged and deployed |
+| **Supersedes** | — |
+
+Written up after the fact, from the same session as Entry 002. Work predating
+`0dc1de9` came from an earlier chat with no recorded id — treat anything
+attributed to it as unverified.
 
 ### 1. Problems at hand
 The app was a UAT-passed demo. Resume parsing was believed to be real outside the demo environment — it was not; simulation was the only code path. No accounts, no tenancy, no paywall, no way to take money.
@@ -104,22 +143,32 @@ Self-serve blockers; latency/accuracy/cost tradeoffs; free-tier abuse and rate l
 - UAT with 10 HRs *is* the launch.
 
 ### 4. What we achieved
-PR #3, merged and deployed (4605cd6): real LLM resume/JD extraction with heuristic fallback; accounts, auth, and multi-tenant scoping; per-role paywall with server-side redaction (top 3 free); bulk resume upload; three payment rails (Razorpay with server-verified signatures, UPI deep link, manual unlock code); 402-gated CSV export; 47 functional tests.
+PR #3, merged and deployed (`4605cd6`): real LLM resume/JD extraction with heuristic fallback; accounts, auth, and multi-tenant scoping; per-role paywall with server-side redaction (top 3 free); bulk resume upload; three payment rails (Razorpay with server-verified signatures, UPI deep link, manual unlock code); 402-gated CSV export; 47 functional tests.
 
 ### 5. Open questions raised
-Env var configuration on Render; live smoke test with real resumes; whether to upgrade off the free tier.
+Env var configuration on Render; live smoke test with real resumes; whether to upgrade off the free tier. *(All still open — carried into Entry 002 §5.)*
 
 ### 6. Decisions made
 - Anti-abuse and free-tier caps deferred in favour of price discovery.
 - Unlock-code bridge accepted as a legitimate payment rail, not a stopgap to be replaced before launch.
 - Stdlib-only auth (scrypt + HMAC tokens) and pure-Python dependencies, to keep free-tier builds safe.
+- **Two-model split**: fast tier for resumes (candidate-facing latency), bigger model for JD extraction. → **Superseded by Entry 002.**
 
 ---
 
 ## Template — copy for a new entry
 
 ```markdown
-## Entry NNN — DD Mon YYYY · <three-word theme>
+## Entry NNN — <three-word theme>
+
+| | |
+|---|---|
+| **Recorded** | YYYY-MM-DD HH:MM UTC |
+| **Session window** | YYYY-MM-DD → YYYY-MM-DD |
+| **Session** | `session_xxx` · [open](https://claude.ai/code/session_xxx) |
+| **Commits** | `sha` (date) — PR #N |
+| **Production at close** | `sha` |
+| **Supersedes** | Entry NNN §6 — <what changed> · or — |
 
 ### 1. Problems at hand
 <What was actually broken, unknown, or blocking. Not "we worked on X".>
