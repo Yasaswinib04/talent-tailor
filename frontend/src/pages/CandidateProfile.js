@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, fmtINR, cx, errMessage } from "../lib/api";
+import { api, fmtINR, cx } from "../lib/api";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Star, Check, X, Plus, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
-import Avatar from "../components/Avatar";
-import ErrorState from "../components/ErrorState";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
@@ -16,127 +14,71 @@ export default function CandidateProfile() {
   const [tab, setTab] = useState("resume");
   const [note, setNote] = useState("");
   const [showRoleMenu, setShowRoleMenu] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [events, setEvents] = useState([]);
 
   const load = async () => {
-    try {
-      const [cr, jr, er] = await Promise.all([
-        api.get(`/candidates/${cid}`),
-        api.get("/jobs"),
-        api.get(`/candidates/${cid}/events`).catch(() => ({ data: [] })),
-      ]);
-      setC(cr.data);
-      setJobs(jr.data);
-      setEvents(er.data || []);
-      setNote(cr.data.notes || "");
-      setError("");
-    } catch (err) {
-      // Without this the 404 rejects unhandled and the page spins forever.
-      setError(
-        err.response?.status === 404
-          ? "This candidate doesn't exist or has been removed."
-          : errMessage(err, "Couldn't load this candidate.")
-      );
-    }
+    const [cr, jr] = await Promise.all([api.get(`/candidates/${cid}`), api.get("/jobs")]);
+    setC(cr.data);
+    setJobs(jr.data);
+    setNote(cr.data.notes || "");
   };
 
   useEffect(() => {
     load();
   }, [cid]);
 
-  if (error) {
-    return (
-      <div className="max-w-[1200px] mx-auto p-4 md:p-8">
-        <ErrorState
-          message={error}
-          onRetry={load}
-          testid="cp-error"
-          action={
-            <button onClick={() => nav("/app")} className="text-xs text-white/50 hover:text-white transition-colors">
-              Back to overview
-            </button>
-          }
-        />
-      </div>
-    );
-  }
-
-  if (!c) return <div className="p-8 text-white/40">Loading…</div>;
+  if (!c) return <div className="p-8 text-white/65">Loading…</div>;
 
   const toggleRole = async (roleId) => {
-    try {
-      const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
-      await api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds });
-      load();
-      setActionError("");
-    } catch (err) {
-      setActionError(errMessage(err, "Couldn't update this candidate's roles."));
-    }
+    const newIds = c.role_ids.includes(roleId) ? c.role_ids.filter((r) => r !== roleId) : [...c.role_ids, roleId];
+    await api.post(`/candidates/${cid}/assign-roles`, { role_ids: newIds });
+    load();
   };
 
   const setStage = async (stage) => {
-    try {
-      await api.post(`/candidates/${cid}/stage`, { stage });
-      load();
-      setActionError("");
-    } catch (err) {
-      setActionError(errMessage(err, "Couldn't change the stage."));
-    }
+    await api.post(`/candidates/${cid}/stage`, { stage });
+    load();
   };
 
   const saveNote = async () => {
-    try {
-      await api.patch(`/candidates/${cid}`, { notes: note });
-      load();
-      setActionError("");
-    } catch (err) {
-      setActionError(errMessage(err, "Couldn't save your note."));
-    }
+    await api.patch(`/candidates/${cid}`, { notes: note });
+    load();
   };
 
   const setRating = async (rating) => {
-    try {
-      await api.patch(`/candidates/${cid}`, { rating });
-      load();
-      setActionError("");
-    } catch (err) {
-      setActionError(errMessage(err, "Couldn't save that rating."));
-    }
+    await api.patch(`/candidates/${cid}`, { rating });
+    load();
   };
 
   const assignedJobs = jobs.filter((j) => c.role_ids.includes(j.id));
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 md:p-8">
-      <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/50 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
+    <div className="max-w-[1200px] mx-auto p-8">
+      <button onClick={() => nav("/app")} data-testid="cp-back-btn" className="text-white/72 hover:text-white text-sm inline-flex items-center gap-1 mb-6 transition-colors">
         <ChevronLeft size={14} /> back
       </button>
 
-      {actionError && (
-        <div className="mb-6 border border-danger/50 bg-danger/10 px-4 py-3 text-sm text-white/80" data-testid="cp-action-error">
-          {actionError}
-        </div>
-      )}
-
-      <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid md:grid-cols-3 gap-8">
         {/* LEFT: Identity */}
         <div className="md:col-span-1 space-y-6">
           <div className="border hairline overflow-hidden bg-surface">
             {/* Airbnb-style large portrait treatment */}
             <div className="relative h-40 bg-gradient-to-br from-brand/40 via-brand/20 to-transparent">
-              <Avatar
-                src={c.avatar}
-                name={c.name}
-                size={112}
-                className="absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
-              />
+              {c.avatar ? (
+                <img
+                  src={c.avatar}
+                  alt=""
+                  className="w-28 h-28 rounded-full object-cover absolute -bottom-14 left-6 border-4 border-surface shadow-2xl"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-app border-4 border-surface shadow-2xl absolute -bottom-14 left-6 flex items-center justify-center font-editorial text-3xl text-white/40">
+                  {c.locked ? "?" : (c.name || "?")[0]}
+                </div>
+              )}
             </div>
-            <div className="pt-16 px-5 md:px-6 pb-6">
+            <div className="pt-16 px-6 pb-6">
               <div className="font-mono-label mb-1">{c.current_title}</div>
-              <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
-              <div className="text-white/50 text-sm mb-6">at {c.current_company}</div>
+              <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
+              <div className="text-white/72 text-sm mb-6">at {c.current_company}</div>
 
               <div className="space-y-2 text-xs">
                 <Row icon={<Mail size={12} />} label={c.email} />
@@ -165,7 +107,7 @@ export default function CandidateProfile() {
                   data-testid={`cp-rating-${n}`}
                   className={cx(
                     "w-9 h-9 border transition-all",
-                    n <= c.rating ? "bg-brand border-brand text-black" : "border-white/20 text-white/40 hover:border-white/50"
+                    n <= c.rating ? "bg-brand border-brand text-black" : "border-white/20 text-white/65 hover:border-white/50"
                   )}
                 >
                   <Star size={14} className="mx-auto" fill={n <= c.rating ? "currentColor" : "none"} />
@@ -178,15 +120,15 @@ export default function CandidateProfile() {
         {/* RIGHT: Details */}
         <div className="md:col-span-2 space-y-6">
           {/* Match + Stage + Multi-role */}
-          <div className="border hairline p-5 md:p-6 bg-surface">
-            <div className="grid sm:grid-cols-2 gap-5 sm:gap-6 sm:items-center pb-6 mb-6 border-b hairline">
+          <div className="border hairline p-6 bg-surface">
+            <div className="grid grid-cols-2 gap-6 items-center pb-6 mb-6 border-b hairline">
               <div>
                 <div className="font-mono-label mb-2">match score</div>
                 <div className="flex items-baseline gap-3">
-                  <span className={cx("font-display text-5xl md:text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
+                  <span className={cx("font-display text-6xl font-bold tracking-tight", c.match_score >= 90 ? "text-brand" : "text-white")}>
                     {c.match_score}
                   </span>
-                  <span className="text-white/40 text-sm">/ 100</span>
+                  <span className="text-white/65 text-sm">/ 100</span>
                 </div>
               </div>
               <div>
@@ -201,7 +143,7 @@ export default function CandidateProfile() {
                         "text-[10px] font-mono uppercase tracking-widest px-2 py-1 border transition-all",
                         c.stage === s
                           ? "bg-brand text-black border-brand"
-                          : "border-white/15 text-white/50 hover:border-white/60 hover:text-white"
+                          : "border-white/15 text-white/72 hover:border-white/60 hover:text-white"
                       )}
                     >
                       {s}
@@ -216,7 +158,7 @@ export default function CandidateProfile() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="font-mono-label">assigned to roles</div>
-                  <div className="text-xs text-white/40 mt-1">One profile, many roles. No duplication.</div>
+                  <div className="text-xs text-white/65 mt-1">One profile, many roles. No duplication.</div>
                 </div>
                 <button
                   onClick={() => setShowRoleMenu((v) => !v)}
@@ -228,7 +170,7 @@ export default function CandidateProfile() {
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {assignedJobs.length === 0 && (
-                  <span className="text-xs text-white/40 italic">Not assigned to any role yet.</span>
+                  <span className="text-xs text-white/65 italic">Not assigned to any role yet.</span>
                 )}
                 {assignedJobs.map((j) => (
                   <motion.span
@@ -239,7 +181,7 @@ export default function CandidateProfile() {
                     data-testid={`cp-role-chip-${j.id}`}
                   >
                     {j.title}
-                    <button onClick={() => toggleRole(j.id)} className="text-white/40 hover:text-danger">
+                    <button onClick={() => toggleRole(j.id)} className="text-white/65 hover:text-danger">
                       <X size={10} />
                     </button>
                   </motion.span>
@@ -271,7 +213,7 @@ export default function CandidateProfile() {
                           </span>
                           <span className="flex-1">
                             <span className="font-medium">{j.title}</span>
-                            <span className="text-white/40 text-xs ml-2">{j.department} · {j.location}</span>
+                            <span className="text-white/65 text-xs ml-2">{j.department} · {j.location}</span>
                           </span>
                           <span className="font-mono text-[10px] text-brand">{fmtINR(j.salary_min).replace("₹", "")}+</span>
                         </button>
@@ -285,7 +227,7 @@ export default function CandidateProfile() {
 
           {/* Tabs */}
           <div className="border hairline bg-surface">
-            <div className="flex border-b hairline overflow-x-auto">
+            <div className="flex border-b hairline">
               {[
                 { id: "resume", label: "Resume" },
                 { id: "skills", label: "Skills" },
@@ -297,8 +239,8 @@ export default function CandidateProfile() {
                   onClick={() => setTab(t.id)}
                   data-testid={`cp-tab-${t.id}`}
                   className={cx(
-                    "px-4 md:px-5 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 whitespace-nowrap",
-                    tab === t.id ? "border-brand text-white" : "border-transparent text-white/40 hover:text-white/70"
+                    "px-5 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2",
+                    tab === t.id ? "border-brand text-white" : "border-transparent text-white/65 hover:text-white/70"
                   )}
                 >
                   {t.label}
@@ -328,19 +270,14 @@ export default function CandidateProfile() {
                     placeholder="Interview notes, follow-ups, red flags…"
                     className="w-full bg-transparent border hairline p-3 min-h-[180px] text-sm focus:border-white outline-none"
                   />
-                  <div className="mt-2 text-[10px] text-white/40">Auto-saves on blur.</div>
+                  <div className="mt-2 text-[10px] text-white/65">Auto-saves on blur.</div>
                 </div>
               )}
               {tab === "activity" && (
-                <div className="space-y-3 text-sm" data-testid="cp-activity">
-                  {events.length === 0 && (
-                    <div className="text-white/40 text-xs italic">
-                      Nothing has happened on this profile yet.
-                    </div>
-                  )}
-                  {events.map((e) => (
-                    <ActivityItem key={e.id} when={relativeTime(e.at)} text={e.summary} who={e.actor} />
-                  ))}
+                <div className="space-y-3 text-sm">
+                  <ActivityItem when="Just now" text={`Assigned to ${assignedJobs.length} role(s).`} />
+                  <ActivityItem when="Yesterday" text={`Stage moved to ${c.stage}.`} />
+                  <ActivityItem when="3 days ago" text={c.auto_applied ? "Auto-applied via shareable link." : "Added to pipeline by recruiter."} />
                 </div>
               )}
             </div>
@@ -354,41 +291,17 @@ export default function CandidateProfile() {
 function Row({ icon, label }) {
   return (
     <div className="flex items-center gap-2 text-white/70">
-      <span className="text-white/40 shrink-0">{icon}</span>
+      <span className="text-white/65 shrink-0">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
   );
 }
 
-/** Real elapsed time from a stored timestamp — the three entries here used to
- *  be hardcoded "Just now / Yesterday / 3 days ago" on a hiring record. */
-function relativeTime(iso) {
-  if (!iso) return "";
-  const then = new Date(iso);
-  if (Number.isNaN(then.getTime())) return "";
-  const secs = Math.max(0, (Date.now() - then.getTime()) / 1000);
-  if (secs < 60) return "just now";
-  const units = [
-    ["minute", 60], ["hour", 3600], ["day", 86400], ["week", 604800],
-    ["month", 2592000], ["year", 31536000],
-  ];
-  let label = "just now";
-  for (const [name, size] of units) {
-    if (secs >= size) {
-      const n = Math.floor(secs / size);
-      label = `${n} ${name}${n > 1 ? "s" : ""} ago`;
-    }
-  }
-  return label;
-}
-
-function ActivityItem({ when, text, who }) {
+function ActivityItem({ when, text }) {
   return (
     <div className="flex items-start gap-3 border-l-2 border-brand/40 pl-3 py-1">
       <div>
-        <div className="font-mono-label mb-0.5">
-          {when}{who ? ` · ${who}` : ""}
-        </div>
+        <div className="font-mono-label mb-0.5">{when}</div>
         <div className="text-white/80">{text}</div>
       </div>
     </div>

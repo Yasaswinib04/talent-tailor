@@ -1,10 +1,10 @@
 {
   "project_context": {
     "domain": "HR Candidate Evaluation Platform",
-    "brand": "CRED",
+    "brand": "Talent Tailor",
     "theme": "Dark Theme",
     "archetype": "Archetype 5 (Luxury) + Archetype 4 (Swiss & High-Contrast)",
-    "description": "A high-end, extremely fast, B2B tool for HR professionals at CRED to evaluate 100s of candidates. Combines an expressive public UX report page with a highly disciplined, keyboard-first dashboard."
+    "description": "A high-end, extremely fast, B2B tool for HR professionals to evaluate 100s of candidates. Combines an expressive public UX report page with a highly disciplined, keyboard-first dashboard."
   },
   "design_principles": [
     "Restrained Luxury: Use deep obsidian backgrounds with stark white text and subtle bronze/copper accents. Avoid pure black.",

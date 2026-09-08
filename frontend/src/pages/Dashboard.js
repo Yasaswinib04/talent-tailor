@@ -1,46 +1,54 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, fmtINR, cx, errMessage } from "../lib/api";
-import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check } from "lucide-react";
-import Avatar from "../components/Avatar";
-import ErrorState from "../components/ErrorState";
+import { api, fmtINR, cx } from "../lib/api";
+import { Plus, Briefcase, Users, TrendingUp, Search, Share2, ChevronRight, Zap, Star, X, Check, Lock, Sparkles } from "lucide-react";
 
 const STAGES = ["New", "Shortlisted", "Interview", "Offer", "Rejected"];
 
 export default function Dashboard() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const tab = params.get("tab") || "overview";
-  const urlQuery = params.get("q") || "";
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [q, setQ] = useState(urlQuery);
+  const [q, setQ] = useState("");
   const [filterStage, setFilterStage] = useState("");
   const [filterJob, setFilterJob] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [cursor, setCursor] = useState(0);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [totalCandidates, setTotalCandidates] = useState(0);
+  const [loadError, setLoadError] = useState(null);
+  const [sampleBusy, setSampleBusy] = useState(false);
   const nav = useNavigate();
 
+  const loadSample = async () => {
+    setSampleBusy(true);
+    try {
+      await api.post("/sample-data");
+      await load();
+    } finally {
+      setSampleBusy(false);
+    }
+  };
+
   const load = async () => {
-    setLoading(true);
     try {
       const [j, c, s] = await Promise.all([
         api.get("/jobs"),
-        api.get("/candidates?limit=500"),
+        api.get("/candidates"),
         api.get("/analytics/summary"),
       ]);
       setJobs(j.data);
-      setCandidates(c.data.items || []);
-      setTotalCandidates(c.data.total ?? (c.data.items || []).length);
+      setCandidates(c.data);
       setSummary(s.data);
-      setError("");
-    } catch (err) {
-      setError(errMessage(err, "Couldn't load your pipeline."));
-    } finally {
-      setLoading(false);
+      setLoadError(null);
+    } catch (e) {
+      // Distinguish "the server is unreachable" from "your filters matched nobody" —
+      // showing an empty table for a network failure misleads the recruiter.
+      setLoadError(
+        e?.response
+          ? `The server returned an error (${e.response.status}).`
+          : "Can't reach the server. Check that the backend is running."
+      );
     }
   };
 
@@ -48,24 +56,10 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // The top-bar search writes ?q=; keep the table in step with it.
-  useEffect(() => {
-    setQ(urlQuery);
-  }, [urlQuery]);
-
-  const unassignedCount = useMemo(
-    () => candidates.filter((c) => c.role_ids.length === 0).length,
-    [candidates]
-  );
-
   const filtered = useMemo(() => {
     return candidates.filter((c) => {
       if (filterStage && c.stage !== filterStage) return false;
-      // "unassigned" keeps candidates reachable after their role is deleted;
-      // otherwise they exist but appear under no role at all.
-      if (filterJob === "unassigned") {
-        if (c.role_ids.length > 0) return false;
-      } else if (filterJob && !c.role_ids.includes(filterJob)) return false;
+      if (filterJob && !c.role_ids.includes(filterJob)) return false;
       if (q) {
         const ql = q.toLowerCase();
         if (
@@ -110,74 +104,65 @@ export default function Dashboard() {
   }, [cursor, filtered, nav]);
 
   const bulkStage = async (stage) => {
-    try {
-      await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
-      setSelected(new Set());
-      load();
-    } catch (err) {
-      setError(errMessage(err, "Couldn't update those candidates."));
-    }
+    await Promise.all([...selected].map((id) => api.post(`/candidates/${id}/stage`, { stage })));
+    setSelected(new Set());
+    load();
   };
 
-  if (error && !jobs.length && !candidates.length) {
-    return (
-      <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
-        <ErrorState message={error} onRetry={load} testid="dash-error" />
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
-      {error && (
-        <div className="mb-6">
-          <ErrorState message={error} onRetry={load} testid="dash-error-inline" />
-        </div>
-      )}
+    <div className="p-8 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6 md:mb-8">
+      <div className="flex items-end justify-between mb-8">
         <div>
-          <div className="font-mono-label mb-2">
-            {tab === "jobs" ? "roles" : tab === "candidates" ? "candidates" : "overview"}
-          </div>
-          <h1 className="font-display text-2xl md:text-4xl font-bold tracking-tight">
-            {tab === "jobs" ? "Open roles" : tab === "candidates" ? "All candidates" : "Talent pipeline"}
-          </h1>
+          <div className="font-mono-label mb-2">overview · jan 2026</div>
+          <h1 className="font-display text-4xl font-bold tracking-tight">Talent pipeline</h1>
         </div>
         <button
           onClick={() => nav("/app/jobs/new")}
           data-testid="dash-new-role-btn"
-          className="bg-brand text-white px-5 py-2.5 text-sm hover:bg-brand/90 transition-colors inline-flex items-center gap-2 linear-glow"
+          className="btn btn-primary"
         >
           <Plus size={14} /> New role
         </button>
       </div>
 
+      {loadError && (
+        <div
+          data-testid="dash-load-error"
+          className="border border-red-500/40 bg-red-500/5 px-5 py-4 mb-8 flex items-start gap-3"
+        >
+          <X size={16} className="text-red-400 mt-0.5 shrink-0" />
+          <div>
+            <div className="text-sm mb-1">Couldn't load your pipeline</div>
+            <div className="text-sm text-white/72">{loadError}</div>
+          </div>
+          <button
+            onClick={load}
+            className="ml-auto text-sm border hairline px-3 py-1.5 hover:bg-white/5 transition-colors shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* KPI band */}
-      {summary && tab === "overview" && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 border hairline mb-6 md:mb-8">
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-5 border hairline mb-8">
           <Kpi label="open roles" value={summary.total_jobs} icon={<Briefcase size={14} />} testid="kpi-jobs" />
           <Kpi label="candidates" value={summary.total_candidates} icon={<Users size={14} />} testid="kpi-candidates" />
           <Kpi label="shortlisted" value={summary.funnel.Shortlisted} icon={<Star size={14} />} testid="kpi-shortlisted" />
           <Kpi label="interviewing" value={summary.funnel.Interview} icon={<TrendingUp size={14} />} testid="kpi-interview" />
-          <Kpi
-            label="self-applied"
-            value={summary.self_applied_share == null ? "—" : `${Math.round(summary.self_applied_share * 100)}%`}
-            hint={summary.self_applied_count != null ? `${summary.self_applied_count} of ${summary.total_candidates}` : null}
-            icon={<Zap size={14} />}
-            testid="kpi-autoapply"
-            gold
-          />
+          <Kpi label="auto-apply rate" value={`${Math.round(summary.auto_apply_conversion * 100)}%`} icon={<Zap size={14} />} testid="kpi-autoapply" gold />
         </div>
       )}
 
       {/* Roles grid */}
-      <div className={cx("mb-10", tab === "candidates" && "hidden")}>
+      <div className="mb-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-xl font-semibold">Open roles</h2>
           <div className="font-mono-label">{jobs.length} active</div>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {jobs.map((j) => (
             <div
               key={j.id}
@@ -187,12 +172,12 @@ export default function Dashboard() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="font-mono-label">{j.department}</div>
-                <ChevronRight size={14} className="text-white/30 group-hover:text-brand group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={14} className="text-white/55 group-hover:text-brand group-hover:translate-x-0.5 transition-all" />
               </div>
               <div className="text-lg font-medium mb-1 leading-snug">{j.title}</div>
-              <div className="text-xs text-white/50 mb-4">{j.location} · {j.seniority}</div>
+              <div className="text-xs text-white/72 mb-4">{j.location} · {j.seniority}</div>
               <div className="flex items-center justify-between text-xs pt-3 border-t hairline">
-                <span className="text-white/50">{j.candidates_count} candidates</span>
+                <span className="text-white/72">{j.candidates_count} candidates</span>
                 <span className="font-mono text-brand">{fmtINR(j.salary_min)}–{fmtINR(j.salary_max)}</span>
               </div>
             </div>
@@ -203,23 +188,35 @@ export default function Dashboard() {
               data-testid="empty-new-role-btn"
               className="border border-dashed hairline p-5 hover:border-brand/40 hover:bg-brand/5 transition-all flex flex-col items-center justify-center min-h-[168px]"
             >
-              <Plus size={20} className="text-white/40 mb-2" />
-              <div className="text-sm text-white/60">Create a new role</div>
+              <Plus size={20} className="text-white/65 mb-2" />
+              <div className="text-sm text-white/78">Create a new role</div>
               <div className="font-mono-label mt-2">press N</div>
+            </button>
+          )}
+          {jobs.length === 0 && !loadError && (
+            <button
+              onClick={loadSample}
+              disabled={sampleBusy}
+              data-testid="load-sample-btn"
+              className="border border-dashed border-brand/40 bg-brand/5 p-5 hover:bg-brand/10 transition-all flex flex-col items-center justify-center min-h-[168px] disabled:opacity-50"
+            >
+              <Sparkles size={20} className="text-brand mb-2" />
+              <div className="text-sm text-white/78">{sampleBusy ? "Loading…" : "Explore with sample data"}</div>
+              <div className="font-mono-label mt-2">4 roles · 20 candidates</div>
             </button>
           )}
         </div>
       </div>
 
       {/* Candidate table */}
-      <div className={cx(tab === "jobs" && "hidden")}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3 flex-wrap">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <h2 className="font-display text-xl font-semibold">All candidates</h2>
             {(q || filterStage || filterJob) && (
               <span className="text-[10px] font-mono flex items-center gap-1.5">
-                <span className="text-white/60">{candidates.length} candidates</span>
-                <span className="text-white/30">→</span>
+                <span className="text-white/78">{candidates.length} candidates</span>
+                <span className="text-white/55">→</span>
                 <span className={cx(
                   "px-1.5 py-0.5 border",
                   filtered.length === 0
@@ -233,31 +230,24 @@ export default function Dashboard() {
                   {filtered.length} matching
                 </span>
                 <button
-                  onClick={() => {
-                    setQ(""); setFilterStage(""); setFilterJob("");
-                    if (urlQuery) {
-                      const next = new URLSearchParams(params);
-                      next.delete("q");
-                      setParams(next, { replace: true });
-                    }
-                  }}
+                  onClick={() => { setQ(""); setFilterStage(""); setFilterJob(""); }}
                   data-testid="dash-clear-filters"
-                  className="text-white/40 hover:text-white transition-colors ml-1"
+                  className="text-white/65 hover:text-white transition-colors ml-1"
                 >
                   clear
                 </button>
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2 border hairline px-3 py-2 flex-1 sm:flex-none min-w-0">
-              <Search size={12} className="text-white/40" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 border hairline px-3 py-2">
+              <Search size={12} className="text-white/65" />
               <input
                 data-testid="candidates-search"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Name, company, skill…"
-                className="bg-transparent focus:outline-none text-xs w-full sm:w-56 min-w-0"
+                className="bg-transparent focus:outline-none text-xs w-56"
               />
             </div>
             <select
@@ -277,23 +267,20 @@ export default function Dashboard() {
             >
               <option value="" className="bg-app">All roles</option>
               {jobs.map((j) => <option key={j.id} value={j.id} className="bg-app">{j.title}</option>)}
-              {unassignedCount > 0 && (
-                <option value="unassigned" className="bg-app">Unassigned ({unassignedCount})</option>
-              )}
             </select>
           </div>
         </div>
 
-        <div className="border hairline overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm min-w-[560px]">
+        <div className="border hairline overflow-hidden">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="border-b hairline bg-surface/60">
                 <th className="w-8 py-3 px-3"></th>
                 <th className="py-3 px-3 font-mono-label">candidate</th>
-                <th className="py-3 px-3 font-mono-label hidden md:table-cell">current</th>
-                <th className="py-3 px-3 font-mono-label hidden sm:table-cell">exp</th>
-                <th className="py-3 px-3 font-mono-label hidden lg:table-cell">ctc</th>
-                <th className="py-3 px-3 font-mono-label hidden lg:table-cell">roles</th>
+                <th className="py-3 px-3 font-mono-label">current</th>
+                <th className="py-3 px-3 font-mono-label">exp</th>
+                <th className="py-3 px-3 font-mono-label">ctc</th>
+                <th className="py-3 px-3 font-mono-label">roles</th>
                 <th className="py-3 px-3 font-mono-label">stage</th>
                 <th className="py-3 px-3 font-mono-label text-right">match</th>
               </tr>
@@ -324,23 +311,26 @@ export default function Dashboard() {
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-3">
-                      <Avatar src={c.avatar} name={c.name} size={32} className="grayscale group-hover:grayscale-0 transition-all" />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{c.name}</div>
-                        <div className="text-[11px] text-white/40 truncate">
-                          <span className="md:hidden">{c.current_title || c.location}</span>
-                          <span className="hidden md:inline">{c.location}</span>
+                      {c.locked ? (
+                        <div className="w-8 h-8 rounded-full bg-white/5 border hairline flex items-center justify-center shrink-0">
+                          <Lock size={12} className="text-white/40" />
                         </div>
+                      ) : (
+                        <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                      )}
+                      <div>
+                        <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
+                        <div className="text-[11px] text-white/65">{c.location}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-3 hidden md:table-cell">
+                  <td className="py-3 px-3">
                     <div className="text-white/80">{c.current_title}</div>
-                    <div className="text-[11px] text-white/40">{c.current_company}</div>
+                    <div className="text-[11px] text-white/65">{c.current_company}</div>
                   </td>
-                  <td className="py-3 px-3 font-mono text-xs hidden sm:table-cell">{c.experience_years}y</td>
-                  <td className="py-3 px-3 font-mono text-xs hidden lg:table-cell">{fmtINR(c.expected_ctc)}</td>
-                  <td className="py-3 px-3 hidden lg:table-cell">
+                  <td className="py-3 px-3 font-mono text-xs">{c.experience_years}y</td>
+                  <td className="py-3 px-3 font-mono text-xs">{fmtINR(c.expected_ctc)}</td>
+                  <td className="py-3 px-3">
                     <div className="flex flex-wrap gap-1">
                       {c.role_ids.slice(0, 2).map((rid) => {
                         const j = jobs.find((jj) => jj.id === rid);
@@ -351,12 +341,7 @@ export default function Dashboard() {
                         ) : null;
                       })}
                       {c.role_ids.length > 2 && (
-                        <span className="text-[10px] font-mono text-white/50">+{c.role_ids.length - 2}</span>
-                      )}
-                      {c.role_ids.length === 0 && (
-                        <span className="text-[10px] font-mono text-amber-400/70 border border-amber-400/30 px-2 py-0.5">
-                          unassigned
-                        </span>
+                        <span className="text-[10px] font-mono text-white/72">+{c.role_ids.length - 2}</span>
                       )}
                     </div>
                   </td>
@@ -369,22 +354,16 @@ export default function Dashboard() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="8" className="py-16 text-center text-white/40 text-sm">
-                  {loading ? "Loading candidates…" : "No candidates match these filters."}
+                <tr><td colSpan="8" className="py-16 text-center text-white/65 text-sm">
+                  {loadError ? "Couldn't load candidates — see the error above." : "No candidates match these filters."}
                 </td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {totalCandidates > candidates.length && (
-          <div className="mt-3 text-[11px] text-white/40" data-testid="dash-truncated">
-            Showing {candidates.length} of {totalCandidates} candidates. Use search or filters to narrow down.
-          </div>
-        )}
-
         {/* Keyboard hint */}
-        <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/40">
+        <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/65">
           <span><span className="kbd">J</span> <span className="kbd">K</span> row nav</span>
           <span><span className="kbd">↵</span> open profile</span>
           <span><span className="kbd">X</span> select</span>
@@ -394,12 +373,12 @@ export default function Dashboard() {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-4 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 border border-brand/40 bg-surface shadow-[0_10px_40px_-10px_rgba(178,138,93,0.6)] flex flex-wrap items-center justify-center gap-2 px-3 py-2">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 border border-brand/40 bg-surface shadow-[0_10px_40px_-10px_rgba(178,138,93,0.6)] flex items-center gap-2 px-3 py-2">
           <div className="font-mono text-xs text-brand pr-3 border-r hairline">{selected.size} selected</div>
           <BulkBtn label="Shortlist" onClick={() => bulkStage("Shortlisted")} testid="bulk-shortlist" />
           <BulkBtn label="Interview" onClick={() => bulkStage("Interview")} testid="bulk-interview" />
           <BulkBtn label="Reject" onClick={() => bulkStage("Rejected")} testid="bulk-reject" danger />
-          <button onClick={() => setSelected(new Set())} className="text-white/40 hover:text-white p-1 ml-1" data-testid="bulk-clear">
+          <button onClick={() => setSelected(new Set())} className="text-white/65 hover:text-white p-1 ml-1" data-testid="bulk-clear">
             <X size={14} />
           </button>
         </div>
@@ -408,26 +387,25 @@ export default function Dashboard() {
   );
 }
 
-function Kpi({ label, value, icon, testid, gold, hint }) {
+function Kpi({ label, value, icon, testid, gold }) {
   return (
-    <div className="p-4 md:p-5 border-r border-b hairline last:border-r-0 lg:border-b-0 min-w-0" data-testid={testid}>
-      <div className="flex items-center gap-2 mb-2 min-w-0">
-        <span className={cx("shrink-0", gold ? "text-brand" : "text-white/40")}>{icon}</span>
-        <span className="font-mono-label truncate">{label}</span>
+    <div className="p-5 border-r hairline last:border-r-0" data-testid={testid}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className={gold ? "text-brand" : "text-white/65"}>{icon}</span>
+        <span className="font-mono-label">{label}</span>
       </div>
-      <div className={cx("font-display text-2xl md:text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
-      {hint && <div className="text-[10px] text-white/35 mt-1 font-mono">{hint}</div>}
+      <div className={cx("font-display text-3xl font-bold tabular-nums tracking-tight", gold && "text-brand")}>{value}</div>
     </div>
   );
 }
 
 function StageBadge({ stage }) {
   const map = {
-    New: "text-white/60 border-white/20",
+    New: "text-white/78 border-white/20",
     Shortlisted: "text-brand border-brand/40",
     Interview: "text-gold border-gold/40",
     Offer: "text-success border-success/40",
-    Rejected: "text-white/30 border-white/10 line-through",
+    Rejected: "text-white/55 border-white/10 line-through",
   };
   return (
     <span className={cx("text-[10px] font-mono uppercase tracking-widest px-2 py-1 border", map[stage] || map.New)}>
@@ -437,7 +415,7 @@ function StageBadge({ stage }) {
 }
 
 function MatchScore({ score }) {
-  const color = score >= 90 ? "text-brand" : score >= 75 ? "text-white" : "text-white/50";
+  const color = score >= 90 ? "text-brand" : score >= 75 ? "text-white" : "text-white/72";
   return (
     <div className="inline-flex items-center gap-2">
       <div className="w-16 h-1 bg-white/10 relative overflow-hidden">

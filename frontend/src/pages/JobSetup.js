@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, fmtINR, errMessage } from "../lib/api";
+import { api, fmtINR } from "../lib/api";
 import {
   Sparkles, X, Plus, ChevronLeft, Loader2, Check, ChevronDown, ChevronUp,
   Filter, Scale, Info, RotateCcw, GraduationCap, Briefcase, Clock, MapPin
@@ -63,9 +63,6 @@ export default function JobSetup() {
   const [recommendedSnapshot, setRecommendedSnapshot] = useState({ filters: null, weights: null });
   const [filterPreview, setFilterPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
-  const [publishError, setPublishError] = useState("");
-  const [extractError, setExtractError] = useState("");
-  const [suggestedSkills, setSuggestedSkills] = useState([]);
 
   useEffect(() => {
     if (!form.jd || form.jd.length < 40) {
@@ -76,7 +73,6 @@ export default function JobSetup() {
     const t = setTimeout(async () => {
       try {
         const res = await api.post("/extract-skills", { jd: form.jd });
-        setExtractError("");
         setForm((f) => ({
           ...f,
           skills: res.data.skills,
@@ -86,14 +82,11 @@ export default function JobSetup() {
           filters: usingRecommended.filters ? { ...f.filters, ...res.data.recommended_filters } : f.filters,
           scoring_weights: usingRecommended.weights ? res.data.recommended_weights : f.scoring_weights,
         }));
-        setSuggestedSkills(res.data.suggested_skills || []);
         setRecommendedSnapshot({
           filters: res.data.recommended_filters,
           weights: res.data.recommended_weights,
         });
         setExtracted(true);
-      } catch (err) {
-        setExtractError(errMessage(err, "Couldn't read that job description."));
       } finally {
         setExtracting(false);
       }
@@ -111,8 +104,6 @@ export default function JobSetup() {
           skills: form.skills,
         });
         setFilterPreview(res.data);
-      } catch {
-        setFilterPreview(null);
       } finally {
         setPreviewing(false);
       }
@@ -124,23 +115,10 @@ export default function JobSetup() {
     setForm((f) => ({ ...f, skills: f.skills.map((s, i) => (i === idx ? { ...s, weight: w } : s)) }));
   const removeSkill = (idx) =>
     setForm((f) => ({ ...f, skills: f.skills.filter((_, i) => i !== idx) }));
-  const addSkill = (name, weight = 3) => {
-    const clean = (name || "").trim();
-    if (!clean) return;
-    setForm((f) =>
-      f.skills.some((s) => s.name.toLowerCase() === clean.toLowerCase())
-        ? f
-        : { ...f, skills: [...f.skills, { name: clean, weight }] }
-    );
-    setSuggestedSkills((prev) => prev.filter((s) => s.name.toLowerCase() !== clean.toLowerCase()));
+  const addSkill = (name) => {
+    if (!name.trim()) return;
+    setForm((f) => ({ ...f, skills: [...f.skills, { name: name.trim(), weight: 3 }] }));
   };
-
-  // A recruiter must be able to correct what the extractor got wrong, in place.
-  const renameSkill = (idx, name) =>
-    setForm((f) => ({ ...f, skills: f.skills.map((s, i) => (i === idx ? { ...s, name } : s)) }));
-
-  const dismissSuggestion = (name) =>
-    setSuggestedSkills((prev) => prev.filter((s) => s.name !== name));
 
   const setFilter = (k, v) => {
     setUsingRecommended((u) => ({ ...u, filters: false }));
@@ -166,17 +144,11 @@ export default function JobSetup() {
   const weightsTotal = Object.values(form.scoring_weights).reduce((a, b) => a + b, 0);
 
   const publish = async () => {
-    if (!form.title.trim()) {
-      setPublishError("Give the role a title before publishing.");
-      return;
-    }
+    if (!form.title.trim()) return alert("Add a role title first");
     setSaving(true);
-    setPublishError("");
     try {
       const res = await api.post("/jobs", form);
       nav(`/app/jobs/${res.data.id}`);
-    } catch (err) {
-      setPublishError(errMessage(err, "Couldn't publish this role. Your draft is still here."));
     } finally {
       setSaving(false);
     }
@@ -185,9 +157,9 @@ export default function JobSetup() {
   return (
     <div className="min-h-full">
       {/* Header */}
-      <div className="border-b hairline px-4 md:px-8 py-4 md:py-5 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-app/90 backdrop-blur-sm z-20">
+      <div className="border-b hairline px-8 py-5 flex items-center justify-between sticky top-0 bg-app/90 backdrop-blur-sm z-20">
         <div className="flex items-center gap-4">
-          <button onClick={() => nav("/app")} data-testid="js-back-btn" className="text-white/50 hover:text-white transition-colors">
+          <button onClick={() => nav("/app")} data-testid="js-back-btn" className="text-white/72 hover:text-white transition-colors">
             <ChevronLeft size={18} />
           </button>
           <div>
@@ -196,17 +168,12 @@ export default function JobSetup() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {publishError && (
-            <span className="text-[11px] text-danger border border-danger/50 bg-danger/10 px-3 py-1.5" data-testid="js-publish-error">
-              {publishError}
-            </span>
-          )}
-          <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/50 hover:text-white transition-colors">Cancel</button>
+          <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/72 hover:text-white transition-colors">Cancel</button>
           <button
             onClick={publish}
             disabled={saving || !form.title}
             data-testid="js-publish-btn"
-            className="bg-brand text-white px-5 py-2.5 text-sm hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 linear-glow"
+            className="btn btn-primary"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             Publish role
@@ -215,9 +182,9 @@ export default function JobSetup() {
       </div>
 
       {/* Split layout */}
-      <div className="grid md:grid-cols-2 gap-0 md:min-h-[calc(100vh-8rem)]">
+      <div className="grid md:grid-cols-2 gap-0 min-h-[calc(100vh-8rem)]">
         {/* LEFT — JD & Basics + Advanced criteria */}
-        <div className="p-4 md:p-8 md:border-r hairline space-y-8 pb-12 md:pb-24">
+        <div className="p-8 border-r hairline space-y-8 pb-24">
           <div>
             <div className="font-mono-label mb-2">step 01 · role title</div>
             <input
@@ -225,11 +192,11 @@ export default function JobSetup() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Senior Frontend Engineer"
-              className="w-full bg-transparent text-2xl md:text-3xl font-display font-medium border-b hairline focus:border-brand pb-3 outline-none placeholder:text-white/20 transition-colors"
+              className="w-full bg-transparent text-3xl font-display font-medium border-b hairline focus:border-brand pb-3 outline-none placeholder:text-white/20 transition-colors"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <SmallField label="Department">
               <select
                 data-testid="js-dept-select"
@@ -278,7 +245,7 @@ export default function JobSetup() {
               placeholder="Paste or write the job description. Skills, salary, filters and scoring weights will appear on the right as you type."
               className="w-full bg-transparent border hairline p-4 focus:border-brand outline-none min-h-[280px] text-sm leading-relaxed transition-colors"
             />
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-white/40">
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-white/65">
               <Sparkles size={10} className="text-brand" />
               <span>Everything on the right runs the moment you pause. No buttons to press.</span>
             </div>
@@ -302,7 +269,7 @@ export default function JobSetup() {
               badge={usingRecommended.filters && extracted ? "recommended · applied" : null}
               onRestore={extracted ? () => restoreRecommended("filters") : null}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <SmallField label={<span className="inline-flex items-center gap-1.5"><Briefcase size={11} /> Min experience</span>}>
                   <div className="flex items-center gap-2">
                     <input
@@ -313,7 +280,7 @@ export default function JobSetup() {
                       className="w-20 bg-transparent border hairline px-2 py-2 text-sm focus:border-brand outline-none"
                       min={0}
                     />
-                    <span className="text-white/50 text-xs">years</span>
+                    <span className="text-white/72 text-xs">years</span>
                   </div>
                 </SmallField>
                 <SmallField label={<span className="inline-flex items-center gap-1.5"><GraduationCap size={11} /> Education</span>}>
@@ -345,7 +312,7 @@ export default function JobSetup() {
                   />
                 </SmallField>
                 <div className="col-span-2">
-                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/40 lowercase">(strict filter)</span></span>}>
+                  <SmallField label={<span className="inline-flex items-center gap-1.5">Must-have skills · <span className="text-white/65 lowercase">(strict filter)</span></span>}>
                     <TagInput
                       values={form.filters.must_have_skills}
                       onChange={(v) => setFilter("must_have_skills", v)}
@@ -365,7 +332,7 @@ export default function JobSetup() {
                   </SmallField>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/40 bg-brand/5 border border-brand/20 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/65 bg-brand/5 border border-brand/20 px-3 py-2">
                 <Info size={11} className="text-brand mt-0.5 shrink-0" />
                 <span>These are <em className="text-brand not-italic">optional</em>. Skip if you want to review everyone yourself.</span>
               </div>
@@ -374,8 +341,8 @@ export default function JobSetup() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-mono-label">impact on current pool</div>
                     <div className="text-[11px] font-mono">
-                      <span className="text-white/60">{filterPreview.total}</span>
-                      <span className="text-white/30 mx-1">→</span>
+                      <span className="text-white/78">{filterPreview.total}</span>
+                      <span className="text-white/55 mx-1">→</span>
                       <span className={filterPreview.passing === 0 ? "text-amber-400" : "text-brand"}>
                         {filterPreview.passing} pass
                       </span>
@@ -389,36 +356,15 @@ export default function JobSetup() {
                       { key: "failed_must_have", label: "Missing a must-have skill" },
                       { key: "failed_location", label: "Wrong location" },
                     ].filter((r) => filterPreview.breakdown[r.key] > 0).map((r) => (
-                      <div key={r.key} className="flex items-center justify-between text-white/60">
+                      <div key={r.key} className="flex items-center justify-between text-white/78">
                         <span>{r.label}</span>
                         <span className="font-mono text-white/80">−{filterPreview.breakdown[r.key]}</span>
                       </div>
                     ))}
                     {Object.values(filterPreview.breakdown).every((v) => v === 0) && (
-                      <div className="text-white/40 italic">Every candidate in your pool passes.</div>
+                      <div className="text-white/65 italic">Every candidate in your pool passes.</div>
                     )}
                   </div>
-                  {filterPreview.unknown &&
-                    Object.values(filterPreview.unknown).some((v) => v > 0) && (
-                      <div className="mt-3 pt-3 border-t hairline space-y-1 text-[11px]" data-testid="js-unknown-breakdown">
-                        <div className="text-white/40 mb-1.5">
-                          Passing on missing data — we don't reject a candidate because their
-                          resume didn't say:
-                        </div>
-                        {[
-                          { key: "unknown_education", label: "Education not stated" },
-                          { key: "unknown_notice", label: "Notice period not stated" },
-                          { key: "unknown_location", label: "Location not stated" },
-                        ]
-                          .filter((r) => filterPreview.unknown[r.key] > 0)
-                          .map((r) => (
-                            <div key={r.key} className="flex items-center justify-between text-white/50">
-                              <span>{r.label}</span>
-                              <span className="font-mono text-white/70">{filterPreview.unknown[r.key]}</span>
-                            </div>
-                          ))}
-                      </div>
-                    )}
                 </div>
               )}
             </CollapsibleSection>
@@ -445,9 +391,9 @@ export default function JobSetup() {
                   { key: "cultural_fit", label: "Cultural / signal", hint: "Preferred companies, gap tolerance, etc." },
                 ].map((row) => (
                   <div key={row.key} className="flex items-center gap-3">
-                    <div className="w-32 sm:w-40 shrink-0">
+                    <div className="w-40 shrink-0">
                       <div className="text-xs">{row.label}</div>
-                      <div className="text-[10px] text-white/40">{row.hint}</div>
+                      <div className="text-[10px] text-white/65">{row.hint}</div>
                     </div>
                     <input
                       type="range"
@@ -462,13 +408,13 @@ export default function JobSetup() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between border-t hairline pt-3 mt-3">
-                  <span className="text-xs text-white/50">Total</span>
+                  <span className="text-xs text-white/72">Total</span>
                   <span className={`font-mono text-sm ${weightsTotal === 100 ? "text-brand" : "text-amber-400"}`}>
                     {weightsTotal}% {weightsTotal !== 100 && `(should be 100%)`}
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/40 bg-brand/5 border border-brand/20 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 text-[11px] text-white/65 bg-brand/5 border border-brand/20 px-3 py-2">
                 <Info size={11} className="text-brand mt-0.5 shrink-0" />
                 <span>System recommends weights based on the seniority in your JD. Edit only what matters to you.</span>
               </div>
@@ -477,8 +423,8 @@ export default function JobSetup() {
         </div>
 
         {/* RIGHT — Live extraction */}
-        <div className="p-4 md:p-8 bg-surface/30 relative border-t md:border-t-0 hairline">
-          <div className="md:sticky md:top-24 space-y-8">
+        <div className="p-8 bg-surface/30 relative">
+          <div className="sticky top-24 space-y-8">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -490,12 +436,7 @@ export default function JobSetup() {
                     <Loader2 size={10} className="animate-spin" /> scanning
                   </span>
                 )}
-                {extractError && !extracting && (
-                  <span className="text-[10px] font-mono text-danger" data-testid="js-extract-error">
-                    {extractError}
-                  </span>
-                )}
-                {extracted && !extracting && !extractError && (
+                {extracted && !extracting && (
                   <span className="text-[10px] font-mono text-success inline-flex items-center gap-1">
                     <Check size={10} /> ready
                   </span>
@@ -503,7 +444,7 @@ export default function JobSetup() {
               </div>
               <h3 className="font-display text-xl font-medium mb-4">Skills detected</h3>
               {form.skills.length === 0 && (
-                <div className="border border-dashed hairline p-8 text-center text-white/40 text-sm">
+                <div className="border border-dashed hairline p-8 text-center text-white/65 text-sm">
                   Paste a job description to see skills, salary, filters and scoring weights appear here — live.
                 </div>
               )}
@@ -516,14 +457,7 @@ export default function JobSetup() {
                     className="flex items-center gap-3 border hairline p-2 pl-3 bg-app group"
                     data-testid={`js-skill-${idx}`}
                   >
-                    <input
-                      value={s.name}
-                      onChange={(e) => renameSkill(idx, e.target.value)}
-                      data-testid={`js-skill-name-${idx}`}
-                      aria-label={`Skill ${idx + 1} name`}
-                      title={s.matched_as ? `Found "${s.matched_as}" in the description` : "Added by you"}
-                      className="font-mono text-xs text-white/90 flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-white/20 focus:border-brand outline-none transition-colors"
-                    />
+                    <span className="font-mono text-xs text-white/90 flex-1">{s.name}</span>
                     <div className="flex items-center gap-1">
                       {[1, 2, 3, 4, 5].map((n) => (
                         <button
@@ -535,52 +469,12 @@ export default function JobSetup() {
                         />
                       ))}
                     </div>
-                    <button onClick={() => removeSkill(idx)} className="text-white/30 hover:text-red-400 p-1" data-testid={`js-remove-skill-${idx}`}>
+                    <button onClick={() => removeSkill(idx)} className="text-white/55 hover:text-red-400 p-1" data-testid={`js-remove-skill-${idx}`}>
                       <X size={12} />
                     </button>
                   </motion.div>
                 ))}
                 {form.skills.length > 0 && <AddSkillInput onAdd={addSkill} />}
-              </div>
-
-              {suggestedSkills.length > 0 && (
-                <div className="mt-5" data-testid="js-suggested-skills">
-                  <div className="font-mono-label mb-2">also acceptable?</div>
-                  <div className="text-[11px] text-white/40 mb-3">
-                    Skills that do the same job, or usually come with the ones above.
-                    Add any you'd accept from a candidate.
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedSkills.map((sg) => (
-                      <span
-                        key={sg.name}
-                        className="inline-flex items-center gap-1.5 border border-dashed border-white/20 bg-white/[0.02] pl-2.5 pr-1 py-1 text-[11px] group"
-                        title={sg.reason}
-                        data-testid={`js-suggestion-${sg.name}`}
-                      >
-                        <button
-                          onClick={() => addSkill(sg.name, sg.kind === "equivalent" ? 3 : 2)}
-                          className="inline-flex items-center gap-1.5 hover:text-brand transition-colors"
-                        >
-                          <Plus size={10} />
-                          <span className="font-mono">{sg.name}</span>
-                          <span className={sg.kind === "equivalent" ? "text-brand/70" : "text-white/30"}>
-                            {sg.kind === "equivalent" ? "≈" : "+"}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => dismissSuggestion(sg.name)}
-                          className="text-white/20 hover:text-white/60 px-1"
-                          aria-label={`Dismiss ${sg.name}`}
-                        >
-                          <X size={9} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="hidden">
               </div>
             </div>
 
@@ -589,9 +483,9 @@ export default function JobSetup() {
                 <div className="font-mono-label mb-3">salary suggestion · based on JD</div>
                 <div className="border hairline p-4 bg-app flex items-baseline gap-3">
                   <span className="font-display text-2xl font-semibold text-brand">{fmtINR(form.salary_min)}</span>
-                  <span className="text-white/40">→</span>
+                  <span className="text-white/65">→</span>
                   <span className="font-display text-2xl font-semibold text-brand">{fmtINR(form.salary_max)}</span>
-                  <span className="ml-auto text-[10px] font-mono text-white/40">per annum</span>
+                  <span className="ml-auto text-[10px] font-mono text-white/65">per annum</span>
                 </div>
               </div>
             )}
@@ -606,7 +500,7 @@ export default function JobSetup() {
                       <span className="flex-1 text-white/80">{q}</span>
                       <button
                         onClick={() => setForm({ ...form, screening_questions: form.screening_questions.filter((_, j) => j !== i) })}
-                        className="text-white/30 hover:text-red-400"
+                        className="text-white/55 hover:text-red-400"
                         data-testid={`js-remove-q-${i}`}
                       >
                         <X size={12} />
@@ -624,7 +518,7 @@ export default function JobSetup() {
                   <div className="font-mono-label">what this role will filter for</div>
                   {filterPreview && (
                     <div className="text-[10px] font-mono flex items-center gap-1.5">
-                      <span className={previewing ? "text-white/30" : "text-white/60"}>
+                      <span className={previewing ? "text-white/55" : "text-white/78"}>
                         {filterPreview.total} candidates →
                       </span>
                       <span className={`px-1.5 py-0.5 border ${
@@ -683,7 +577,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
           <div>
             <div className="font-mono-label mb-1">{step}</div>
             <div className="font-display text-base font-medium">{title}</div>
-            <div className="text-[11px] text-white/50 mt-0.5">{subtitle}</div>
+            <div className="text-[11px] text-white/72 mt-0.5">{subtitle}</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -698,7 +592,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
               {badge}
             </span>
           )}
-          {open ? <ChevronUp size={14} className="text-white/50" /> : <ChevronDown size={14} className="text-white/50" />}
+          {open ? <ChevronUp size={14} className="text-white/72" /> : <ChevronDown size={14} className="text-white/72" />}
         </div>
       </button>
       <AnimatePresence initial={false}>
@@ -716,7 +610,7 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
                   <button
                     onClick={onRestore}
                     data-testid={`${testid}-restore`}
-                    className="text-[10px] font-mono text-white/40 hover:text-brand inline-flex items-center gap-1 transition-colors"
+                    className="text-[10px] font-mono text-white/65 hover:text-brand inline-flex items-center gap-1 transition-colors"
                   >
                     <RotateCcw size={10} /> restore recommended
                   </button>
@@ -733,64 +627,22 @@ function CollapsibleSection({ open, onToggle, step, title, subtitle, icon, badge
 
 function AddSkillInput({ onAdd }) {
   const [v, setV] = useState("");
-  const [matches, setMatches] = useState([]);
-
-  // Type-ahead against the same taxonomy the extractor uses, so a recruiter's
-  // free text lands on the canonical name rather than a near-miss spelling.
-  useEffect(() => {
-    if (!v.trim()) {
-      setMatches([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const r = await api.get(`/skills/suggest?q=${encodeURIComponent(v)}`);
-        setMatches(r.data.matches || []);
-      } catch {
-        setMatches([]);
-      }
-    }, 180);
-    return () => clearTimeout(t);
-  }, [v]);
-
-  const commit = (name) => {
-    onAdd(name);
-    setV("");
-    setMatches([]);
-  };
-
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2 border border-dashed hairline p-2 pl-3">
-        <Plus size={12} className="text-white/40" />
-        <input
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit(matches[0] && matches[0].toLowerCase().startsWith(v.toLowerCase()) ? matches[0] : v);
-            if (e.key === "Escape") setMatches([]);
-          }}
-          data-testid="js-add-skill-input"
-          placeholder="Add a skill and press Enter"
-          className="bg-transparent focus:outline-none text-xs flex-1 min-w-0 font-mono"
-        />
-      </div>
-      {matches.length > 0 && (
-        <div
-          className="absolute z-30 left-0 right-0 mt-1 border hairline bg-app shadow-xl max-h-56 overflow-auto"
-          data-testid="js-skill-autocomplete"
-        >
-          {matches.map((m) => (
-            <button
-              key={m}
-              onClick={() => commit(m)}
-              className="w-full text-left px-3 py-2 text-xs font-mono hover:bg-brand/10 hover:text-brand transition-colors"
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="flex items-center gap-2 border border-dashed hairline p-2 pl-3">
+      <Plus size={12} className="text-white/65" />
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onAdd(v);
+            setV("");
+          }
+        }}
+        data-testid="js-add-skill-input"
+        placeholder="Add a skill and press Enter"
+        className="bg-transparent focus:outline-none text-xs flex-1 font-mono"
+      />
     </div>
   );
 }

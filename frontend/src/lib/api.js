@@ -1,41 +1,57 @@
 import axios from "axios";
 
-// CRA inlines this at BUILD time. When it is unset the value becomes the
-// string "undefined", which silently produces requests to "undefined/api/..."
-// — a bundle that looks fine and fails on every call. Fail at load instead.
 const BASE = process.env.REACT_APP_BACKEND_URL;
 
-// Throwing here would blank the whole app, including the screen that explains
-// the problem — so surface it as a value and let index.js render it.
+// CRA inlines REACT_APP_* at build time, so an unset variable becomes the
+// literal string "undefined" and every call goes to "undefined/api" — a bundle
+// that looks fine until it 404s in the browser. scripts/check-env.js fails the
+// build first; this is the belt-and-braces check, so a bundle built some other
+// way says what is wrong instead of showing an empty shell.
 export const CONFIG_ERROR =
   !BASE || BASE === "undefined" || BASE === "null"
-    ? "REACT_APP_BACKEND_URL was not set when this bundle was built."
+    ? "REACT_APP_BACKEND_URL was not set when this bundle was built, so the app has no API to talk to."
     : null;
 
-if (CONFIG_ERROR) console.error(CONFIG_ERROR);
+const TOKEN_KEY = "tt_token";
+const USER_KEY = "tt_user";
+
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const getUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY));
+  } catch {
+    return null;
+  }
+};
+export const setSession = (token, user) => {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+export const clearSession = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+};
 
 export const api = axios.create({
   baseURL: `${(BASE || "").replace(/\/+$/, "")}/api`,
   headers: { "Content-Type": "application/json" },
-  // The session lives in an httpOnly cookie, so it must be sent cross-origin.
-  withCredentials: true,
 });
 
-// A 401 anywhere means the session ended — expired, revoked, or signed out in
-// another tab. Notify once and let the app route to the login screen, rather
-// than letting every in-flight call render its own error.
-let onUnauthorized = null;
-export const setUnauthorizedHandler = (fn) => {
-  onUnauthorized = fn;
-};
+api.interceptors.request.use((cfg) => {
+  const t = getToken();
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
+});
 
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    const url = err.config?.url || "";
-    // /auth/me probing for a session, and a failed sign-in, are expected 401s.
-    const isAuthProbe = url.includes("/auth/me") || url.includes("/auth/login");
-    if (err.response?.status === 401 && !isAuthProbe) onUnauthorized?.();
+    // An expired/invalid session inside the app bounces to sign-in. Public
+    // pages (landing, apply) never trigger this — their calls are unauthenticated.
+    if (err?.response?.status === 401 && window.location.pathname.startsWith("/app")) {
+      clearSession();
+      window.location.assign("/login");
+    }
     return Promise.reject(err);
   }
 );
@@ -49,49 +65,22 @@ export const fmtINR = (n) => {
 
 export const cx = (...arr) => arr.filter(Boolean).join(" ");
 
-/** Turn an axios failure into something worth showing a person. */
-// FastAPI validation errors arrive as a list of {loc, msg}. Rendering "try
-// again" for those is wrong — the same input will fail identically, so the
-// person needs to know which field is the problem.
-const FIELD_LABELS = {
-  name: "Full name",
-  email: "Email",
-  phone: "Phone",
-  current_title: "Current title",
-  current_company: "Current company",
-  experience_years: "Experience (years)",
-  expected_ctc: "Expected CTC",
-  password: "Password",
-  stage: "Stage",
-  rating: "Rating",
-};
-
-const readableValidation = (detail) => {
-  const parts = detail
-    .map((d) => {
-      const field = [...(d.loc || [])].reverse().find((x) => FIELD_LABELS[x]);
-      const msg = (d.msg || "").replace(/^Value error,\s*/i, "");
-      if (!field) return msg;
-      const label = FIELD_LABELS[field];
-      if (/valid email/i.test(msg)) return `${label} doesn't look like a valid email address.`;
-      if (/at least (\d+) character/i.test(msg)) return `${label} is too short.`;
-      if (/greater than or equal/i.test(msg)) return `${label} can't be negative.`;
-      if (/less than or equal/i.test(msg)) return `${label} looks too large.`;
-      return `${label}: ${msg}`;
-    })
-    .filter(Boolean);
-  return parts.length ? [...new Set(parts)].join(" ") : null;
-};
-
-export const errMessage = (err, fallback = "Something went wrong.") => {
-  if (err?.response) {
-    const detail = err.response.data?.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) return readableValidation(detail) || fallback;
-    if (err.response.status === 404) return "Not found.";
-    if (err.response.status >= 500) return "The server had a problem. Try again in a moment.";
-    return fallback;
+/** FastAPI returns 422 detail as a list of per-field objects; a raw dump of that
+ *  in the UI reads as a stack trace. Turn it into something a person can act on. */
+export const errMessage = (err, fallback = "Something went wrong. Please try again.") => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : null;
+        const msg = (d?.msg || "").replace(/^Value error, /, "");
+        return field && field !== "body" ? `${field}: ${msg}` : msg;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" · ");
   }
-  if (err?.request) return "Can't reach the server — check your connection.";
+  if (err?.response?.status === 429) return "Too many requests. Give it a minute and try again.";
+  if (!err?.response) return "Could not reach the server. Check your connection and try again.";
   return fallback;
 };

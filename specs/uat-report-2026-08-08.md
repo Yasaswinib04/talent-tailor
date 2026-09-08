@@ -1,288 +1,214 @@
-# UAT Report — CRED HR Talent Engine
+# UAT Report — Talent Tailor (Talent Engine)
 
-**Date:** 2026-08-08 · **Build:** `8141bb8` · **Target release:** 2026-08-09
-**Tester:** QA pass against the production build + live API
+> **Status: all findings below were fixed and retested on 2026-08-08.**
+> See [Retest](#retest--2026-08-08) at the end for verified results. The original findings are
+> kept as written so the before/after is auditable.
 
----
-
-## QA Gate: **FAIL — critical bugs found**
-
-The current build cannot be deployed successfully. The frontend production
-bundle ships with a literal `undefined` in its API base URL, so the app makes
-zero successful backend calls once deployed. Separately, `.env.example`
-documents four environment variables that no code reads while omitting all three
-that are required — so a deployer following the repo would configure the wrong
-things and the backend would not start either.
-
-Beyond deployability, the app has no authentication of any kind, and every
-candidate's name, personal email, phone number, current employer, expected CTC
-and recruiter notes is served from public unauthenticated endpoints.
+**Date:** 2026-08-08
+**Build:** `main` @ 8141bb8
+**Environment:** local — FastAPI `:8000`, React `:3000`, MongoDB `localhost:27017` / db `talent_tailor`
+**Tested by:** QA pass against `specs/uat-test-plan.md`
 
 ---
 
 ## Summary
 
-| Suite | Total | Pass | Fail |
-|---|---|---|---|
-| Backend API (`/api/*`, live server) | 35 | 22 | 13 |
-| Browser end-to-end (Chromium, prod build) | 30 | 17 | 13 |
-| **Total** | **65** | **39** | **26** |
-
-| Severity | Count | Meaning |
+| Result | Count | Test cases |
 |---|---|---|
-| **P0 — Blocker** | 5 | App does not work, or leaks PII. Must fix before deploy. |
-| **P1 — Critical** | 8 | Data loss / corruption, or a broken flagship flow. |
-| **P2 — Major** | 13 | Visible defects and dead UI. |
+| **Pass** | 12 | TC-01, TC-03, TC-04, TC-05, TC-06, TC-10, TC-12, TC-13, TC-15, TC-16, TC-18, TC-21 |
+| **Fail** | 6 | TC-08, TC-09, TC-17, TC-20, plus two defects found outside the numbered plan (D-01, D-02) |
+| **Partial** | 1 | TC-11 |
+| **Blocked** | 3 | TC-02, TC-19, TC-22 |
 
-### Note on the previous test report
+### QA gate: **FAIL — do not present this as a working shortlisting product.**
 
-`test_reports/iteration_1.json` records "100% (14/14)", zero critical issues and
-zero action items. That run exercised happy paths only, against a hosted preview
-URL hardcoded in `backend/tests/backend_test.py`. It did not cover
-configuration, auth, invalid input, error states, or lifecycle. It should not be
-read as launch evidence.
+The gate required TC-01, TC-04, TC-07, TC-12, TC-13, TC-15, TC-18 to pass. TC-07 passes mechanically but the shipped defaults make it produce a nonsense answer, and the two defects below break the product's core promise.
+
+**The build is solid as a UX prototype and unsafe as a product demo.** The interface, information architecture, and interaction design are genuinely good — the redesign brief has been delivered. What is missing is the engine underneath: nothing in this build actually shortlists anyone.
 
 ---
 
-## P0 — Launch blockers
+## Blocking defects
 
-### P0-1 · The deployed frontend calls `undefined/api` and nothing works
+### D-01 · Publishing a role produces a shortlist of zero — CRITICAL
 
-`frontend/src/lib/api.js:3` reads `process.env.REACT_APP_BACKEND_URL`. That
-variable is set nowhere — there is no `.env`, and `.gitignore` excludes all
-`.env*` files. CRA inlines env vars at build time, so an unset variable becomes
-the string `"undefined"`.
+The job setup screen tells the user "**2 of 20 candidates in your pool would pass these**" and renders a filter-impact breakdown. On publish, the role is created with `candidates_count: 0` and `GET /api/candidates?job_id=<new>` returns an empty list.
 
-**Evidence** — building the repo exactly as committed:
+The filters are a **preview only**. They are stored on the job and never applied to assign, rank, or shortlist anyone. The advertised loop — *define criteria → get the right candidates* — is not connected end to end.
 
-```
-$ npx react-scripts build && grep -o 'baseURL:"[^"]*"' build/static/js/main.*.js
-baseURL:"undefined/api"
-```
+**Evidence:** published a Senior Frontend Engineer role via the UI with recommended filters applied; job `97dcd6e9` created with all filters and weights persisted correctly, and zero candidates attached.
 
-Every request goes to `https://<host>/undefined/api/...`. Dashboard, Job Setup,
-Candidate Profile and Public Apply are all completely non-functional, and
-because there is no error handling (P1-6) the user sees an empty shell rather
-than an error.
+**Impact:** this is the single sentence an HR will ask about. There is no answer in the current build.
 
-### P0-2 · `.env.example` documents the wrong variables entirely
+---
 
-| `.env.example` says | Code actually reads |
+### D-02 · "Bachelor's degree or equivalent" rejects every master's-degree candidate — CRITICAL
+
+`_matches_education()` (`backend/server.py:456`) tests the bachelor's preference against the tokens `b.tech, b.e., b.sc, b.des, bachelor, b.a.` only. Anyone whose listed qualification is a master's has none of those tokens and is rejected.
+
+**Evidence:** with only the education filter applied, 8 of 20 candidates fail — every one of them because their highest degree is *higher* than the requirement:
+
+| Rejected | Qualification |
 |---|---|
-| `GEMINI_API_KEY` | *(never read — skill extraction is a local dictionary in `server.py:352`)* |
-| `DATABASE_URL` (PostgreSQL) | *(never read — the backend is MongoDB)* |
-| `SUPABASE_URL` | *(never read)* |
-| `SUPABASE_SERVICE_ROLE_KEY` | *(never read)* |
-| — | **`MONGO_URL`** (`server.py:19`, `os.environ[...]`) |
-| — | **`DB_NAME`** (`server.py:20`, `os.environ[...]`) |
-| — | **`REACT_APP_BACKEND_URL`** (build-time, frontend) |
+| Anand Iyer | M.Tech, IIT Madras |
+| Aditya Bhatia | M.Tech, IIT Roorkee |
+| Priya Desai | MBA, IIM Ahmedabad |
+| Meera Krishnan | MBA, ISB Hyderabad |
+| Nikhil Verma | MBA, IIM Bangalore |
+| Kavita Rangan | M.Des, IDC IIT Bombay |
+| Pooja Agarwal | M.Des, IIT Guwahati |
+| Ananya Reddy | M.Sc., Srishti Institute |
 
-Both backend variables are read with bracket subscript, so a missing one is a
-hard `KeyError` at import — the server does not start and gives no usable
-message. Anyone deploying from this repo tomorrow will set four irrelevant
-secrets and hit a crash.
-
-### P0-3 · No authentication; candidate PII is publicly readable
-
-There is no auth anywhere in the codebase — zero matches for
-`auth|login|token|session|jwt|password` across `backend/server.py` and
-`frontend/src`. `memory/test_credentials.md` confirms: *"no auth in this build."*
-
-`GET /api/candidates` returns, for all 20+ candidates, full name, personal
-email, phone, current employer, expected CTC, education and recruiter notes. The
-entire recruiter console at `/app` is reachable by URL alone. CORS is
-`allow_origins=["*"]` **with** `allow_credentials=True` (`server.py:27-33`), so
-any origin can read it from a browser.
-
-This is real candidate data about identifiable individuals. Publishing it
-without access control is a DPDP Act exposure, not only a security bug.
-
-### P0-4 · `POST /api/jobs` returns 500 on a documented-optional payload
-
-`JobCreate` declares `filters: Optional[dict] = None` and
-`scoring_weights: Optional[dict] = None` (`server.py:72-73`), but `create_job`
-then does `Job(**payload.model_dump())` and `Job` requires both to be dicts
-(`server.py:53-54`). Omitting either raises `ValidationError` → 500.
-
-```
-POST /api/jobs {"title":"QA Role","department":"Engineering","location":"Bengaluru"}
-→ 500 Internal Server Error
-```
-
-The current Job Setup screen always sends both, which masks it — but any other
-client, and the onboarding flow when it is wired up, hits an unhandled 500.
-
-### P0-5 · `PATCH` accepts a raw dict and `$set`s it verbatim — the primary key can be overwritten
-
-`update_job` and `update_candidate` (`server.py:336-342`, `546-558`) take an
-untyped `payload: dict` and pass it straight into `$set`. Nothing is validated,
-whitelisted or immutable.
-
-```
-POST  /api/jobs                          → job id 3f2a…
-PATCH /api/jobs/3f2a… {"id":"spoofed","share_slug":"aaaa","evil":true}
-      → 200, response body: null
-GET   /api/jobs/3f2a…                    → 404
-GET   /api/jobs                          → still lists it, now with id "spoofed"
-```
-
-The record is corrupted and unreachable at its own URL while still appearing in
-lists. `share_slug`, `match_score` and `auto_applied` are equally rewritable,
-and arbitrary new fields can be injected. Unauthenticated (P0-3), this is
-one-request data destruction by anyone who knows a URL.
+This filter is **applied by default** on every new role. An HR will spot it within seconds, and it disqualifies the strongest people in the pool.
 
 ---
 
-## P1 — Critical
+## Failed test cases
 
-### P1-1 · Public apply accepts empty name and email
+### TC-09 · Scoring weights do not affect anything — FAIL, HIGH
 
-`CandidateApply` (`server.py:110-118`) has no validators. Verified in the
-browser: cleared name and email on the review step, clicked Submit, got the
-"Applied." confirmation, and the record landed in HR's dashboard as a blank row
-(screenshot `08-blank-apply.png`, `09-dashboard-after.png`). The API also
-accepts `experience_years: -5` and `expected_ctc: -100` with a 200.
+The 5 weight sliders (skills / experience / education / notice / cultural fit) save to the job and are read by nothing. `match_score` is a fixed integer baked into the seed data; candidate lists sort on that stored value.
 
-### P1-2 · No de-duplication — the same person applies twice, gets two records
-
-Two identical `POST /api/apply/{slug}` calls create two candidates with the same
-email. Auto-apply is the headline beta feature and the UX report claims
-"Duplicate profiles: 1 per 3 roles → **0**". The share link reintroduces exactly
-the duplication the redesign says it removed.
-
-### P1-3 · Stage is free text — candidates silently vanish from the pipeline
-
-`StageUpdate.stage` is an unconstrained `str`. All of these return 200 and
-persist:
+**Evidence:** set `skills:100` (all others 0) → top 6 order unchanged. Set `education:100` (all others 0) → identical order. Verified the weights persisted on the job between runs.
 
 ```
-stage='Banana'    → 200, stored 'Banana'
-stage=''          → 200, stored ''
-stage='<script>'  → 200, stored '<script>'
+baseline        skills=100      education=100
+92 Rohan        92 Rohan        92 Rohan
+90 Neha         90 Neha         90 Neha
+86 Siddharth    86 Siddharth    86 Siddharth
 ```
 
-The candidate then appears in **no** funnel bucket and matches **no** dashboard
-stage filter — effectively deleted from the recruiter's view while still in the
-database. Confirmed against `/api/analytics/summary`, whose totals no longer
-account for them.
-
-### P1-4 · Deleting a role orphans its candidates
-
-`DELETE /api/jobs/{id}` (`server.py:345-348`) removes only the job document.
-Verified: 5 candidates still carried the deleted role in `role_ids` afterwards.
-Their role chips disappear from the dashboard and they are unreachable from any
-Job Detail page. `candidates_count` on other roles is not recomputed either.
-
-### P1-5 · The system-recommended filters reject 100% of the pool
-
-Using the app's own "fill with sample" JD and the defaults the UI labels
-**RECOMMENDED · APPLIED**, the live counter reads:
-
-> **0 of 20 candidates in your pool would pass these.**
-
-Cause: `recommended_filters.must_have_skills` is the top-3 extracted skills
-(`server.py:415`), and `preview_filter` requires all of them via
-`must_have.issubset(cand_skills)` (`server.py:505`). For the sample JD that
-demands `Design Systems` **and** `UPI / Payments` **and** `React` on one CV; the
-API breakdown attributes `failed_must_have: 20`. A first-time HR's very first
-screen tells them nobody qualifies, using settings the product recommended.
-Screenshot `05-criteria.png`.
-
-### P1-6 · The frontend has essentially no error handling
-
-One `.catch()` exists across all nine page/component files (`PublicApply.js:30`).
-Every other `api.get`/`api.post` is unguarded, so any failure is an unhandled
-promise rejection.
-
-- Backend unreachable → dashboard renders a complete empty shell: "0 ACTIVE",
-  no candidates, **no error message and no retry** (screenshot `12-backend-down.png`).
-- `/app/candidates/<unknown-id>` → the 404 rejects, `setC` never runs, and the
-  page shows "Loading…" **forever** (screenshot `13-404.png`).
-- `PublicApply.submit()` is unguarded — a failed application looks like a dead button.
-
-### P1-7 · Auto-applied candidates are second-class records that skew filtering
-
-`apply_to_job` (`server.py:602-620`) hardcodes `location="—"`,
-`education="—"`, `notice_period="—"`, and `skills=["General"]` when nothing
-matches the dictionary. Consequences:
-
-- `_parse_notice_days("—")` returns **0**, so every auto-applicant is scored as
-  an immediate joiner and passes any notice-period filter.
-- They fail every education and location filter, permanently.
-- `avatar` is picked with `hash(email)` — Python randomises string hashing per
-  process, so an auto-applicant's avatar changes on every server restart.
-
-The candidates produced by the flagship feature are the ones the filtering
-engine handles worst.
-
-### P1-8 · A candidate can be unassigned from every role and lost
-
-Removing role chips one by one leaves "Not assigned to any role yet."
-(screenshot `11-orphan.png`). The candidate is now absent from every Job Detail
-page and reachable only from the unfiltered All Candidates table.
+Aggravating factor: the section is labelled "**How the match score is calculated**" and carries a `RECOMMENDED · APPLIED` badge. The UI states something untrue rather than merely omitting a feature.
 
 ---
 
-## P2 — Major
+### TC-08 · Adding "Remote" silently disables location filtering — FAIL, HIGH
 
-| # | Finding | Evidence |
+In `preview_filter()` (`backend/server.py:508`), when `remote` appears in the accepted locations the entire location check is skipped for every candidate.
+
+**Evidence:**
+
+| Filter | Passing | Expected |
 |---|---|---|
-| P2-1 | Sidebar **Roles** and **Candidates** go nowhere. `?tab=` is read into `tab` (`Dashboard.js:10`) and never used — the build's own eslint flags it as unused. All three links render the identical Overview page. | UI-04 |
-| P2-2 | All three sidebar links are highlighted as active **at once** — `NavLink` ignores query strings, so `/app`, `/app?tab=jobs` and `/app?tab=candidates` all match. | UI-05, `navcheck` |
-| P2-3 | Top-bar global search and the `⌘K` badge are decoration — the input has no state and no handler. Typing filters nothing. | UI-06 |
-| P2-4 | Bulk **Reject** fires instantly on click: no confirmation, no undo, no toast. The most destructive action in the app is the least protected. | UI-11 |
-| P2-5 | Publish is allowed with scoring weights ≠ 100%. The "(should be 100%)" warning is cosmetic. | UI-14 |
-| P2-6 | Resume upload is theatre: the file is discarded (`PublicApply.js:58` passes `""`) while the UI animates "Extracted name and contact / skills / education". Uploading a CV for "Priya Nair" produced a form for "Aarav Menon". | UI-19, `07-apply-fake-parse.png` |
-| P2-7 | Unusable on mobile: `scrollWidth` 832 px in a 390 px viewport, fixed 224 px sidebar, KPI labels overlapping their values. | UI-27, `14-mobile.png` |
-| P2-8 | `/themes` — six internal design explorations — is publicly routable in the production build. | UI-28 |
-| P2-9 | No catch-all route in `App.js`; unknown URLs render a completely blank page. | UI-29 |
-| P2-10 | Blank/whitespace-only job titles accepted (`title: "   "` → 200). Markup in a title is stored raw; React escapes it on render so it is inert today, but it flows through to the public apply page. | Probes B, C |
-| P2-11 | `salary_min > salary_max` and negative salaries accepted without validation. | Probes D, E |
-| P2-12 | `to_list(1000)` on every list endpoint, no pagination. Silently truncates past 1000 candidates — for a product pitched on "evaluate 100s of candidates". | `server.py:309, 476, 530` |
-| P2-13 | `share_slug` is 8 hex chars with no uniqueness index; a collision silently hijacks another role's apply link. Also guessable by enumeration given P0-3. | Probe G |
+| `[Bengaluru]` | 15/20 | 15 ✓ |
+| `[Bengaluru, Remote]` | **20/20** | 18 — Noida and Gurgaon candidates wrongly pass |
+| `[Mars]` | 0/20 | 0 ✓ |
+| `[Mars, Remote]` | **20/20** | 3 |
 
-### Smaller items
-
-- `backend/requirements.txt` omits `pytest` and `requests`, and
-  `backend_test.py:6` defaults to a hardcoded `…emergentagent.com` preview URL —
-  the suite cannot run against a local or production deployment as committed.
-- No lockfile for the frontend (`frontend/package-lock.json` is absent; the
-  530 KB `package-lock.json` at the repo root does not correspond to it) — builds
-  are not reproducible.
-- Onboarding is client-only; everything entered across the three steps is
-  discarded on "Finish". Already tracked as P1 in the PRD backlog.
-- Fonts (Google Fonts, Fontshare) and all imagery (Unsplash avatars, a Pexels
-  hero) load from third-party CDNs with no fallback.
-- No favicon, `manifest.json`, or `robots.txt`.
-- `"1 candidates"` on role cards.
+`["Bengaluru", "Remote"]` is the **recommended default** on every role, so the location filter never rejects anyone out of the box.
 
 ---
 
-## What passed
+### TC-17 · No server-side validation on public apply — FAIL, HIGH
 
-Worth stating plainly — the core product ideas hold up under test:
+`POST /api/apply/{slug}` with `{"name": "", "email": "not-an-email"}` returns **200 OK** and writes the candidate. A nameless row with an invalid email appeared in the pipeline and on the dashboard.
 
-- Live skill extraction from a pasted JD works and feels immediate (UI-12).
-- The "will pass" preview counter is genuinely responsive and its per-filter
-  breakdown is accurate — the numbers it reports are correct; it is the
-  *recommended defaults* feeding it that are wrong (P1-5).
-- Multi-role assignment works end to end, in the UI and the API, and
-  `candidates_count` stays consistent through assignment (TC-05, TC-29, CP-02).
-- Notes persist correctly across a full page reload (CP-04).
-- Keyboard navigation works, and text inputs are correctly guarded against
-  shortcut hijacking (UI-08, UI-09).
-- Publishing a role and applying through its share link works end to end, and
-  the applicant appears under the correct role with a consistent count
-  (UI-16→18, TC-22, TC-23).
-- Seeding, sorting, stage filtering and job-scoped candidate queries are correct.
-- The production build compiles clean (warnings only) at 135 KB gzipped JS.
+There is no validation beyond Pydantic type-checking, and no delete-candidate endpoint, so bad rows cannot be removed through the product. (The test row was removed directly in MongoDB during cleanup.)
 
 ---
 
-## Recommendation
+### TC-20 · No error state when the backend is unreachable — FAIL, MEDIUM
 
-Do not deploy this build. P0-1 and P0-2 alone mean tomorrow's launch produces a
-dead app; both are small, mechanical fixes measured in minutes. P0-3 is the one
-that needs a product decision rather than a patch — see the fix plan.
+With uvicorn stopped, `/app` renders an unhandled `AxiosError: Network Error`, the KPI band disappears, and the candidate table shows "**No candidates match these filters**" — telling the user their filters excluded everyone when in fact the server is down.
 
-Fix plan and sequencing: **[`specs/launch-fix-plan.md`](./launch-fix-plan.md)**.
+The red stack-trace overlay is CRA's dev-mode overlay and will not appear in a production build. The unhandled rejection, the absent error state, and the misleading empty-state copy will.
+
+---
+
+## Partial
+
+### TC-11 · Keyboard navigation — PARTIAL
+
+`J` / `K` / `↵` / `N` / `X` all work correctly; `X` selects and the bulk action bar appears. **`⌘K` does nothing** — `AppShell.js:74` renders the badge as a static `<span>` with no handler. It is advertised prominently in the search bar. Do not press it during a demo.
+
+Minor: the bulk action bar overlays the selected row and covers its "Current" column.
+
+---
+
+## Additional findings
+
+- **Auto-applied candidates are unfilterable.** `POST /api/apply` writes `location: "—"`, `education: "—"`, `notice_period: "—"` — the exact three fields the mandatory filters screen on. Every candidate who arrives via the shareable link therefore fails the role's own education and location filters. The intake half and the shortlisting half of the product do not share a data contract.
+- **Must-have skills use a strict subset test.** The recommended default sets must-haves to the JD's top 3 skills and requires *all* of them, so 18 of 20 candidates fail. Combined with D-02, the shipped defaults take a 20-person pool down to 2.
+- **An unrecognised JD recommends must-haves that nobody can satisfy** — Communication / Problem Solving / Collaboration are not in any candidate record, so the live counter reads 0 will pass on a first run with a plain-English JD.
+- **`no_gaps_over_months`** is returned in recommended filters and never evaluated. Dead filter.
+- **`AVATAR_POOL[hash(email) % len]`** uses Python's randomised string `hash()`, so an auto-applied candidate's avatar changes on every backend restart.
+- Repo hygiene: `README.md` is unmodified AI Studio boilerplate with wrong run instructions; `.env.example` describes Gemini + Postgres + Supabase while the app actually needs `MONGO_URL` + `DB_NAME`; no `.env` files were committed, so the backend crashes on import out of the box. Working `.env` files were created during setup.
+
+---
+
+## Blocked
+
+- **TC-02 / TC-19 / TC-22** — the automated browser pane runs with `document.visibilityState: "hidden"`, which throttles framer-motion. Entrance animations do not complete, so step transitions and empty states could not be judged reliably. Observed step-content desync during onboarding is **an artifact of this, not a confirmed defect**. Click through onboarding manually before relying on it.
+
+---
+
+## What passed, and passed well
+
+- **TC-04 live skill extraction** — genuinely good. 8 skills, salary band, screening questions and recommended filters all appear as you stop typing, with no button to hunt for. This is the brief's central complaint, fixed.
+- **TC-06 progressive disclosure** and the filter-impact panel (`20→2 pass`, with `−10 experience / −8 education / −18 must-have` attribution) are a strong piece of interaction design. The presentation is right; only the numbers underneath are wrong.
+- **TC-13 multi-role assignment** — assign and unassign keep `candidates_count` correct across all 5 jobs. One of the two explicitly beta-requested features, working.
+- **TC-15 auto-apply** — public link → demo resume → auto-filled form → submit → scored candidate on the dashboard, count incremented. The other beta-requested feature, working end to end.
+- **TC-12 bulk stage actions** and **TC-18 persistence** across both browser and backend restart, with no seed duplication.
+- **TC-01** cold-start seeding, **TC-16** 404s on bad slugs, **TC-21** report page.
+
+---
+
+## Recommended fix order
+
+**Before showing it to anyone as a product** (est. half a day):
+
+1. **D-02** — make education preference a floor, not an exact match: treat a master's/PhD as satisfying "bachelor's or equivalent" (`server.py:456`).
+2. **D-01** — on publish, apply the filters and attach passing candidates to the role, so "2 will pass" produces an actual shortlist.
+3. **TC-08** — treat `Remote` as one accepted location, not a wildcard that skips the check (`server.py:508`).
+4. Soften the must-have default — require *any* of the top skills, or default the list to empty.
+
+**Before claiming AI shortlisting** (est. 1 day):
+
+5. **TC-09** — compute `match_score` per role from the weights, or remove the sliders and the "how the match score is calculated" copy.
+6. **TC-17** — validate name and email server-side; return 422 on bad input.
+
+**Demo hygiene** (est. 1 hour):
+
+7. Hide the `⌘K` badge until it works.
+8. Add an error state for backend-unreachable, and distinguish it from "no results".
+9. Fix `README.md` and `.env.example` so a second machine can run this.
+
+---
+
+# Retest — 2026-08-08
+
+Every item above was fixed and reverified. **QA gate: PASS.**
+Backend suite `backend/tests/backend_test.py`: **14/14 passing**.
+
+## Blocking defects
+
+| ID | Fix | Verified |
+|---|---|---|
+| **D-01** publish yields no shortlist | Publishing now runs the role's filters across the pool and attaches everyone who clears them. Preview and publish share one code path (`_filter_failures`), so they cannot disagree. Editing a role's filters re-runs the attach. | Published from the UI: preview said "9 will pass" → role created with `candidates_count: 9` → 9 candidates actually attached. |
+| **D-02** bachelor's rejects master's | Education is now a *floor* via `_education_level()` (none/bachelor/master/doctorate). A master's satisfies "bachelor's or equivalent"; "master's or higher" still excludes bachelor's-only. | "Bachelor's or equivalent" 12/20 → **20/20**. "Master's or higher" correctly returns 11. All 8 wrongly-rejected candidates now pass. |
+
+## Failed cases
+
+| ID | Fix | Verified |
+|---|---|---|
+| **TC-09** dead scoring sliders | Real scoring engine. Five dimensions scored 0–100 independently (`_score_components`), combined by the role's weights (`_score_candidate`), computed per role at query time. Responses include a `score_breakdown`. | Ranking now genuinely reorders: `education=100` puts M.Tech/MBA on top; `notice=100` puts short-notice candidates on top; `skills=100` puts full-skill matches at 100. |
+| **TC-08** Remote wildcard | Each accepted location is matched on its own merits; Remote is one of them, not a bypass. | `[Bengaluru,Remote]` 20/20 → **18/20** (Noida and Gurgaon correctly excluded). `[Mars,Remote]` 20/20 → **3/20**. |
+| **TC-17** no apply validation | Pydantic `field_validator`s on name, title, company, email, and experience range. UI surfaces the message and keeps the candidate on the form. | Blank name / bad email / negative experience all return **422**; zero blank rows written. UI shows "name is required" inline. |
+| **TC-20** no backend-down state | `load()` catches failures and renders a "Couldn't load your pipeline" banner with a Retry button; the table no longer claims the filters excluded everyone. | Verified with the backend stopped, and Retry recovers cleanly once it is back. |
+| **TC-11** dead ⌘K badge | Badge removed from the top bar until a palette exists. `J/K/↵/N/X` legend kept — those work. | No `.kbd` element remains in the top bar. |
+
+## Also fixed
+
+- **Auto-applied candidates are now filterable** — the apply form captures location, highest qualification, and notice period, and the API stores them. These candidates are scored against the role on the same basis as everyone else (verified: Aarav Menon scored 78, ranked correctly mid-pack).
+- **Must-have skills default to empty** — pre-filling the top 3 as a strict AND was disqualifying 18 of 20. Extracted skills still drive the score; a hard requirement is now opt-in. Net effect on a senior frontend role: **2 of 20 → 9 of 20** pass the recommended defaults.
+- **Missing data never rejects a candidate** — an unknown education, location, or notice period surfaces the person for the recruiter to judge rather than silently dropping them. In *scoring*, unknown is neutral (not best), so missing data cannot out-rank a declared value.
+- **Job creation without filters** — pre-existing 500 (`JobCreate` sends `None`, `Job` requires dicts). This was failing the repo's own `test_create_job` before any of this work. Fixed.
+- **Non-deterministic avatars** — `hash()` (randomised per process) replaced with `zlib.crc32`, so an applicant's avatar survives a restart.
+- **Dead `no_gaps_over_months` filter** removed — it was returned in recommendations and never evaluated.
+- **Repo hygiene** — `README.md` rewritten with real setup, run, and matching-behaviour docs; `.env.example` now describes the variables the app actually reads; `backend_test.py` no longer defaults to a dead Emergent preview URL.
+
+## Still open (unchanged, and by design)
+
+- Skill extraction is a keyword dictionary, not an LLM. Resume parsing on the apply page is simulated — the uploaded file is not read. Both are documented in the README; describe them accurately rather than demonstrating them as AI.
+- Onboarding is still client-only and not persisted (PRD P1).
+- TC-02 / TC-19 / TC-22 remain unverified by automation for the reason given above; click through onboarding manually.

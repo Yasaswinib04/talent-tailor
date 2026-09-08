@@ -1,115 +1,113 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, fmtINR, errMessage } from "../lib/api";
-import { Upload, Check, Loader2, ArrowRight, Sparkles, FileText, AlertTriangle } from "lucide-react";
+import { api, fmtINR } from "../lib/api";
+import { Upload, Check, Loader2, ArrowRight, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  phone: "",
+  current_title: "",
+  current_company: "",
+  experience_years: 0,
+  expected_ctc: 0,
+  resume_text: "",
+  skills: [],
+  // Sent through so auto-applied candidates are filterable on the same fields
+  // the role's mandatory criteria screen on.
+  location: "",
+  education: "",
+  notice_period: "",
+};
 
 /**
  * Public apply flow — the "auto-apply" experience.
- * Candidate uploads a resume (text/file, we simulate parsing), form auto-fills,
- * they hit submit. Response shows their match score.
+ * Candidate uploads a resume, the backend reads it and an LLM extracts the
+ * fields, the form auto-fills, they hit submit. Response shows their match score.
  */
 export default function PublicApply() {
   const { slug } = useParams();
   const [job, setJob] = useState(null);
   const [stage, setStage] = useState("upload"); // upload -> scanning -> review -> submitted
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    current_title: "",
-    current_company: "",
-    experience_years: 0,
-    expected_ctc: 0,
-    resume_text: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [result, setResult] = useState(null);
   const [scanText, setScanText] = useState("");
+  const [parseNotice, setParseNotice] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [invalid, setInvalid] = useState({});
-  const [parseError, setParseError] = useState("");
-  const [found, setFound] = useState([]);
 
   useEffect(() => {
     api.get(`/jobs/share/${slug}`).then((r) => setJob(r.data)).catch(() => setJob(false));
   }, [slug]);
 
-  // Real parsing. This used to discard the uploaded file entirely and fill the
-  // form with a hardcoded "Aarav Menon" sample, so an applicant submitted
-  // someone else's name, email and salary while the UI animated claims about
-  // extracting theirs.
-  const parseResume = async (file) => {
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParseNotice(null);
     setStage("scanning");
     setScanText(file.name);
-    setParseError("");
-    setFound([]);
-    const fd = new FormData();
-    fd.append("file", file, file.name);
     try {
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await api.post(`/apply/${slug}/parse-resume`, fd, {
-        headers: { "Content-Type": undefined },
+        headers: { "Content-Type": "multipart/form-data" },
       });
-      const p = res.data.parsed || {};
-      setForm((f) => ({
-        ...f,
-        name: p.name || f.name,
-        email: p.email || f.email,
-        phone: p.phone || f.phone,
-        current_title: p.current_title || f.current_title,
-        current_company: p.current_company || f.current_company,
-        experience_years: p.experience_years || f.experience_years,
-        expected_ctc: p.expected_ctc || f.expected_ctc,
-        resume_text: res.data.resume_text || "",
-      }));
-      setFound(res.data.found || []);
-      setStage("review");
+      const { parsed, fields, message } = res.data;
+      setForm({ ...EMPTY_FORM, ...(fields || {}) });
+      if (!parsed) setParseNotice(message || "We couldn't fully read that file — please fill in the rest.");
     } catch (err) {
-      // Never a dead end: they can always type it in themselves.
-      setParseError(errMessage(err, "We couldn't read that file — please fill in your details below."));
-      setForm((f) => ({ ...f, resume_text: "" }));
-      setStage("review");
+      setForm(EMPTY_FORM);
+      setParseNotice(
+        err?.response?.status === 413
+          ? "That file is over 5 MB — please fill in your details instead."
+          : "We couldn't read that file — please fill in your details below."
+      );
     }
-  };
-
-  const onFile = (e) => {
-    const file = e.target.files?.[0];
-    if (file) parseResume(file);
-  };
-
-  const startManually = () => {
-    setScanText("");
-    setFound([]);
-    setParseError("");
     setStage("review");
   };
 
-  const fieldErrors = () => {
-    const e = {};
-    if (!form.name.trim() || !/[^\W\d_]/u.test(form.name)) e.name = "Please enter your name.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())) e.email = "Please enter a valid email address.";
-    if (form.experience_years < 0 || form.experience_years > 60) e.experience_years = "Enter a number between 0 and 60.";
-    if (form.expected_ctc < 0) e.expected_ctc = "This can't be negative.";
-    return e;
+  // Kept for people without a resume at hand: fills the form with a labelled
+  // sample so the flow can still be walked end-to-end.
+  const onDemoParse = async () => {
+    setParseNotice("This is sample data — replace it with your own details before submitting.");
+    setStage("scanning");
+    setScanText("sample-resume.txt");
+    await new Promise((r) => setTimeout(r, 900));
+    setForm({
+      ...EMPTY_FORM,
+      name: "Aarav Menon",
+      email: "aarav.menon@email.in",
+      phone: "+91 98450 22118",
+      current_title: "Senior Frontend Engineer",
+      current_company: "Razorpay",
+      experience_years: 5.5,
+      expected_ctc: 4000000,
+      location: "Bengaluru",
+      education: "B.Tech, IIT Roorkee",
+      notice_period: "30 days",
+      skills: ["React", "TypeScript", "Next.js", "Design Systems", "Performance Optimization"],
+      resume_text:
+        "Senior Frontend Engineer at Razorpay. 5.5 years of production React, TypeScript, Next.js. Built the design system used across all consumer surfaces. Previously at Freshworks working on performance optimization. B.Tech from IIT Roorkee.",
+    });
+    setStage("review");
   };
 
   const submit = async () => {
-    if (submitting) return;
-    const errs = fieldErrors();
-    setInvalid(errs);
-    if (Object.keys(errs).length) {
-      setSubmitError("Please fix the highlighted fields before submitting.");
-      return;
-    }
+    setSubmitError(null);
     setSubmitting(true);
-    setSubmitError("");
     try {
       const res = await api.post(`/apply/${slug}`, form);
       setResult(res.data);
       setStage("submitted");
-    } catch (err) {
-      // Keep them on the review step with their details intact so they can retry.
-      setSubmitError(errMessage(err, "We couldn't submit your application. Nothing was lost — try again."));
+    } catch (e) {
+      // FastAPI returns 422 with per-field messages; surface the first one plainly.
+      const detail = e?.response?.data?.detail;
+      setSubmitError(
+        Array.isArray(detail)
+          ? detail[0]?.msg?.replace(/^Value error, /, "") || "Please check your details."
+          : "Couldn't submit your application. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -117,28 +115,28 @@ export default function PublicApply() {
 
   if (job === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-app text-white/60">
+      <div className="min-h-screen flex items-center justify-center bg-app text-white/78">
         This job link is no longer active.
       </div>
     );
   }
-  if (!job) return <div className="min-h-screen flex items-center justify-center text-white/40">Loading…</div>;
+  if (!job) return <div className="min-h-screen flex items-center justify-center text-white/65">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-app text-white">
       {/* Header */}
       <div className="border-b hairline">
-        <div className="max-w-4xl mx-auto px-5 md:px-8 py-5 flex items-center justify-between gap-3">
-          <Link to="/" className="font-editorial text-xl">cred<span className="text-brand">.</span>hr</Link>
+        <div className="max-w-4xl mx-auto px-8 py-5 flex items-center justify-between">
+          <Link to="/" className="font-editorial text-xl">talent<span className="text-brand">.</span>tailor</Link>
           <div className="font-mono-label">apply · in 30 seconds</div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-5 md:px-8 py-8 md:py-12">
+      <div className="max-w-4xl mx-auto px-8 py-12">
         {/* Job header */}
         <div className="mb-10">
           <div className="font-mono-label mb-3">{job.department} · {job.location}</div>
-          <h1 className="font-editorial text-3xl sm:text-5xl md:text-6xl leading-[1.05] sm:leading-[0.95] mb-4">{job.title}</h1>
+          <h1 className="font-editorial text-5xl md:text-6xl leading-[0.95] mb-4">{job.title}</h1>
           <div className="flex items-baseline gap-4">
             <span className="font-editorial text-2xl text-brand">{fmtINR(job.salary_min)} – {fmtINR(job.salary_max)}</span>
             <span className="font-mono-label">per annum</span>
@@ -151,10 +149,10 @@ export default function PublicApply() {
         {/* Flow */}
         <AnimatePresence mode="wait">
           {stage === "upload" && (
-            <motion.div key="u" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="border-2 border-dashed hairline p-6 md:p-12 text-center bg-surface/30 hover:border-brand/50 transition-colors">
+            <motion.div key="u" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="border-2 border-dashed hairline p-12 text-center bg-surface/30 hover:border-brand/50 transition-colors">
               <Upload size={28} className="text-brand mx-auto mb-4" />
               <h2 className="font-display text-2xl font-medium mb-2">Drop your resume — we do the rest</h2>
-              <p className="text-white/50 text-sm mb-6 max-w-sm mx-auto">
+              <p className="text-white/72 text-sm mb-6 max-w-sm mx-auto">
                 No forms. No typing your job history twice. Upload once, we extract everything.
               </p>
               <label className="inline-block cursor-pointer">
@@ -165,14 +163,14 @@ export default function PublicApply() {
                   className="hidden"
                   data-testid="pa-file-input"
                 />
-                <span className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 transition-colors">
+                <span className="btn btn-light">
                   <Upload size={14} /> Upload resume
                 </span>
               </label>
-              <div className="mt-6 text-[11px] text-white/40">
+              <div className="mt-6 text-[11px] text-white/65">
                 or{" "}
-                <button onClick={startManually} data-testid="pa-manual-btn" className="text-brand hover:text-white underline underline-offset-2">
-                  fill the form in yourself
+                <button onClick={onDemoParse} data-testid="pa-demo-btn" className="text-brand hover:text-white underline underline-offset-2">
+                  try with a demo resume
                 </button>
               </div>
             </motion.div>
@@ -190,16 +188,16 @@ export default function PublicApply() {
                 <Loader2 size={16} className="animate-spin text-brand ml-auto" />
               </div>
               <div className="space-y-2">
-                {["Reading the file", "Finding your contact details", "Picking out your experience"].map((label, i) => (
+                {["Name and contact", "Current title & company", "Years of experience", "Skills & expertise", "Education"].map((s, i) => (
                   <motion.div
-                    key={label}
+                    key={s}
                     initial={{ opacity: 0, x: -6 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 * i }}
+                    transition={{ delay: 0.15 * i }}
                     className="flex items-center gap-3 text-xs text-white/70"
                   >
-                    <Loader2 size={12} className="animate-spin text-brand" />
-                    <span>{label}…</span>
+                    <Check size={12} className="text-success" />
+                    <span>Extracting {s.toLowerCase()}</span>
                   </motion.div>
                 ))}
               </div>
@@ -207,53 +205,54 @@ export default function PublicApply() {
           )}
 
           {stage === "review" && (
-            <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-5 md:p-8 bg-surface/30">
-              <div className="mb-6">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="text-brand" />
-                  <div className="font-mono-label">
-                    {found.length > 0 ? `read ${found.length} field${found.length > 1 ? "s" : ""} from your resume · check and submit` : "your details · check and submit"}
+            <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="border hairline p-8 bg-surface/30">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles size={14} className="text-brand" />
+                <div className="font-mono-label">auto-filled from your resume · confirm and submit</div>
+              </div>
+              {parseNotice && (
+                <div data-testid="pa-parse-notice" className="mb-6 border border-gold/40 bg-gold/5 px-4 py-3 text-sm text-white/80">
+                  {parseNotice}
+                </div>
+              )}
+              {form.skills?.length > 0 && (
+                <div className="mb-6">
+                  <div className="font-mono-label mb-2">skills we found</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {form.skills.map((s) => (
+                      <span key={s} className="text-[11px] font-mono border border-brand/30 bg-brand/5 text-brand px-2 py-0.5">{s}</span>
+                    ))}
                   </div>
                 </div>
-                {parseError && (
-                  <div className="mt-3 border border-amber-400/40 bg-amber-400/5 px-3 py-2 flex items-start gap-2" data-testid="pa-parse-error">
-                    <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
-                    <span className="text-[11px] text-white/80">{parseError}</span>
-                  </div>
-                )}
-                {found.length > 0 && (
-                  <div className="mt-2 text-[11px] text-white/40" data-testid="pa-found-summary">
-                    Please check everything below — anything we couldn't find is blank.
-                  </div>
-                )}
-              </div>
-              <div className="grid sm:grid-cols-2 gap-5 md:gap-6">
-                <FieldPA label="Full name" value={form.name} error={invalid.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
-                <FieldPA label="Email" value={form.email} error={invalid.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />
+              )}
+              <div className="grid md:grid-cols-2 gap-6">
+                <FieldPA label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testid="pa-name" />
+                <FieldPA label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} testid="pa-email" />
                 <FieldPA label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} testid="pa-phone" />
                 <FieldPA label="Current title" value={form.current_title} onChange={(v) => setForm({ ...form, current_title: v })} testid="pa-title" />
                 <FieldPA label="Current company" value={form.current_company} onChange={(v) => setForm({ ...form, current_company: v })} testid="pa-company" />
-                <FieldPA label="Experience (years)" value={form.experience_years} error={invalid.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
-                <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} error={invalid.expected_ctc} onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} type="number" testid="pa-ctc" />
+                <FieldPA label="Experience (years)" value={form.experience_years} type="number" onChange={(v) => setForm({ ...form, experience_years: Number(v) })} testid="pa-exp" />
+                <FieldPA label="Expected CTC (INR)" value={form.expected_ctc} type="number" onChange={(v) => setForm({ ...form, expected_ctc: Number(v) })} testid="pa-ctc" />
+                <FieldPA label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} testid="pa-location" />
+                <FieldPA label="Highest qualification" value={form.education} onChange={(v) => setForm({ ...form, education: v })} testid="pa-education" />
+                <FieldPA label="Notice period" value={form.notice_period} onChange={(v) => setForm({ ...form, notice_period: v })} testid="pa-notice" />
               </div>
               {submitError && (
-                <div className="mt-6 border border-danger/50 bg-danger/10 px-4 py-3 flex items-start gap-2" data-testid="pa-submit-error">
-                  <AlertTriangle size={13} className="text-danger mt-0.5 shrink-0" />
-                  <span className="text-xs text-white/80">{submitError}</span>
+                <div data-testid="pa-submit-error" className="mt-6 border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+                  {submitError}
                 </div>
               )}
-              <div className="mt-8 flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 sm:justify-between">
-                <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/50 hover:text-white transition-colors">
+              <div className="mt-8 flex items-center justify-between">
+                <button onClick={() => setStage("upload")} data-testid="pa-back-btn" className="text-sm text-white/72 hover:text-white transition-colors">
                   ← Upload a different resume
                 </button>
                 <button
                   onClick={submit}
                   disabled={submitting}
                   data-testid="pa-submit-btn"
-                  className="bg-white text-black px-6 py-3 text-sm hover:bg-gray-200 inline-flex items-center gap-2 transition-colors disabled:opacity-50"
+                  className="btn btn-light disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</>
-                    : <>Submit application <ArrowRight size={14} /></>}
+                  {submitting ? "Submitting…" : "Submit application"} <ArrowRight size={14} />
                 </button>
               </div>
             </motion.div>
@@ -264,15 +263,13 @@ export default function PublicApply() {
               <div className="w-14 h-14 border border-brand rounded-full mx-auto flex items-center justify-center mb-6">
                 <Check size={22} className="text-brand" />
               </div>
-              <h2 className="font-editorial text-4xl mb-3">
-                {result.duplicate ? "Updated." : "Applied."}
-              </h2>
-              <p className="text-white/60 max-w-md mx-auto mb-8" data-testid="pa-result-message">
-                {result.message || "Our team will review your profile. Your match score for this role is:"}
+              <h2 className="font-editorial text-4xl mb-3">Applied.</h2>
+              <p className="text-white/78 max-w-md mx-auto mb-8">
+                Our team will review your profile. Your match score for this role is:
               </p>
-              <div className="font-editorial text-6xl md:text-8xl text-brand mb-2">{result.match_score}</div>
+              <div className="font-editorial text-8xl text-brand mb-2">{result.match_score}</div>
               <div className="font-mono-label">match / 100</div>
-              <div className="mt-10 text-xs text-white/40">You may safely close this tab.</div>
+              <div className="mt-10 text-xs text-white/65">You may safely close this tab.</div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -281,7 +278,7 @@ export default function PublicApply() {
   );
 }
 
-function FieldPA({ label, value, onChange, testid, type = "text", error }) {
+function FieldPA({ label, value, onChange, testid, type = "text" }) {
   return (
     <label className="block">
       <div className="font-mono-label mb-1.5">{label}</div>
@@ -290,16 +287,8 @@ function FieldPA({ label, value, onChange, testid, type = "text", error }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         data-testid={testid}
-        aria-invalid={error ? "true" : undefined}
-        className={`w-full bg-transparent border-b pb-2 text-lg outline-none transition-colors ${
-          error ? "border-danger focus:border-danger" : "hairline focus:border-white"
-        }`}
+        className="w-full bg-transparent border-b hairline pb-2 text-lg focus:border-white outline-none"
       />
-      {error && (
-        <div className="mt-1.5 text-[11px] text-danger" data-testid={`${testid}-error`}>
-          {error}
-        </div>
-      )}
     </label>
   );
 }

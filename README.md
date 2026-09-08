@@ -1,129 +1,111 @@
-# CRED HR — Talent Engine
+# Talent Tailor
 
-A redesigned candidate evaluation platform for recruiters hiring at volume.
-React + Tailwind frontend, FastAPI + MongoDB backend.
+An HR candidate-shortlisting app: describe a role, get LLM skill extraction and recommended
+criteria, see how many of your pool clears the bar before you publish, and receive applicants
+through a shareable auto-apply link — their resumes are read and parsed by an LLM. Each
+account is an isolated workspace; every role shows its top 3 ranked candidates free and
+unlocks the full shortlist + CSV export per role (₹1,999 by default).
 
-- **UX report** — `/`
-- **Recruiter app** — `/app` (dashboard, job setup, candidate profiles, bulk resume upload)
-- **Public apply link** — `/apply/:slug`
+- **Frontend** — React 18 (CRA) + Tailwind + Framer Motion + Radix UI
+- **Backend** — FastAPI + MongoDB (motor)
+- **Product context** — `memory/PRD.md`
+- **QA** — test plan and latest report in `specs/`
+- **Deploy** — [DEPLOY.md](DEPLOY.md) (free: Render + MongoDB Atlas)
 
-## Run locally
+## Prerequisites
 
-**Prerequisites:** Node.js 18+, Python 3.11+, a MongoDB instance.
+- Node.js 18+
+- Python 3.11+
+- MongoDB running locally, or a MongoDB Atlas connection string
+
+<details>
+<summary>Installing MongoDB locally on macOS</summary>
 
 ```bash
-cp .env.example .env          # fill in MONGO_URL and DB_NAME
+brew tap mongodb/brew && brew trust mongodb/brew && brew install mongodb-community@8.0
+```
 
-# Backend — http://localhost:8001
-pip install -r backend/requirements.txt
-uvicorn server:app --app-dir backend --port 8001 --reload
+`brew services start` can fail with a launchctl bootstrap error. Running it directly works:
 
-# Frontend — http://localhost:3000
+```bash
+mkdir -p ~/data/mongo-talent-tailor && mongod --dbpath ~/data/mongo-talent-tailor
+```
+</details>
+
+## Configure
+
+Copy the two blocks in [.env.example](.env.example) into `backend/.env` and `frontend/.env`.
+Neither file is committed, and **both are required** — the backend reads `MONGO_URL` and
+`DB_NAME` at import time and will not start without them.
+
+`REACT_APP_BACKEND_URL` is the one to get right. CRA inlines it at *build* time, so an
+unset value produces a bundle that calls `undefined/api` — it compiles clean and fails
+only once deployed. `npm run build` therefore refuses to run without it
+([scripts/check-env.js](frontend/scripts/check-env.js)); pass it on the command line, or
+put it in an uncommitted `frontend/.env.development` for `npm start`:
+
+```bash
+REACT_APP_BACKEND_URL=https://your-api.example.com npm run build
+```
+
+There is deliberately no committed default: one would let a deploy that forgot the
+variable build successfully with `localhost` baked in, which fails more quietly than
+not building at all.
+
+## Run
+
+Backend (port 8000):
+
+```bash
+cd backend && python3 -m venv venv && venv/bin/pip install -r requirements.txt && venv/bin/uvicorn server:app --port 8000
+```
+
+Frontend (port 3000):
+
+```bash
 cd frontend && npm install && npm start
 ```
 
-## Configuration
+Open http://localhost:3000 and create an account. An empty workspace offers a one-click
+"Explore with sample data" (4 roles, 20 fictional candidates). Set `SEED_DEMO_DATA="1"` to
+also seed a shared demo workspace on first start against an empty database.
 
-Every variable the code reads is documented in [`.env.example`](.env.example).
-There are four:
+## Routes
 
-| Variable | Where | Notes |
-|---|---|---|
-| `MONGO_URL` | backend, runtime | Required. The API refuses to start without it. |
-| `DB_NAME` | backend, runtime | Required. Seed data is inserted on first startup if the database is empty. |
-| `CORS_ORIGINS` | backend, runtime | Comma-separated allowed origins. **Required** when the app and API are on different origins — see below. |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | backend, runtime | Used once on first startup to create the first admin. No default password; without these, nobody can sign in. |
-| `COOKIE_SECURE` | backend, runtime | Set to `true` on HTTPS. Marks the session cookie `Secure` + `SameSite=None`. |
-| `SEED_DEMO_DATA` | backend, runtime | `true` inserts 4 sample roles and 20 fabricated candidates on first boot. **Leave unset in production.** |
-| `REACT_APP_BACKEND_URL` | frontend, **build time** | Backend origin, no trailing slash, no `/api` suffix. |
+| Path | What it is |
+|---|---|
+| `/` | Landing page (design case study at `/report`) |
+| `/login`, `/signup` | Account sign-in / workspace creation |
+| `/onboarding` | 3-step setup |
+| `/app` | Candidate dashboard (keyboard: `J` `K` `↵` `N` `X`) |
+| `/app/jobs/new` | Role setup with live extraction |
+| `/app/candidates/:id` | Candidate profile, multi-role assignment |
+| `/apply/:slug` | Public application link |
+| `/themes` | Theme explorations |
 
-### The one that bites
+## How matching works
 
-`REACT_APP_BACKEND_URL` is inlined into the JavaScript bundle by Create React
-App during `npm run build`. It is **not** read at runtime — setting it on a
-running server does nothing, and an unset value becomes the literal string
-`"undefined"`, producing a bundle that calls `undefined/api/...` on every
-request. It builds clean and fails only once deployed.
+Two separate mechanisms, deliberately:
 
-`npm run build` now refuses to proceed if it is missing or malformed. Set it in
-`frontend/.env.production` (committed — it's a public URL, not a secret) or
-export it in your build step, and rebuild whenever it changes.
+- **Mandatory criteria** are a hard filter. Publishing a role runs them across the pool and
+  attaches everyone who clears them — the "N will pass" preview and the resulting shortlist
+  use the same code path, so they cannot disagree. Missing data never rejects a candidate;
+  an unknown value surfaces them for the recruiter to judge.
+- **Scoring weights** rank the people who got through, per role. Each of the five dimensions
+  is scored 0–100 independently and combined by the weights you set, so moving a slider
+  genuinely reorders the list. Education is a floor: a master's satisfies a bachelor's
+  requirement.
 
-## Authentication
+Skill extraction (from JDs) and resume parsing (on the apply page — the uploaded PDF/DOCX is
+read and its text extracted) run through an LLM via OpenRouter (`backend/llm.py`, model set by
+`OPENROUTER_MODEL`). Without an `OPENROUTER_API_KEY`, both fall back to the keyword dictionary
+(`SKILL_DICTIONARY` in `backend/server.py`) so an outage degrades quality, never availability.
+Scanned-image PDFs aren't OCR'd — the applicant is asked to fill the form manually.
 
-The recruiter console requires a sign-in. Sessions are opaque server-side
-tokens delivered in an `httpOnly` cookie — page JavaScript cannot read them, and
-signing out or revoking a session takes effect immediately. Passwords are bcrypt
-hashed, and repeated failed sign-ins are throttled per IP and email.
+## Monetization
 
-Three endpoints stay public by design: `/api/health`, `/api/jobs/share/{slug}`
-and `/api/apply/{slug}` — candidates applying through a share link do not have
-accounts. Everything else returns 401 without a session.
-
-**Bootstrapping the first account:** set `ADMIN_EMAIL` and `ADMIN_PASSWORD`
-(12+ characters) before first startup. There is deliberately no default
-password. Once you can sign in, add colleagues from the app and you can drop
-those variables. Admins can create accounts; recruiters cannot.
-
-### CORS and cookies
-
-Because the session is a cookie, browsers only send it cross-origin when the
-API names an **exact** origin. With `CORS_ORIGINS="*"`, sign-in fails with what
-looks like a network error. Set it to your frontend's origin:
-
-```
-CORS_ORIGINS=https://hr.example.com
-```
-
-Leave it as `*` only when the app and API are served from the same origin behind
-one proxy. The API prints a warning at startup if it is a wildcard.
-
-## Deploying
-
-```bash
-# 1. Backend
-pip install -r backend/requirements.txt
-MONGO_URL=... DB_NAME=... \
-CORS_ORIGINS=https://hr.your-domain.example.com \
-COOKIE_SECURE=true \
-ADMIN_EMAIL=you@company.com ADMIN_PASSWORD='a long passphrase here' \
-  uvicorn server:app --app-dir backend --host 0.0.0.0 --port 8001
-
-# 2. Frontend — build with the backend URL, then serve frontend/build statically
-cd frontend
-REACT_APP_BACKEND_URL=https://api.your-domain.example.com npm run build
-```
-
-Serve `frontend/build` with SPA fallback (all unmatched paths → `index.html`),
-otherwise deep links like `/app/jobs/:id` and `/apply/:slug` 404 at the CDN.
-
-**Before you deploy**, confirm the bundle got the URL:
-
-```bash
-grep -o 'baseURL[^,]*' frontend/build/static/js/main.*.js   # must not contain "undefined"
-```
-
-## Tests
-
-```bash
-pip install -r backend/requirements.txt -r backend/tests/requirements.txt
-pytest backend/tests                    # 173 tests; integration ones skip without a server
-TEST_API_URL=http://localhost:8001 pytest backend/tests   # includes integration tests
-```
-
-- `test_auth.py`, `test_bulk_upload.py`, `test_p0_fixes.py`,
-  `test_pipeline_integrity.py`, `test_no_mocks.py` and `test_skills.py` run
-  fully locally
-  against an in-memory Mongo — no server needed. `test_auth.py` walks the app's
-  own route table, so a new endpoint added without a guard fails the build.
-- `backend_test.py` is an integration suite; point it at a running API with
-  `TEST_API_URL`.
-
-## Known issues
-
-A full UAT was run on 2026-08-08. See
-[`specs/uat-report-2026-08-08.md`](specs/uat-report-2026-08-08.md) for findings
-and [`specs/launch-fix-plan.md`](specs/launch-fix-plan.md) for what is fixed and
-what remains. All P0s and P1s are closed, everything previously mocked or
-decorative now works for real, and the app is responsive down to 375px — see
-the fix plan. No known non-working features remain.
+The shortlist is free to see, paid to use: every role reveals its top 3 candidates in full;
+the rest are ranked but identity-redacted (server-side) until the role is unlocked. Unlocking
+(₹`UNLOCK_PRICE_INR`, default 1999, one-time per role) reveals everyone and enables CSV
+export. Payment is currently manual: the buyer pays you directly, you share the `UNLOCK_CODE`,
+they enter it on the job page — swap that check for a Razorpay webhook to go fully self-serve.

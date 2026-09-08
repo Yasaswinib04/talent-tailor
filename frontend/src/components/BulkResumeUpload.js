@@ -78,10 +78,10 @@ export default function BulkResumeUpload({ jobId, jobTitle, onComplete }) {
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f, f.name));
-      const res = await api.post(`/jobs/${jobId}/bulk-upload`, fd, {
+      const res = await api.post(`/jobs/${jobId}/upload-resumes`, fd, {
         // Let the browser set multipart boundaries; the shared instance
         // otherwise forces application/json.
-        headers: { "Content-Type": undefined },
+        headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => {
           if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
         },
@@ -258,27 +258,28 @@ export default function BulkResumeUpload({ jobId, jobTitle, onComplete }) {
             <div className="flex items-center justify-between px-4 py-3 border-b hairline">
               <div className="font-mono-label">upload results</div>
               <div className="flex items-center gap-3 text-[11px] font-mono">
-                <span className="text-success">{summary.created} added</span>
-                {summary.duplicates > 0 && <span className="text-white/50">{summary.duplicates} duplicate</span>}
-                {summary.failed > 0 && <span className="text-amber-400">{summary.failed} skipped</span>}
+                <span className="text-success">{summary.ranked} ranked</span>
+                {summary.failed?.length > 0 && <span className="text-amber-400">{summary.failed.length} skipped</span>}
               </div>
             </div>
             <div className="divide-y divide-white/5 max-h-72 overflow-auto">
               {summary.results.map((r, i) => (
                 <div key={r.filename + i} className="flex items-start gap-3 px-4 py-2.5" data-testid={`bulk-result-${i}`}>
                   <span className="mt-0.5 shrink-0">
-                    {r.status === "created" ? <Check size={12} className="text-success" />
-                      : r.status === "duplicate" ? <Users size={12} className="text-white/40" />
+                    {r.ok
+                      ? <Check size={12} className={r.needs_review ? "text-amber-400" : "text-success"} />
                       : <AlertTriangle size={12} className="text-amber-400" />}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs truncate">
+                    <div className="text-xs truncate" data-private>
                       {r.name || r.filename}
-                      {r.email && <span className="text-white/40 ml-2">{r.email}</span>}
                     </div>
                     <div className="text-[10px] text-white/40 truncate">
-                      {r.reason || r.filename}
-                      {r.skills?.length > 0 && ` · ${r.skills.slice(0, 4).join(", ")}`}
+                      {r.ok
+                        ? r.needs_review
+                          ? `${r.filename} · couldn't read the details — open and check`
+                          : r.filename
+                        : r.error || r.filename}
                     </div>
                   </div>
                   {typeof r.match_score === "number" && (

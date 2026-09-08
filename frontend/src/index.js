@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ConfigError from "./components/ConfigError";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { CONFIG_ERROR } from "./lib/api";
 import "./index.css";
 
@@ -12,8 +13,10 @@ root.render(
   CONFIG_ERROR ? (
     <ConfigError message={CONFIG_ERROR} />
   ) : (
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 );

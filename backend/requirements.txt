@@ -4,8 +4,17 @@ pydantic==2.10.4
 python-dotenv==1.0.1
 motor==3.6.0
 pymongo==4.9.2
-python-multipart==0.0.20
+# Required to resolve MongoDB Atlas "mongodb+srv://" URLs. pymongo does not pull
+# this in on its own, and the failure only shows up in prod: the app starts, then
+# every request hangs on DNS. Local "mongodb://localhost" never needs it.
+dnspython==2.7.0
+# CA bundle for the TLS handshake with Atlas.
+certifi==2024.12.14
+# LLM extraction calls to OpenRouter.
+httpx==0.28.1
+# Resume file → text. Pure-python on purpose: native deps are a build risk on
+# free-tier hosts.
 pypdf==5.1.0
 python-docx==1.1.2
-bcrypt==4.2.1
-email-validator==2.2.0
+# FastAPI needs this for UploadFile (multipart form parsing).
+python-multipart==0.0.20
