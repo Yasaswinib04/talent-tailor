@@ -24,13 +24,6 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 IS_LOCAL = any(h in BASE_URL for h in ("127.0.0.1", "localhost"))
 
-# Mirrors FREE_REVEAL in server.py: the top N of a locked role are shown in full.
-FREE_REVEAL = int(os.environ.get("FREE_REVEAL", "3"))
-
-# Fields _redact() strips. If a response carries any of these for a locked
-# candidate, the paywall has a hole in it.
-IDENTITY_FIELDS = ("email", "phone")
-
 
 def _credentials(suffix: str = ""):
     """Test-account credentials. Explicit env vars against a remote host, so a
@@ -121,19 +114,6 @@ def candidates(client):
     return r.json()
 
 
-@pytest.fixture(scope="session")
-def locked_role(client, jobs):
-    """A locked role holding more than FREE_REVEAL candidates, plus its ranked
-    list — the setup every paywall test needs."""
-    for j in sorted(jobs, key=lambda j: j.get("candidates_count", 0), reverse=True):
-        if j.get("unlocked"):
-            continue
-        r = client.get(f"{BASE_URL}/api/candidates", params={"job_id": j["id"]})
-        assert r.status_code == 200
-        ranked = r.json()
-        if len(ranked) > FREE_REVEAL:
-            return j, ranked
-    pytest.skip(f"no locked role with more than {FREE_REVEAL} candidates in this workspace")
 
 
 # ---------- Health ----------
@@ -257,72 +237,53 @@ def test_candidates_filter_by_job(client, jobs):
 
 
 # ---------- Paywall ----------
-# The business model in test form: ranking stays visible, identity doesn't,
-# and no endpoint hands back what the list page redacts.
-def test_locked_role_reveals_only_the_top_three(locked_role):
-    _, ranked = locked_role
-    for c in ranked[:FREE_REVEAL]:
-        assert not c.get("locked"), "a free-tier candidate came back redacted"
-        assert c["email"], "a revealed candidate has no contact details"
-    for c in ranked[FREE_REVEAL:]:
-        assert c.get("locked") is True, f"candidate {c['id']} past the free tier is not redacted"
-        for f in IDENTITY_FIELDS:
-            assert not c.get(f), f"locked candidate leaks {f}"
-
-
-def test_locked_candidate_stays_locked_on_direct_fetch(client, locked_role):
-    _, ranked = locked_role
-    locked = ranked[-1]
-    r = client.get(f"{BASE_URL}/api/candidates/{locked['id']}")
+# Redaction itself is pinned in tests/test_paywall.py, not here. Observing it
+# needs a workspace whose plan has EXPIRED, and every workspace this file can
+# create over HTTP has a live 14-day trial — there is deliberately no endpoint
+# that revokes access. What a live server can prove is that the entitlement is
+# reported, that the paid artifact is gated on it, and that the retired
+# per-role unlock path is really gone.
+def test_billing_config_reports_the_entitlement(client):
+    r = client.get(f"{BASE_URL}/api/billing/config")
     assert r.status_code == 200
-    c = r.json()
-    assert c.get("locked") is True
-    for f in IDENTITY_FIELDS:
-        assert not c.get(f), f"direct fetch leaks {f}"
+    cfg = r.json()
+    assert "has_access" in cfg, "the client cannot tell whether this workspace is paid"
+    assert isinstance(cfg.get("price_inr"), int), "the frontend must never hardcode a price"
+    for secret in ("razorpay_key_secret", "unlock_code"):
+        assert secret not in cfg, f"/billing/config leaked {secret}"
 
 
-def test_writes_do_not_leak_a_locked_identity(client, locked_role, jobs):
-    """The regression this file exists for.
-
-    PATCH, stage change and role assignment all return the candidate they just
-    wrote. Before this was fixed they returned it raw — so anyone could read a
-    paywalled name, email and phone by rating the candidate one star. Cheaper
-    than paying, and it needed no exploit, just the ordinary buttons.
-    """
-    job, ranked = locked_role
-    locked = ranked[-1]
-    cid = locked["id"]
-
-    responses = {
-        "PATCH /candidates/{id}": client.patch(f"{BASE_URL}/api/candidates/{cid}", json={"rating": 1}),
-        "POST /candidates/{id}/stage": client.post(f"{BASE_URL}/api/candidates/{cid}/stage", json={"stage": "Interview"}),
-        "POST /candidates/{id}/assign-roles": client.post(
-            f"{BASE_URL}/api/candidates/{cid}/assign-roles", json={"role_ids": [job["id"]]}
-        ),
-    }
-    for label, r in responses.items():
-        assert r.status_code == 200, f"{label} failed: {r.status_code} {r.text}"
-        c = r.json()
-        assert c.get("locked") is True, f"{label} returned an unredacted candidate"
-        for f in IDENTITY_FIELDS:
-            assert not c.get(f), f"{label} leaks {f} for a locked candidate"
-
-    # restore
-    client.post(f"{BASE_URL}/api/candidates/{cid}/stage", json={"stage": locked["stage"]})
-    client.post(f"{BASE_URL}/api/candidates/{cid}/assign-roles", json={"role_ids": locked["role_ids"]})
+def test_there_is_only_one_paywall_path(client, jobs):
+    """`07954d1` replaced the per-role unlock with workspace-wide access. Two
+    disagreeing entitlement paths is the bug that showed the same person a full
+    name on one screen and "Candidate #7" on another — so the old route must be
+    gone, not merely unused."""
+    if not jobs:
+        pytest.skip("no roles in this workspace")
+    r = client.post(f"{BASE_URL}/api/jobs/{jobs[0]['id']}/unlock", json={"code": "anything"})
+    assert r.status_code == 404, (
+        f"the per-role unlock route still answers ({r.status_code}) — that is a second paywall path"
+    )
 
 
-def test_export_is_paid(client, locked_role):
-    job, _ = locked_role
-    r = client.get(f"{BASE_URL}/api/jobs/{job['id']}/export")
-    assert r.status_code == 402, "CSV export is the paid artifact — it must refuse while locked"
+def test_redeeming_a_wrong_code_never_grants_access(client):
+    r = client.post(f"{BASE_URL}/api/billing/redeem", json={"code": "definitely-not-the-code"})
+    # 403 wrong code, 503 redeeming not configured, 409 this workspace already
+    # redeemed the real one. Never 200.
+    assert r.status_code in (403, 503, 409), f"a wrong code returned {r.status_code}"
 
 
-def test_unlock_rejects_a_wrong_code(client, locked_role):
-    job, _ = locked_role
-    r = client.post(f"{BASE_URL}/api/jobs/{job['id']}/unlock", json={"code": "definitely-not-the-code"})
-    # 403 when unlocking is configured, 503 when UNLOCK_CODE is unset. Never 200.
-    assert r.status_code in (403, 503), f"a wrong unlock code returned {r.status_code}"
+def test_export_tracks_the_entitlement(client, jobs):
+    """Export is the paid artifact. It must agree with /billing/config rather
+    than making its own decision — a second opinion here is a second paywall."""
+    if not jobs:
+        pytest.skip("no roles in this workspace")
+    has_access = client.get(f"{BASE_URL}/api/billing/config").json().get("has_access")
+    r = client.get(f"{BASE_URL}/api/jobs/{jobs[0]['id']}/export")
+    if has_access:
+        assert r.status_code == 200, "a paid workspace was refused its own export"
+    else:
+        assert r.status_code == 402, "a lapsed workspace exported the paid artifact"
 
 
 # ---------- Extract Skills ----------
