@@ -563,6 +563,14 @@ async def create_job(payload: JobCreate, user: dict = Depends(current_user)):
     # Drop unset optionals so Job's own defaults apply — filters and scoring_weights
     # arrive as None when omitted, which its dict fields reject.
     job = Job(**{k: v for k, v in payload.model_dump().items() if v is not None}, owner_id=user["id"])
+    # A role with no skills scores every candidate identically — the skill
+    # component falls back to the neutral score for everyone — so the shortlist
+    # looks ranked while carrying no signal at all. The wizard extracts skills
+    # before publishing, but nothing else does, so derive them here when a JD
+    # was given and no skills came with it.
+    if not job.skills and (job.jd or "").strip():
+        job.skills = [{"name": s["name"], "weight": s["weight"]}
+                      for s in skills_lib.extract_skills(job.jd)]
     doc = job.model_dump()
     await db.jobs.insert_one(doc)  # mutates doc, adding a non-serialisable _id
     # Publishing a role runs its filters over the pool and attaches everyone who
