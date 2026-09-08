@@ -3,6 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx, getUser } from "../lib/api";
 import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload, Loader2 } from "lucide-react";
 
+// SUPPORT_CONTACT is operator-configured and may be an email or a phone number.
+// Phone numbers open WhatsApp — wa.me needs digits only, country code included,
+// and works with a personal account (Business is not required).
+const contactHref = (contact) => {
+  if (contact.includes("@")) return `mailto:${contact}`;
+  const digits = contact.replace(/\D/g, "");
+  return `https://wa.me/${digits}`;
+};
+
 export default function JobDetail() {
   const { jobId } = useParams();
   const nav = useNavigate();
@@ -45,7 +54,7 @@ export default function JobDetail() {
         const res = await api.get("/billing/config");
         setBilling(res.data);
       } catch {
-        setBilling({ price_inr: 1999, razorpay: false, upi_vpa: null, unlock_code_enabled: true });
+        setBilling({ price_inr: 1999, razorpay: false, upi_vpa: null, support_contact: null, unlock_code_enabled: true });
       }
     }
   };
@@ -423,8 +432,24 @@ export default function JobDetail() {
                 <div className="font-mono-label mb-2">pay via upi</div>
                 Pay ₹{(billing?.price_inr ?? 1999).toLocaleString("en-IN")} to{" "}
                 <span className="text-brand font-mono">{billing.upi_vpa}</span>
-                {billing.upi_payee ? ` (${billing.upi_payee})` : ""}, then WhatsApp the payment screenshot
-                with this role's name — you'll get your unlock code within minutes.
+                {billing.upi_payee ? ` (${billing.upi_payee})` : ""}
+                {billing.support_contact ? (
+                  <>
+                    , then send the payment screenshot with this role's name to{" "}
+                    <a
+                      href={contactHref(billing.support_contact)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand underline underline-offset-2"
+                      data-testid="unlock-support-contact"
+                    >
+                      {billing.support_contact}
+                    </a>{" "}
+                    — you'll get your unlock code within minutes.
+                  </>
+                ) : (
+                  ". Once it's through, you'll get your unlock code within minutes."
+                )}
                 <a
                   href={`upi://pay?pa=${encodeURIComponent(billing.upi_vpa)}&pn=${encodeURIComponent(billing.upi_payee || "Talent Tailor")}&am=${billing?.price_inr ?? 1999}&cu=INR&tn=${encodeURIComponent("Shortlist unlock - " + job.title)}`}
                   className="block mt-3 text-brand underline underline-offset-2"
@@ -436,8 +461,20 @@ export default function JobDetail() {
 
             {!billing?.razorpay && !billing?.upi_vpa && (
               <div className="border hairline bg-app p-4 text-sm text-white/78 mb-4 leading-relaxed">
-                To pay: contact the Talent Tailor team with this role's name. You'll get a
-                payment link and an unlock code within minutes.
+                To pay: contact{" "}
+                {billing?.support_contact ? (
+                  <a
+                    href={contactHref(billing.support_contact)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand underline underline-offset-2"
+                  >
+                    {billing.support_contact}
+                  </a>
+                ) : (
+                  "the Talent Tailor team"
+                )}{" "}
+                with this role's name. You'll get a payment link and an unlock code within minutes.
               </div>
             )}
 

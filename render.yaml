@@ -55,6 +55,10 @@ services:
       # UPI fallback shown in the unlock modal when Razorpay keys are unset.
       - key: UPI_VPA
         sync: false
+      # Where buyers send payment proof — email or a phone number (wa.me link).
+      # Public to every buyer. Unset is fine; the modal adapts.
+      - key: SUPPORT_CONTACT
+        sync: false
       # Lock CORS to the web service's origin once both URLs are known,
       # e.g. https://talent-tailor-web.onrender.com
       - key: CORS_ORIGINS

@@ -49,6 +49,12 @@ RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
 UPI_VPA = os.environ.get("UPI_VPA", "")
 UPI_PAYEE_NAME = os.environ.get("UPI_PAYEE_NAME", "Talent Tailor")
 
+# Where a buyer sends proof of a manual UPI payment. A phone number becomes a
+# wa.me link, anything with "@" becomes mailto. Unset is a supported state: the
+# unlock modal then stops telling people to send a screenshot somewhere, rather
+# than naming a channel that doesn't exist.
+SUPPORT_CONTACT = os.environ.get("SUPPORT_CONTACT", "").strip()
+
 
 def _razorpay_enabled() -> bool:
     return bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)
@@ -650,6 +656,7 @@ async def billing_config(user: dict = Depends(current_user)):
         "razorpay_key_id": RAZORPAY_KEY_ID if _razorpay_enabled() else None,
         "upi_vpa": UPI_VPA or None,
         "upi_payee": UPI_PAYEE_NAME,
+        "support_contact": SUPPORT_CONTACT or None,
         "unlock_code_enabled": bool(UNLOCK_CODE),
     }
 
