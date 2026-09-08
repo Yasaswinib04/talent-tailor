@@ -77,12 +77,14 @@ export default function CandidateProfile() {
             </div>
             <div className="pt-16 px-6 pb-6">
               <div className="font-mono-label mb-1">{c.current_title}</div>
-              <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
+              {/* data-private keeps candidate identity out of session replay.
+                  Layout and behaviour still record; the person doesn't. */}
+              <h1 data-private className="font-display text-3xl font-bold tracking-tight mb-1">{c.name}</h1>
               <div className="text-white/72 text-sm mb-6">at {c.current_company}</div>
 
               <div className="space-y-2 text-xs">
-                <Row icon={<Mail size={12} />} label={c.email} />
-                <Row icon={<Phone size={12} />} label={c.phone} />
+                <Row icon={<Mail size={12} />} label={c.email} isPrivate />
+                <Row icon={<Phone size={12} />} label={c.phone} isPrivate />
                 <Row icon={<MapPin size={12} />} label={c.location} />
                 <Row icon={<Briefcase size={12} />} label={`${c.experience_years} years experience`} />
                 <Row icon={<Calendar size={12} />} label={`Notice: ${c.notice_period}`} />
@@ -288,11 +290,12 @@ export default function CandidateProfile() {
   );
 }
 
-function Row({ icon, label }) {
+function Row({ icon, label, isPrivate }) {
   return (
     <div className="flex items-center gap-2 text-white/70">
       <span className="text-white/65 shrink-0">{icon}</span>
-      <span className="truncate">{label}</span>
+      {/* isPrivate marks contact details so session replay masks them. */}
+      <span className="truncate" {...(isPrivate ? { "data-private": "" } : {})}>{label}</span>
     </div>
   );
 }
