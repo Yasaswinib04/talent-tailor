@@ -38,6 +38,144 @@ the second session simply forgot the first.
 
 ---
 
+## Entry 005 — Launch blockers, deferred
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 19:34 UTC |
+| **Session window** | 2026-09-08 |
+| **Session** | `session_01WzUrGzicSpGjLZmYiDQMzp` · [open](https://claude.ai/code/session_01WzUrGzicSpGjLZmYiDQMzp) |
+| **Commits** | `034e424` → merged to `main` as `5b2f96d` — PR #8 |
+| **Production at close** | `origin/main` read as `d934f7a`; last deploy *observed in-session* was `4605cd6`. Whether prod followed the merges is unverified — see §5 |
+| **Supersedes** | — · Entry 004 (written concurrently) already corrects Entry 003 §3; §3 below concurs from the remote side and extends the retraction to Entry 002 §6 |
+
+> **Ordering note.** Entries 004 and 005 were written by two sessions running at
+> the same time, and 004's own §3 records that one machine's clock is skewed.
+> Their recorded minutes are therefore not reliably orderable. Read by entry
+> number, not by timestamp, for these two.
+
+Launch-day session. The ask was narrow: what is actually pending on me to put
+this in front of users today, and park everything else in writing.
+
+### 1. Problems at hand
+- No written separation between *blocks launch today* and *feels urgent*. Every
+  prior entry mixes them.
+- Render env config was unknown territory. The API had been running on defaults
+  with nobody able to say which of the ten variables the code reads were set.
+- The manual UPI rail had **no fulfilment step**. With `UPI_VPA` set and Razorpay
+  unset — the exact launch configuration — the modal told a buyer to "WhatsApp
+  the payment screenshot" and named no number anywhere in the app.
+- Launching a monetised side product while employed, without the current
+  employer becoming a problem.
+- Still no demo asset, and the live-key resume parse still unrun.
+
+### 2. What was discussed
+- Render Blueprint sync vs. hand-entered variables; why `sync: false` keys never
+  populate themselves.
+- Dodo Payments as a merchant-of-record for international buyers.
+- Emailing receipts automatically, and what that would actually cost to build.
+- Whether `CORS_ORIGINS` blocks launch.
+- Rotating the Atlas password after it appeared in a shared screenshot.
+- Recording a product walkthrough with Playwright; real vs. synthetic test data.
+
+### 3. What was concluded
+- **The launch-blocking set was five environment variables, not a feature list:**
+  `UPI_VPA`, `UPI_PAYEE_NAME`, `UNLOCK_CODE`, `OPENROUTER_API_KEY`,
+  `SUPPORT_CONTACT`. Everything else deferred, recorded in §6.
+- **The missing variables were not a failed Blueprint sync.** The sync *had* run
+  — the model vars carry `render.yaml` values, which only exist post-`4605cd6`.
+  Only `sync: false` secrets were missing, because Render prompts for those
+  rather than reading them, and the prompt had been skipped. Diagnosis matters:
+  the fix is five dashboard entries, not a re-sync.
+- **`CORS_ORIGINS` does not block launch** — asserted as required earlier in this
+  session and corrected on reading the middleware. `allow_credentials=False` with
+  Bearer-token auth makes the `"*"` default valid and already working. The
+  exposure is the unauthenticated surface only; no cookie exists for a hostile
+  page to ride. Hardening, not a blocker.
+- **The one real code blocker was in the rail nobody had touched.** The dead-end
+  contact copy shipped in `4605cd6` and survived every review since, because
+  attention followed the newest diff. Generalises: on a manual payment rail, the
+  fulfilment step is the part with no test.
+- **Dodo Payments: not now.** ICP is India-only for 90 days (PR #4). MoR fees and
+  a checkout rewrite buy nothing until international buyers exist.
+- **Auto-receipts: not now, and would be thrown away.** The backend has zero
+  email capability, the long pole is SPF/DKIM on `yomnita.com` rather than code,
+  and **Razorpay issues its own receipts** the moment that rail turns on. At
+  concierge volume the reply carrying the unlock code already *is* the receipt.
+- **Entry 003's production claim fails from the remote side too.** Entry 004 §3
+  establishes that `07954d1` was never pushed and lives on one laptop. Confirmed
+  independently here: it is not a valid object in any ref, and `origin/main`
+  still describes itself as "a per-role paywall (top-3 free preview, unlock for
+  the rest)", with unlock setting a per-job `unlocked` flag against a one-time
+  `UNLOCK_PRICE_INR`. **Extending Entry 004's correction:** Entry 002 §6 carried a
+  marker saying its subscription scope-out had been superseded by that commit.
+  It had not. That marker is now retracted in place and **the scope-out stands.**
+- **Real JDs are safe test data; resumes are a different question.** A JD is a
+  company document. A resume is personal data — and what breaks parsers is
+  *layout*, not content, so a real resume with identity fields swapped keeps all
+  its test value. A synthetic resume is clean text and teaches nothing.
+- **Production is unreachable from Claude Code sessions.** The egress proxy
+  returns 403 to CONNECT for `*.onrender.com` at organisation-policy level. Live
+  verification and demo recording have to run from Yasaswini's machine. This is
+  permanent, not transient — plan verification around it.
+
+### 4. What we achieved
+- **PR #8 shipped and merged** (`5b2f96d`): `SUPPORT_CONTACT` surfaced through
+  `/api/billing/config`, rendered as `mailto:` or `wa.me` by shape, with unset a
+  supported state that stops promising a channel rather than naming a missing
+  one. Frontend build verified against the `render.yaml` command.
+- Five Render variables set by the operator; the missing-variable diagnosis above.
+- `.env.example` records why `UPI_PAYEE_NAME` matters — the buyer's UPI app shows
+  the name registered against the VPA, and a mismatch reads as fraud at the
+  moment of payment.
+- Entry 002 §6's false supersession marker retracted.
+- No demo assets written — paused pending real JDs.
+
+### 5. Open questions — for Yasaswini
+| Question | Why it matters | Next action |
+|---|---|---|
+| Does a real resume parse correctly with a live key? | **Open across five entries now.** Every commercial claim rests on it, and it is the least-exercised path in the product | Upload 5 real resumes. Still the highest-value hour available |
+| What sha is production actually serving? | `origin/main` moved four commits during this session; the only deploy observed was `4605cd6`. Entry 004 read prod as `253182f`, this session read `origin/main` as `d934f7a` — both true at different minutes, neither is a deploy confirmation | Open the Render dashboard and read the deployed sha |
+| Where do the real resumes come from? | If they are the current employer's candidate data they are out of bounds — same exposure as §6's identity call. Own network or Talent Tailor's own applicants are fine | State the source before uploading |
+| Rotate the Atlas password? | It was legible in a screenshot shared this session | Rotate — **but set `SECRET_KEY` first**, or the rotation signs out every existing user through the derived-key coupling |
+| How many roles does each HR hire per quarter? | Carried from Entry 002 §5 and Entry 003 §5, still unanswered | Ask all 10 during UAT |
+
+### 6. Decisions made
+
+**Scoped out (deliberate no — revisit only on evidence):**
+- **Dodo Payments / international rails.** Revisit when a non-Indian buyer
+  actually appears. The ICP lock makes this free to defer.
+- **Automated email receipts.** Revisit only if the manual rail outlives Razorpay
+  adoption — Razorpay makes this free when it lands.
+- **`CORS_ORIGINS` hardening.** Not a blocker; do it whenever. Recorded so the
+  next session doesn't re-escalate it into one.
+- **WhatsApp as the support channel.** Rejected on identity exposure, not on
+  mechanics — `wa.me` works fine with a personal account, Business is not
+  required, and that misconception nearly parked the fix on false grounds.
+
+**Feature calls:**
+- **One `SUPPORT_CONTACT` variable, shape-detected.** `@` → `mailto`, otherwise
+  `wa.me`. Chosen over two variables so the channel changes without a deploy.
+  Wrong only if both channels ever need to appear at once.
+- **Unset is a supported state, not a broken one.** The copy adapts. That is what
+  let the code merge before the operator had chosen a contact.
+
+**Prioritisation:**
+- **Config outranked code.** Four of five launch blockers were dashboard entries.
+  The instinct to look for something to build was the wrong instinct.
+- **Verification still outranks everything.** Unchanged since Entry 003, and now
+  worse: this session added a fifth reason to run the live-key parse and still
+  did not run it.
+
+**Identity / employment:**
+- **The operator's name and number stay off the product.** Payments route to a
+  family UPI ID under that person's real registered name; support is
+  `hello@yomnita.com`, never the personal Gmail — which is the operator's full
+  name and would be shown to every buyer. Recorded because it constrains future
+  work: anything surfacing an operator identity has to respect it.
+
+---
+
 ## Entry 004 — Branding cleanup, repo drift
 
 | | |
@@ -329,7 +467,10 @@ breakeven"; most of the value was in rejecting that framing.
 - **OCR for scanned PDFs.** Real cost and native-dependency risk. Ship when data shows scanned resumes are a meaningful share of uploads.
 - **LinkedIn / personal-site enrichment.** Post-revenue. LinkedIn scraping violates ToS; paid enrichment is ₹15–40/profile. When it does ship, it must land as a **non-scoring insights panel first** — silently changing score inputs breaks comparability between candidates ranked before and after.
 - **Subscription pricing model.** Not built. Shipping an untested payment flow hours before a UAT is a bad trade; decide after the roles-per-quarter data lands.
-  → Superseded by commit `07954d1`; recorded in Entry 003 §3.
+  → ~~Superseded by commit `07954d1`; recorded in Entry 003 §3.~~
+  **Supersession retracted — see Entry 004 §3 and Entry 005 §3.** That commit was
+  never pushed, and no subscription code has shipped. **This scope-out still
+  stands.**
 - **Any price change this session.** Explicitly held at ₹1,999.
 - **Candidate-facing flows.** Parked from active investment; still live in production.
 - **Razorpay webhook automation, sticky reveals, free-tier caps, anti-abuse.** All deferred in favour of price discovery.
