@@ -668,17 +668,12 @@ breakeven"; most of the value was in rejecting that framing.
 | **Recorded** | 2026-09-08 18:59 UTC (retrospective) |
 | **Session window** | 2026-08-08 → 2026-08-19 |
 | **Session** | `session_0179T2yRdNCGRtT5o6sDGp4A` · [open](https://claude.ai/code/session_0179T2yRdNCGRtT5o6sDGp4A) |
-| **Commits** | `4605cd6` (2026-08-19) — PR #3, merged and deployed |
+| **Commits** | `0dc1de9` … `4605cd6` (2026-08-19) — PR #3, merged and deployed |
 | **Supersedes** | — |
 
-Written up after the fact, from the same session as Entry 002.
-
-**Provenance corrected 2026-09-09.** This entry originally claimed `0dc1de9` …
-`4605cd6` and attributed the earlier work to "an earlier chat with no recorded
-id". That chat is now **Entry 000**, and `0dc1de9`, `c2fd444` and `cdf26f4`
-belong to it, not here — this entry's own contribution is PR #3 (`4605cd6`).
-The range has been narrowed accordingly. Work in Entry 000's range is no longer
-unverified.
+Written up after the fact, from the same session as Entry 002. Work predating
+`0dc1de9` came from an earlier chat with no recorded id — treat anything
+attributed to it as unverified.
 
 ### 1. Problems at hand
 The app was a UAT-passed demo. Resume parsing was believed to be real outside the demo environment — it was not; simulation was the only code path. No accounts, no tenancy, no paywall, no way to take money.
@@ -719,8 +714,17 @@ Env var configuration on Render; live smoke test with real resumes; whether to u
 
 Written up retrospectively on 2026-09-09 from the conversation transcript. **This
 is the "earlier chat with no recorded id" that Entry 001 refers to** — it now has
-an id and an entry, so work in this range is no longer unverified. Note the
-commit-range correction in Entry 001's header.
+an id and an entry, so work in this range is no longer unverified.
+
+**Discrepancy with Entry 001, recorded here rather than corrected there.**
+Entry 001 lists its commit range as `0dc1de9` … `4605cd6`. Three of those —
+`0dc1de9`, `c2fd444`, `cdf26f4` — were produced by *this* session and are
+listed above; Entry 001's own contribution is PR #3 (`4605cd6`). Entry 001 has
+been left exactly as its session wrote it, on the principle that an entry is a
+record of what that session concluded and should not be edited afterwards by a
+different one. So this is the only place the overlap is noted: **if you are
+reconciling commits to entries, trust this entry's range over Entry 001's for
+anything dated on or before 2026-08-09.**
 
 ### 1. Problems at hand
 - The repo **did not boot as cloned**: `server.py` reads `MONGO_URL`/`DB_NAME` via `os.environ[...]` and crashes without them, no `.env` was committed, and `README.md` / `.env.example` were boilerplate from a different scaffold (they described Gemini + Postgres + Supabase; the app is Mongo).
