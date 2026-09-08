@@ -38,6 +38,180 @@ the second session simply forgot the first.
 
 ---
 
+## Entry 006 — ICP lock-in, GTM execution tooling
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 19:37 UTC |
+| **Session window** | 2026-08-28 → 2026-09-08 |
+| **Session** | `session_01TshCk7SpbZGDfTsJqYKH56` · [open](https://claude.ai/code/session_01TshCk7SpbZGDfTsJqYKH56) |
+| **Commits** | `d1c57c5` (2026-08-28) — draft PR #4, branch `claude/icp-gtm-strategy-on7l0u` |
+| **Production at close** | `4605cd6` — corroborated independently here and by Entry 005 §3, both reading `origin/main` directly rather than trusting an earlier session's claim |
+| **Supersedes** | — |
+
+A different track from Entries 001–005: this session is go-to-market, not
+engineering, and ran mostly in parallel with them without visibility into
+their work. Drafted once as "Entry 003", then renumbered twice more — to
+005, then to 006 — as two, then three, other sessions landed entries on this
+branch in the same window before this one's push went through. Direct,
+small-scale experience of the drift Entry 004 §3 and Entry 005's ordering
+note both describe from the inside. Zero paying customers, zero locked ICP,
+zero demand-generation motion at session start.
+
+### 1. Problems at hand
+- No locked ICP — candidate segments (SMB in-house TA, staffing agencies,
+  enterprise, outside India) all still open, with no evidence ranking them.
+- No answer for why buyers would actually pay, whether ₹1,999 was the right
+  number, or whether the HRMS-export friction the founder was anxious about
+  was a real blocker or an imagined one.
+- No north star or funnel metrics defined for a pre-PMF stage.
+- A written plan existed but nothing to execute or track it against, on a
+  real constraint of 2–3 weekday slots/week rather than full-time.
+- Mid-session: a full week (the plan's original Week 1) elapsed with zero
+  execution, partly because Google Calendar task creation never went through.
+- End-of-session: pushing this entry collided three times with other
+  sessions writing the same file in the same hour (see the renumbering
+  above) — this session's own encounter with the cross-session drift Entry
+  004 §3 names generally.
+
+### 2. What was discussed
+- ICP candidates and why each was ranked in, tested, or parked: in-house
+  TA/recruiter at a 30–500-person Indian company vs. staffing agencies vs.
+  enterprise (Workday/Greenhouse) vs. outside India vs. friends & family.
+- Evidence audit — which claims about buyer pain were actually validated
+  (shortlisting pain, "top-N" framing) vs. assumed (skills-matching, repeat
+  purchase) vs. completely untested (willingness to pay ₹1,999 at all).
+- The HRMS-export anxiety specifically — whether it's a real deal-killer for
+  the chosen ICP or a founder-side worry not backed by the one real data point.
+- Pricing, asked to be answered honestly: is ₹1,999 correct, and by what
+  mechanism would it change.
+- A realistic 4-week execution cadence built around 2–3 slots/week (not the
+  doc's ideal 5/week), and what tooling would make it trackable day to day.
+- Whether to build a spreadsheet, an interactive tracker, Google Calendar
+  tasks, or push tracking data into Google Sheets — and what this session's
+  tool access actually allows for each.
+
+### 3. What was concluded
+- **ICP v1 locked**: in-house recruiter/TA at an Indian startup or mid-size
+  company (~30–500 employees), screening 100+ applicants/role, 1–5 person TA
+  team, no HRMS, actively hiring multiple roles, can pay without procurement.
+  Secondary segment (staffing agencies): test with 3–5 conversations, don't
+  chase yet. Enterprise, outside India, and friends/family as "customers" are
+  explicitly parked for 90 days — full reasoning in `gtm/ICP.md` §2. **This
+  is now load-bearing for other sessions**: Entry 005 §3 cites this doc's
+  India-only, 90-day scope directly as the reason to scope out international
+  payment rails. It also **agrees with Entry 003 §3's independent
+  agency-beachhead call**, reached the same day from a different conversation
+  and evidence base — corroboration, not yet confirmation; both are still
+  waiting on the same roles-per-quarter data.
+- **Strongest use case is already decided by the evidence**: high-inbound role
+  triage (100s of applicants → ranked top-N with skill-match reasons), not the
+  auto-apply link, which is the second act, not the pitch.
+- **The HRMS anxiety doesn't apply to ICP v1.** The one real data point
+  contradicts it (the target user offered to drag-and-drop resumes himself);
+  it belongs to the enterprise segment that's already parked.
+- **₹1,999 is a probe, not a settled price.** Consistent with Entries 002 and
+  003's separate decisions to hold it there — the number's job right now is
+  to make "will anyone pay?" a cheap, real experiment, not to be
+  revenue-optimal. Explicit trigger to raise it: three unlocks where nobody
+  flinches. This session assumed the live product is the per-role one-time
+  unlock described in `gtm/ICP.md` — which Entries 004 and 005 independently
+  confirm `origin/main` actually runs, so the assumption held, but only by
+  chance relative to what Entry 003 briefly believed had shipped instead.
+- **North star = paid role unlocks/month.** Full funnel (Learn → Try → Value →
+  Pay → Retain → Refer) already written into `gtm/ICP.md` §8; this session
+  added a realistic day-30 pacing layer on top of the doc's 90-day targets,
+  since 2–3 slots/week reaches the full 20-conversation / 5-unlock target
+  closer to week 6, not week 4.
+- **A slipped week gets re-dated, not rationalized.** When the plan's first
+  week passed with no execution, the honest move was to shift all remaining
+  dates forward to start from the actual current week, not to backfill fake
+  progress or leave the tooling showing a plan that had already failed.
+
+### 4. What we achieved
+- `gtm/ICP.md` written and committed (`d1c57c5`); draft PR #4 opened on
+  `claude/icp-gtm-strategy-on7l0u` (not merged — docs only, no app code
+  touched, production unaffected).
+- Published a shareable ICP one-pager as a Claude Artifact.
+- Built `Talent_Tailor_GTM_Tracker.xlsx` (delivered as a file, not committed
+  to the repo): a Dashboard wired with live formulas against the funnel, plus
+  4-Week Plan, Conversations log, Pilots & Pricing log, Evidence snapshot, and
+  ICP reference tabs. Caught and fixed a real formula bug pre-ship (a column
+  collision was silently counting shortlist-views as payment-asks); verified
+  with a LibreOffice recalculation pass after installing the missing
+  `libreoffice-calc` package in the sandbox — zero formula errors on the
+  shipped file.
+- Built and published the "GTM Cockpit" — a self-persisting interactive
+  Artifact (plan checklist, conversation/pilot logs, live funnel dashboard)
+  using the `artifact` runtime capability, so it survives across sessions and
+  devices instead of living in browser storage. Caught and fixed a real
+  re-render bug pre-ship (changing a conversation's status silently didn't
+  refresh the visible funnel numbers) via a headless-browser (Playwright)
+  interaction test.
+- Re-dated both the workbook and the Cockpit forward by one week (plan now
+  runs Sep 7 → Oct 2) once a full week passed with no execution.
+- Google Calendar: attempted to create the 4-week plan as 12 calendar events
+  (Mon/Wed/Fri, 8:00 AM IST) twice — both attempts, before and after the
+  re-date, failed with the same `Google_Calendar` OAuth token expiry. **No
+  calendar events exist.** Blocked on the user reconnecting the connector.
+- Google Sheets: no Drive upload/create tool was available in this session
+  (only share / rename / trash on existing files, no Sheets connector at
+  all) — could not push the workbook to Drive. User opted to upload the
+  `.xlsx` manually instead.
+- This entry — drafted as "Entry 003", pushed as Entry 005, landed as
+  Entry 006, after three rounds of fetch-and-renumber against concurrent
+  sessions (§1, §6).
+
+### 5. Open questions — for Yasaswini
+| Question | Why it matters | Next action |
+|---|---|---|
+| Is the Google Calendar connector reconnected? | The 12 plan events still don't exist; nothing is scheduled | Reconnect under claude.ai → Settings → Connectors, then ask Claude to retry `create_event` |
+| Did the Aug 31 call with the cousin (Rohan) happen, and what was the outcome? | The Cockpit still shows it as "Booked" and now stale | Log the real outcome in the Cockpit's Conversations tab |
+| Was making the GTM Cockpit artifact publicly shared deliberate? | It holds real names and pricing-strategy notes | Check its share menu; revert to owner-only if not intended |
+| What's the modal profile of the recruiter-email list (company size, in-house vs. agency split)? | Per `gtm/ICP.md` §1, this is supposed to *define* ICP v1 and hasn't been done yet. It is also the fastest way to test Entry 003 §3's agency-beachhead hypothesis against this session's independent one | Export and profile the list (Week 1 Slot A in the shifted plan) |
+| Have the 3–5 agency/consultant conversations happened yet? | Secondary segment is "test, don't chase" in this entry, primary beachhead in Entry 003 — untested either way | Book them this week per the shifted plan |
+| Merge draft PR #4? | It's docs-only, non-conflicting, and Entry 005 §3 already treats its ICP scope as settled fact | Review and merge, or say why not |
+| One GTM/strategy session at a time on shared docs, or accept the renumbering overhead? | This entry collided three times with other sessions on the same file in the same hour; Entry 004 §5 already asks the general version of this question | Pick a convention and say so here |
+
+### 6. Decisions made
+
+**Scoped out (deliberate no — revisit only on evidence):**
+- **Selling outside India, the enterprise/Workday-Greenhouse segment, and
+  friends/family as validation.** All parked for the next 90 days — full
+  reasoning in `gtm/ICP.md` §2. Revisit at 10 paying customers (outside
+  India) or when 3+ ICP-fit people separately cite HRMS export as a blocker
+  (enterprise).
+- **Moving off the manual UPI/unlock-code payment bridge to full self-serve
+  Razorpay checkout.** Deliberately kept — every manual payment currently
+  forces a conversation with a paying customer, which is more valuable right
+  now than removing friction.
+- **Discounting the ₹1,999 unlock for friends or family.** A discounted
+  unlock produces no usable pricing signal; adopted as a standing rule
+  ("no friend discounts"), not just a one-off call.
+
+**Feature calls:**
+- **Two execution tools, not one** — a workbook (offline review/sharing) and
+  a self-persisting interactive Cockpit (daily execution) — both computing
+  the same funnel from the same field definitions, so they can't silently
+  drift out of agreement with each other.
+- **₹1,999 held**, consistent with Entries 002, 003, and 005 — reframed
+  explicitly as a probe with a stated raise trigger, not re-opened as a live
+  pricing decision.
+
+**Prioritisation:**
+- Real discovery conversations and pilots ranked above tooling polish — the
+  workbook and Cockpit were scoped to *support* the plan, not to gate it.
+- Re-dating the plan to the actual current week ranked above preserving the
+  original Aug 31 start date — a stale, unexecuted plan was judged worse than
+  a shifted, honest one.
+- On the push conflicts themselves: re-fetching and renumbering each time
+  ranked above force-pushing any of the three drafts — the log's own rules
+  (supersession markers, newest-first ordering) only work if entries don't
+  clobber each other, and this session had no more claim to "first" than the
+  two it collided with.
+
+---
+
 ## Entry 005 — Launch blockers, deferred
 
 | | |
