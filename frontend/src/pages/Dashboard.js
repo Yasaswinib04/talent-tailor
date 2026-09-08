@@ -319,7 +319,7 @@ export default function Dashboard() {
                         <img src={c.avatar} alt="" className="w-8 h-8 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" />
                       )}
                       <div>
-                        <div className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
+                        <div data-private className={cx("font-medium", c.locked && "text-white/50")}>{c.name}</div>
                         <div className="text-[11px] text-white/65">{c.location}</div>
                       </div>
                     </div>

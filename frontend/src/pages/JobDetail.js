@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx, getUser } from "../lib/api";
 import BulkResumeUpload from "../components/BulkResumeUpload";
+import { track } from "../lib/analytics";
 import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload } from "lucide-react";
 
 // SUPPORT_CONTACT is operator-configured and may be an email or a phone number.
@@ -49,6 +50,13 @@ export default function JobDetail() {
 
   const openUnlock = async () => {
     setUnlockOpen(true);
+    // The top of the paid funnel. Everything after this — which rail they
+    // pick, whether they abandon at the price — hangs off this event.
+    track("unlock_modal_opened", {
+      job_id: jobId,
+      locked_count: cands.filter((c) => c.locked).length,
+      candidates_count: cands.length,
+    });
     if (!billing) {
       try {
         const res = await api.get("/billing/config");
@@ -64,6 +72,7 @@ export default function JobDetail() {
   const payWithRazorpay = async () => {
     setUnlockError(null);
     setPayBusy(true);
+    track("payment_started", { job_id: jobId, rail: "razorpay" });
     try {
       if (!window.Razorpay) {
         await new Promise((resolve, reject) => {
@@ -90,12 +99,21 @@ export default function JobDetail() {
             setUnlockOpen(false);
             await load();
           } catch {
+            // Money taken, shortlist still locked — the worst state the app
+            // has. Track it separately so it can be alerted on, not buried in
+            // a generic failure count.
+            track("payment_verification_failed", { job_id: jobId });
             setUnlockError("Payment made but verification failed — contact us with your payment id and we'll unlock it.");
           } finally {
             setPayBusy(false);
           }
         },
-        modal: { ondismiss: () => setPayBusy(false) },
+        modal: {
+          ondismiss: () => {
+            track("payment_abandoned", { job_id: jobId, rail: "razorpay" });
+            setPayBusy(false);
+          },
+        },
       });
       rzp.open();
     } catch (err) {
@@ -123,6 +141,7 @@ export default function JobDetail() {
   };
 
   const exportCsv = async () => {
+    track("shortlist_exported", { job_id: jobId });
     const res = await api.get(`/jobs/${jobId}/export`, { responseType: "blob" });
     const url = URL.createObjectURL(res.data);
     const a = document.createElement("a");

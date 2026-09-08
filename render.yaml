@@ -59,6 +59,12 @@ services:
       # Public to every buyer. Unset is fine; the modal adapts.
       - key: SUPPORT_CONTACT
         sync: false
+      # Product analytics. Unset = analytics fully off, no code path changes.
+      # Same "phc_..." Project API Key the web service uses.
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: POSTHOG_HOST
+        value: https://us.i.posthog.com
       # Lock CORS to the web service's origin once both URLs are known,
       # e.g. https://talent-tailor-web.onrender.com
       - key: CORS_ORIGINS
@@ -79,6 +85,12 @@ services:
       # No trailing slash — src/lib/api.js appends "/api".
       - key: REACT_APP_BACKEND_URL
         sync: false
+      # Pageviews + session replay. Baked into the bundle at build time, so
+      # changing it needs a rebuild, not just a restart. Safe to expose.
+      - key: REACT_APP_POSTHOG_KEY
+        sync: false
+      - key: REACT_APP_POSTHOG_HOST
+        value: https://us.i.posthog.com
     routes:
       # SPA fallback. Without this, hard-refreshing /app/jobs/new returns a 404
       # because no such file exists on disk — React Router handles it client-side.

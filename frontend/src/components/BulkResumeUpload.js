@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { api, cx } from "../lib/api";
+import { track } from "../lib/analytics";
 import { Upload, X, FileText, Loader2, Check, AlertTriangle, Users, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -93,6 +94,7 @@ export default function BulkResumeUpload({ jobId, jobTitle, onComplete }) {
       onComplete?.();
     } catch (err) {
       const status = err.response?.status;
+      track("bulk_upload_failed", { job_id: jobId, file_count: files.length, status: status || null });
       const detail = err.response?.data?.detail;
       if (status === 413) {
         setError(detail || `You can upload ${MAX_BULK_FILES} resumes at a time.`);
