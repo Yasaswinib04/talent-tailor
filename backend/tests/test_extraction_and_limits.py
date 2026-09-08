@@ -194,3 +194,30 @@ def test_server_and_editor_share_one_taxonomy():
     never produce, and the two halves of the feature disagree silently."""
     assert skills_lib.canonicalise("reactjs") == "React"
     assert "React" in server._dictionary_skills("We use ReactJS in production")
+
+
+# ---------- A role must be able to rank ----------
+def test_a_role_created_from_a_jd_can_actually_rank(client):
+    """A role with no skills scores everyone identically, so the shortlist looks
+    ranked while carrying no signal. The wizard extracts skills before
+    publishing; nothing else did, so a role created any other way ranked flat."""
+    job = make_job(client)
+    assert job["skills"], "a role created from a JD must carry skills to score against"
+
+    upload(client, job["id"], [
+        ("match.txt", resume("Aarti Deshpande", "aarti@example.com",
+                             skills="React, TypeScript, GraphQL")),
+        ("nomatch.txt", resume("Rohan Mehta", "rohan@example.com",
+                               skills="Python, Django, PostgreSQL")),
+    ])
+    by_name = {c["name"]: c["match_score"] for c in client.get("/api/candidates").json()}
+    assert by_name["Aarti Deshpande"] > by_name["Rohan Mehta"], (
+        f"the candidate matching the role's skills must outrank the one who does not: {by_name}"
+    )
+
+
+def test_an_explicit_skill_list_is_not_overwritten(client):
+    """Deriving from the JD is a fallback, never a correction — a recruiter who
+    edited the list keeps exactly what they chose."""
+    job = make_job(client, skills=[{"name": "Kubernetes", "weight": 5}])
+    assert [s["name"] for s in job["skills"]] == ["Kubernetes"]
