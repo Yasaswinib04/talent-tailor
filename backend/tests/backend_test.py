@@ -68,6 +68,22 @@ def _sign_in(email: str, password: str) -> requests.Session:
     return s
 
 
+def _server_is_up() -> bool:
+    try:
+        return requests.get(f"{BASE_URL}/api/health", timeout=2).status_code == 200
+    except requests.RequestException:
+        return False
+
+
+# This module drives a *running* instance over HTTP, unlike the rest of the
+# suite. Skip rather than error when there isn't one, so `pytest backend/tests`
+# is green on a clean checkout and a real failure here still means something.
+pytestmark = pytest.mark.skipif(
+    not _server_is_up(),
+    reason=f"no API at {BASE_URL} — start the backend to run these",
+)
+
+
 @pytest.fixture(scope="session")
 def client():
     """Signed-in session with the sample dataset loaded."""

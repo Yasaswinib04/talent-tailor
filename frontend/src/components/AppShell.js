@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { LayoutGrid, Briefcase, Users, Plus, Search, LogOut } from "lucide-react";
 import { getUser, clearSession } from "../lib/api";
+import { resetAnalytics } from "../lib/analytics";
 
 export default function AppShell() {
   const nav = useNavigate();
@@ -69,6 +70,9 @@ function TopBar() {
   const user = getUser();
   const logout = () => {
     clearSession();
+    // Without this the next person to sign in on this browser is merged into
+    // the previous user's person profile and replay session.
+    resetAnalytics();
     nav("/login");
   };
   return (

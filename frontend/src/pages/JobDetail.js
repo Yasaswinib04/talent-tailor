@@ -1,16 +1,26 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, fmtINR, cx, getUser } from "../lib/api";
-import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload, Loader2 } from "lucide-react";
+import BulkResumeUpload from "../components/BulkResumeUpload";
+import { track } from "../lib/analytics";
+import { ChevronLeft, Share2, Copy, Check, ExternalLink, Users, Lock, Unlock, Download, X, Upload } from "lucide-react";
+
+// SUPPORT_CONTACT is operator-configured and may be an email or a phone number.
+// Phone numbers open WhatsApp — wa.me needs digits only, country code included,
+// and works with a personal account (Business is not required).
+const contactHref = (contact) => {
+  if (contact.includes("@")) return `mailto:${contact}`;
+  const digits = contact.replace(/\D/g, "");
+  return `https://wa.me/${digits}`;
+};
 
 export default function JobDetail() {
   const { jobId } = useParams();
   const nav = useNavigate();
   const [job, setJob] = useState(null);
   const [cands, setCands] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadSummary, setUploadSummary] = useState(null);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [unlockCode, setUnlockCode] = useState("");
   const [unlockError, setUnlockError] = useState(null);
@@ -61,6 +71,13 @@ export default function JobDetail() {
 
   const openUnlock = async () => {
     setUnlockOpen(true);
+    // The top of the paid funnel. Everything after this — which rail they
+    // pick, whether they abandon at the price — hangs off this event.
+    track("unlock_modal_opened", {
+      job_id: jobId,
+      locked_count: cands.filter((c) => c.locked).length,
+      candidates_count: cands.length,
+    });
     if (!billing) await loadBilling();
   };
 
@@ -69,6 +86,7 @@ export default function JobDetail() {
   const payWithRazorpay = async () => {
     setUnlockError(null);
     setPayBusy(true);
+    track("payment_started", { job_id: jobId, rail: "razorpay" });
     try {
       if (!window.Razorpay) {
         await new Promise((resolve, reject) => {
@@ -95,12 +113,21 @@ export default function JobDetail() {
             setUnlockOpen(false);
             await load();
           } catch {
+            // Money taken, shortlist still locked — the worst state the app
+            // has. Track it separately so it can be alerted on, not buried in
+            // a generic failure count.
+            track("payment_verification_failed", { job_id: jobId });
             setUnlockError("Payment made but verification failed — contact us with your payment id and we'll unlock it.");
           } finally {
             setPayBusy(false);
           }
         },
-        modal: { ondismiss: () => setPayBusy(false) },
+        modal: {
+          ondismiss: () => {
+            track("payment_abandoned", { job_id: jobId, rail: "razorpay" });
+            setPayBusy(false);
+          },
+        },
       });
       rzp.open();
     } catch (err) {
@@ -128,6 +155,7 @@ export default function JobDetail() {
   };
 
   const exportCsv = async () => {
+    track("shortlist_exported", { job_id: jobId });
     const res = await api.get(`/jobs/${jobId}/export`, { responseType: "blob" });
     const url = URL.createObjectURL(res.data);
     const a = document.createElement("a");
@@ -138,29 +166,6 @@ export default function JobDetail() {
   };
 
   const lockedCount = cands.filter((c) => c.locked).length;
-
-  // The activation path: turn the resume pile the recruiter already has into a
-  // ranked shortlist now, instead of waiting for the apply link to fill up.
-  const onBulkUpload = async (e) => {
-    const files = [...(e.target.files || [])].slice(0, 20);
-    e.target.value = "";
-    if (!files.length) return;
-    setUploadSummary(null);
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
-      const res = await api.post(`/jobs/${jobId}/upload-resumes`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setUploadSummary(res.data);
-      await load();
-    } catch (err) {
-      setUploadSummary({ total: files.length, ranked: 0, failed: [], error: "Upload failed — please try again." });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <div className="max-w-[1200px] mx-auto p-8">
@@ -289,11 +294,13 @@ export default function JobDetail() {
             <span className="font-mono-label">{cands.length} total</span>
           </div>
           <div className="flex items-center gap-3">
-          <label className={cx("btn btn-light !py-2 text-xs cursor-pointer", uploading && "opacity-50 pointer-events-none")}>
-            <input type="file" multiple accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={onBulkUpload} data-testid="jd-bulk-upload-input" />
-            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-            {uploading ? "Parsing & ranking…" : "Upload resumes"}
-          </label>
+          <button
+            onClick={() => setShowUpload((v) => !v)}
+            data-testid="jd-bulk-upload-toggle"
+            className="btn btn-light !py-2 text-xs"
+          >
+            <Upload size={12} /> {showUpload ? "Hide upload" : "Upload resumes"}
+          </button>
           {billing?.has_access ? (
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-mono text-success flex items-center gap-1.5" data-testid="jd-unlocked-badge">
@@ -321,27 +328,9 @@ export default function JobDetail() {
           </div>
         </div>
 
-        {uploadSummary && (
-          <div data-testid="jd-upload-summary" className={cx(
-            "mb-4 border px-5 py-4 text-sm flex items-start gap-3",
-            uploadSummary.error || uploadSummary.ranked === 0 ? "border-red-500/40 bg-red-500/5" : "border-success/40 bg-success/5"
-          )}>
-            <Check size={14} className={uploadSummary.error ? "text-red-400 mt-0.5" : "text-success mt-0.5"} />
-            <div className="flex-1">
-              {uploadSummary.error ? (
-                uploadSummary.error
-              ) : (
-                <>
-                  <span className="font-medium">{uploadSummary.ranked} of {uploadSummary.total} resumes parsed and ranked.</span>
-                  {uploadSummary.failed?.length > 0 && (
-                    <div className="mt-1 text-white/72 text-xs">
-                      Couldn't read: {uploadSummary.failed.map((f) => `${f.filename} (${f.error})`).join(", ")}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <button onClick={() => setUploadSummary(null)} className="text-white/55 hover:text-white"><X size={13} /></button>
+        {showUpload && (
+          <div className="mb-4">
+            <BulkResumeUpload jobId={jobId} jobTitle={job.title} onComplete={load} />
           </div>
         )}
         <div className="border hairline">
@@ -387,7 +376,7 @@ export default function JobDetail() {
         {/* The ask sits here and nowhere earlier: the full ranked list is on
             screen with the top of it revealed, so what's being bought is
             visible before it's paid for. */}
-        {!job.unlocked && lockedCount > 0 && (
+        {!billing?.has_access && lockedCount > 0 && (
           <div data-testid="jd-paywall-banner" className="mt-6 border border-brand/40 bg-brand/5 p-6 flex flex-wrap items-center gap-4">
             <Lock size={16} className="text-brand shrink-0" />
             <div className="flex-1 min-w-[240px]">
@@ -443,8 +432,24 @@ export default function JobDetail() {
                 <div className="font-mono-label mb-2">pay via upi</div>
                 Pay ₹{(billing?.price_inr ?? 0).toLocaleString("en-IN")} to{" "}
                 <span className="text-brand font-mono">{billing.upi_vpa}</span>
-                {billing.upi_payee ? ` (${billing.upi_payee})` : ""}, then WhatsApp the payment screenshot
-                with this role's name — you'll get your unlock code within minutes.
+                {billing.upi_payee ? ` (${billing.upi_payee})` : ""}
+                {billing.support_contact ? (
+                  <>
+                    , then send the payment screenshot with this role's name to{" "}
+                    <a
+                      href={contactHref(billing.support_contact)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand underline underline-offset-2"
+                      data-testid="unlock-support-contact"
+                    >
+                      {billing.support_contact}
+                    </a>{" "}
+                    — you'll get your unlock code within minutes.
+                  </>
+                ) : (
+                  ". Once it's through, you'll get your unlock code within minutes."
+                )}
                 <a
                   href={`upi://pay?pa=${encodeURIComponent(billing.upi_vpa)}&pn=${encodeURIComponent(billing.upi_payee || "Talent Tailor")}&am=${billing?.price_inr ?? 0}&cu=INR&tn=${encodeURIComponent("Talent Tailor - 30 days")}`}
                   className="block mt-3 text-brand underline underline-offset-2"
@@ -456,8 +461,20 @@ export default function JobDetail() {
 
             {!billing?.razorpay && !billing?.upi_vpa && (
               <div className="border hairline bg-app p-4 text-sm text-white/78 mb-4 leading-relaxed">
-                To pay: contact the Talent Tailor team with this role's name. You'll get a
-                payment link and an unlock code within minutes.
+                To pay: contact{" "}
+                {billing?.support_contact ? (
+                  <a
+                    href={contactHref(billing.support_contact)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand underline underline-offset-2"
+                  >
+                    {billing.support_contact}
+                  </a>
+                ) : (
+                  "the Talent Tailor team"
+                )}{" "}
+                with this role's name. You'll get a payment link and an unlock code within minutes.
               </div>
             )}
 

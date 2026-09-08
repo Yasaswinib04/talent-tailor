@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Report from "./pages/Report";
@@ -11,6 +11,8 @@ import PublicApply from "./pages/PublicApply";
 import Auth from "./pages/Auth";
 import Themes from "./pages/Themes";
 import AppShell from "./components/AppShell";
+import NotFound from "./pages/NotFound";
+import { trackPageview } from "./lib/analytics";
 import { getToken } from "./lib/api";
 
 function RequireAuth({ children }) {
@@ -21,7 +23,17 @@ function RequireAuth({ children }) {
   return children;
 }
 
+/** CRA + react-router is a SPA, so navigation never reloads the page and
+ *  PostHog's automatic pageview would only ever fire once. Send them here. */
+function usePageviews() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    trackPageview(pathname);
+  }, [pathname]);
+}
+
 export default function App() {
+  usePageviews();
   return (
     <div className="min-h-screen grain">
       <Routes>
@@ -51,6 +63,9 @@ export default function App() {
           <Route path="/app/jobs/:jobId" element={<JobDetail />} />
           <Route path="/app/candidates/:cid" element={<CandidateProfile />} />
         </Route>
+        {/* Without this an unknown URL rendered nothing at all — a blank page
+            is indistinguishable from an app that failed to load. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, setSession } from "../lib/api";
+import { identify, track } from "../lib/analytics";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 /**
@@ -26,8 +27,13 @@ export default function Auth({ mode: initialMode = "signup" }) {
           ? await api.post("/auth/signup", form)
           : await api.post("/auth/login", { email: form.email, password: form.password });
       setSession(res.data.token, res.data.user);
+      // Identify before the first in-app event so this session's replay and
+      // pageviews stitch to the same person the backend reports on.
+      identify(res.data.user);
+      track(mode === "signup" ? "signed_up" : "signed_in");
       nav(location.state?.from || "/app");
     } catch (err) {
+      track("auth_failed", { mode, status: err?.response?.status || null });
       const detail = err?.response?.data?.detail;
       setError(
         Array.isArray(detail)
