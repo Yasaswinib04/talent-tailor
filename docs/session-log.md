@@ -23,18 +23,43 @@ them is context for reading those two correctly.
    think about pricing" is not an open question; "Ask 10 HRs how many roles
    they hire per quarter" is.
 
-### Resolving conflicting decisions
+### Resolving conflicts between entries
 
-When a session reverses an earlier call, do both of these:
+Two kinds of conflict, handled differently. The test is whether the disagreement
+is about a **judgement** — which a later session is entitled to overturn — or a
+**fact**, which the earlier session either got right or got wrong at the time,
+and which no later edit can change.
+
+**Decisions — annotate the old entry.** When a session reverses an earlier call,
+do both of these:
 
 - Fill the new entry's **Supersedes** field: `Entry 002 §6 — model default`.
 - Add a one-line pointer under the old decision: `→ Superseded by Entry 004`.
 
-That way the conflict is visible from either direction. If two entries disagree
-and neither declares supersession, the later **Recorded** timestamp wins — but
-treat that as a defect in the log and add the markers retroactively, because
-recency alone doesn't tell you whether the reversal was deliberate or whether
-the second session simply forgot the first.
+That way the conflict is visible from either direction. Retracting such a marker
+later is also fair game — Entry 005 removed one that turned out to be wrong.
+These annotations are additive and reversible: they sit *beside* what the
+original session argued, never on top of it.
+
+**Facts — never edit the old entry; correct it in yours.** Commit ranges, shas,
+timestamps, session ids, what shipped and what didn't. If a later session finds
+one of these wrong, it records the correction **in its own entry** and leaves the
+original exactly as written. An entry is a record of what a session believed at
+the time; editing its facts destroys the evidence of what it actually believed
+and leaves the corrector's version as the only surviving account — which is
+worse than a visible disagreement, because it is an invisible one.
+
+*Precedent:* Entry 000 corrects Entry 001's commit range this way. Entry 001
+still reads exactly as its session wrote it.
+
+The cost of this rule is real and accepted: someone reading top-down meets the
+wrong fact first and gets no signal there. Mitigate it in the correcting entry —
+say plainly which version to trust, and for what range.
+
+**Neither declared?** If two entries disagree and neither says anything, the
+later **Recorded** timestamp wins — but treat that as a defect in the log and add
+the markers, because recency alone doesn't tell you whether the reversal was
+deliberate or whether the second session simply forgot the first.
 
 ---
 
