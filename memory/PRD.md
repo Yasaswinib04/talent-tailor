@@ -35,7 +35,9 @@ Expected outcome: a UX report on the changes + a new, easy-to-use template proto
 - **P1** — Command palette (`⌘K`) — currently visual affordance only
 - **P2** — Real resume parsing (PDF.js on candidate side) instead of simulated scan
 - **P2** — Interviewer assignment + calendar sync
-- **P2** — Analytics deep-dive page (funnel, time-in-stage, source ROI)
+- **P2** — Analytics deep-dive page (funnel, time-in-stage, source ROI). Event
+  capture for this now exists (PostHog, PR #7) — the funnel is queryable in
+  PostHog once the key is set; what's still missing is an in-app page.
 - **P3** — Email drip templates for candidates
 - **P3** — Multi-recruiter collaboration (mentions, approvals)
 
