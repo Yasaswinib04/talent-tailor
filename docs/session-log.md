@@ -38,6 +38,121 @@ the second session simply forgot the first.
 
 ---
 
+## Entry 003 — Revenue motion, not breakeven
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-08 19:28 UTC |
+| **Session window** | 2026-09-08 |
+| **Session** | `4062c3f9-5926-4dde-ad39-a3866f35a468` (local Claude Code session; no claude.ai link recorded) |
+| **Commits** | none — strategy only, no code changed |
+| **Production at close** | `07954d1` (moved from `4605cd6` in an unlogged session — see §3) |
+| **Supersedes** | Entry 002 §6 — "subscription pricing model, not built" · see §3 |
+
+Strategy conversation, no build. Opened as "how do we make money beyond
+breakeven"; most of the value was in rejecting that framing.
+
+### 1. Problems at hand
+- No repeatable revenue motion. Not "no revenue" — no path where someone pays a
+  *second* time without being chased.
+- "Beyond breakeven" is a meaningless target on free Render + Atlas M0. Breakeven
+  is the first ₹500, so the phrase hides the real question.
+- Which segment actually pays was still unsettled — Entry 001 explored personas
+  and deliberately declined to lock one, and that debt came due here.
+- Two stale premises were carried into the conversation and had to be corrected
+  mid-session (§3).
+
+### 2. What was discussed
+- Three segments and their economics: recruitment agencies, SMB HRs / founders
+  hiring without an ATS, enterprise HR.
+- Hiring *frequency* as the hidden driver of subscription retention.
+- A concierge / productized-service model as a pre-SaaS revenue motion.
+- What price anchor a buyer holds in their head: another ₹999/mo tool, versus
+  the ~₹80k+ an agency placement costs.
+- Whether the goal is income or portfolio credibility — the two strategies
+  diverge immediately and the goal was never stated.
+
+### 3. What was concluded
+- **Breakeven is the wrong milestone; a repeatable motion is the right one.**
+  Working target named: **~₹50k/month recurring** ≈ 15 paid shortlists or ~10
+  subscriptions. The value of naming it is that it reveals how *few* customers
+  are actually being hunted.
+- **Agencies are the better beachhead than SMB HRs.** SMB HRs hire 2–5 roles a
+  quarter, so they buy once, hire, and churn — subscription retention is
+  structurally impossible with them. Agencies hire constantly and shortlisting
+  speed maps directly onto their placement fee. This is a *hypothesis about
+  frequency*, and Entry 002's still-open roles-per-quarter question is the
+  measurement that confirms or kills it.
+- **Enterprise HR is out.** Six-month sales cycles, procurement, and an
+  incumbent ATS.
+- **The riskiest assumption is not technical.** It is whether an HR trusts a
+  machine-ranked shortlist enough to pay for it. No amount of building answers
+  that; one invoice does.
+- **Two stale premises were corrected mid-session, both in the direction of
+  "further along than assumed":**
+  - *"Resume parsing is simulated."* False since `4605cd6` (Entry 001). Real LLM
+    parsing is shipped and live. The accurate state is **shipped but never
+    executed against a live key** — Entry 002 §5 carries it as the only untested
+    path in the product. That is a verification task, not a build task, and the
+    distinction changes what has to happen before charging.
+  - *"Pricing is per-role one-time."* False since `07954d1`. Production is now
+    workspace-wide time-boxed access: **₹1,999 / 30 days, 14-day full trial from
+    signup, lapsed workspaces capped at 2 roles.** Entry 002 scoped a
+    subscription model *out*; it shipped anyway in a session that was never
+    logged. **That commit, not this session, is what supersedes Entry 002 §6.**
+- **Consequence of the above:** the per-role pricing shape argued for early in
+  this session is already contradicted by shipped code. The live product is
+  subscription-shaped, which — usefully — is the shape that *fits agencies* and
+  fits SMB HRs badly. The segment call and the shipped pricing model agree.
+- **The sellable differentiator is the pair of UAT design rules**, not a feature:
+  missing data never rejects a candidate, and must-haves default to empty.
+  "We surface the candidates other tools silently drop" is a line an ATS keyword
+  filter cannot say.
+
+### 4. What we achieved
+- Nothing shipped. No code, no PR, no test change.
+- Session moved into the `talent-tailor` repo (it had been running in an
+  unrelated project directory).
+- This entry.
+
+### 5. Open questions — for Yasaswini
+| Question | Why it matters | Next action |
+|---|---|---|
+| Do you know 3+ people at recruitment agencies? | Decides whether the agency beachhead is one WhatsApp message away or needs cold outreach. If the network is all in-house HRs, the beachhead call flips | Count them, honestly |
+| Income, or portfolio/buildathon credibility? | A self-serve payment gateway *looks* better while converting worse. The two strategies diverge immediately and the goal has never been stated in writing | Decide and record it here |
+| What is the actual revenue number? | ₹50k/mo was assigned in this session, not chosen by you. The number sets how many customers to hunt | Confirm or replace |
+| Does a concierge offer conflict with the shipped self-serve product? | Production already sells ₹1,999/30 days self-serve. Running a manual "send me your JD, get a shortlist in 24h" offer alongside it is a second, unpriced motion — it may be the faster learning instrument or it may split focus | Decide before offering it to anyone |
+| Does a real resume parse correctly with a live key? | **Unchanged and unanswered since Entry 001.** Still the only untested path. Everything in this entry assumes it works | Upload 5 real resumes. This is the single highest-value hour available |
+| How many roles does each HR hire per quarter? | Carried from Entry 002 §5. Now doubly important: it is also the measurement that confirms or kills the agency-beachhead hypothesis | Ask all 10 during UAT |
+
+### 6. Decisions made
+
+**Scoped out (deliberate no — revisit only on evidence):**
+- **Enterprise HR as an early segment.** Sales cycle and incumbency. Revisit only
+  if one walks in with a signed cheque.
+- **Any pricing change this session.** Held at ₹1,999/30 days. Same call as
+  Entry 002, for the same reason: the roles-per-quarter data is not in yet.
+
+**Feature calls:**
+- None. No code was written or specified.
+
+**Prioritisation:**
+- **Verification still outranks strategy.** The live-key parse test has now been
+  open across three entries. Nothing in this entry is actionable if the engine
+  does not parse a real resume, and every session that discusses positioning
+  instead of running that test is choosing the pleasant task.
+- **Segment evidence outranks segment argument.** The agency hypothesis was
+  reasoned, not observed. It stays a hypothesis until the UAT data lands.
+
+**Recorded but not decided:**
+- **Concierge productized service** — "send your JD and resume pile, get a ranked
+  shortlist in 24h", ₹2,000–5,000 per role, run manually behind the product.
+  Proposed as a 60-day instrument for testing the pay-for-a-shortlist
+  assumption. **Not adopted** — it conflicts with the shipped self-serve motion
+  (§5), and that conflict was surfaced rather than resolved.
+
+---
+
 ## Entry 002 — Cost visibility, model tier, pricing shape
 
 | | |
@@ -100,6 +215,7 @@ the second session simply forgot the first.
 - **OCR for scanned PDFs.** Real cost and native-dependency risk. Ship when data shows scanned resumes are a meaningful share of uploads.
 - **LinkedIn / personal-site enrichment.** Post-revenue. LinkedIn scraping violates ToS; paid enrichment is ₹15–40/profile. When it does ship, it must land as a **non-scoring insights panel first** — silently changing score inputs breaks comparability between candidates ranked before and after.
 - **Subscription pricing model.** Not built. Shipping an untested payment flow hours before a UAT is a bad trade; decide after the roles-per-quarter data lands.
+  → Superseded by commit `07954d1`; recorded in Entry 003 §3.
 - **Any price change this session.** Explicitly held at ₹1,999.
 - **Candidate-facing flows.** Parked from active investment; still live in production.
 - **Razorpay webhook automation, sticky reveals, free-tier caps, anti-abuse.** All deferred in favour of price discovery.
