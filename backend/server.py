@@ -1671,7 +1671,13 @@ async def upload_resumes(job_id: str, files: List[UploadFile] = File(...), user:
             402,
             f"Bulk resume upload needs an active plan (₹{PLANS[DEFAULT_PLAN]['price_inr']}/month).",
         )
-    if _bulk_rate_limited(user["id"]):
+    # Two bounds, and both earn their place. The per-minute one stops a burst;
+    # the 10-per-10-minutes parse budget is what actually caps sustained spend,
+    # and dropping it in the merge would have raised the ceiling from ~10 files
+    # a minute to 120 on a tier that asks for no card. They are not redundant:
+    # PARSE_RATE_LIMIT is env-configurable, so raising it for the public apply
+    # endpoint would otherwise silently loosen this one too.
+    if _bulk_rate_limited(user["id"]) or _rate_limited(f"bulk:{user['id']}"):
         raise HTTPException(429, "Too many uploads in a row. Give it a minute and try again.")
     results = await asyncio.gather(*[_ingest_resume_file(f, job) for f in files])
     created = [r for r in results if r.get("ok")]
