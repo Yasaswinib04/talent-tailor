@@ -20,7 +20,7 @@ Proposal + before/after mockups: https://claude.ai/code/artifact/1e7dce7a-bfa6-4
 | ID | Sev | Summary | Where | Status |
 |----|-----|---------|-------|--------|
 | UAT-01 | Blocker | "Publish role" is unclickable and never says why | `frontend/src/pages/JobSetup.js:168` | **FIXED** 2026-09-06 |
-| UAT-02 | Blocker | No publish CTA at the bottom, where the form ends | `frontend/src/pages/JobSetup.js:155` | OPEN |
+| UAT-02 | Blocker | No publish CTA at the bottom, where the form ends | `frontend/src/pages/JobSetup.js:155` | **FIXED** 2026-09-12 |
 | UAT-03 | High | Overview / Roles / Candidates render the identical page | `frontend/src/pages/Dashboard.js:10`, `AppShell.js:19` | **FIXED** 2026-09-06 |
 | UAT-04 | High | Pool is filtered live during role setup — remove it; eligible candidates surface after publish | `frontend/src/pages/JobSetup.js:546`, `:526` | **PARTIAL** — empty-pool false alarm killed; preview not yet moved to role page |
 | UAT-05 | High | Right panel never says what it is, or that it's working | `frontend/src/pages/JobSetup.js:420` | **PARTIAL** — panel renamed "reading your JD"; loader/skeletons still to do |
@@ -55,6 +55,42 @@ bottom-right. **Nothing duplicated at the top** — the top bar becomes pure
 context (back, "new role · draft", title), with room for a quiet "saved 2s ago"
 once drafts autosave. Plus the readiness line and one sentence saying what
 publish does.
+
+**Shipped 2026-09-12.** One sticky bottom bar, `sticky bottom-0` so it pins while
+the four-screen form scrolls and settles at the true bottom. Cancel and Publish
+role (primary, bottom-right) are there and **nowhere else** — the top bar is now
+back, "new role · draft" and the title, nothing clickable. The readiness line
+above the buttons states what publishing will do with what you have typed so far:
+
+| State | Line |
+|---|---|
+| No title | `Add a role title to publish` (amber) |
+| Extracting | `Reading your job description…` |
+| No skills, no JD | `No job description yet — without skills, every candidate scores the same` |
+| No skills, JD given | `No skills detected — candidates will be ranked on experience and filters alone` |
+| Ready | `6 skills · 1 screening question` (brand) |
+
+Only the title gates publishing; the rest are statements, not gates. Under it, the
+sentence the screen never had: *"Publishing creates the role, opens its apply
+link, and adds everyone already in your pool who clears the filters. You can edit
+all of it afterwards."* The publish error (the 402 free-role cap, most often) moved
+into this bar too — it used to render under the top bar, four screens away from
+the button you just pressed.
+
+**Save draft is deliberately not in the bar.** The decision above lists it, but
+there is no draft in the data model: `Job.status` defaults to `"open"`, `JobCreate`
+does not accept `status` at all, and `POST /api/jobs` runs
+`_attach_matching_candidates` and increments `jobs_created_total` against the free
+role cap on every create. A "Save draft" button today would publish the role and
+spend a role from the recruiter's allowance while saying it did neither — exactly
+the dead-and-dishonest affordance decision 1 and UAT-01 were about. Making it real
+means draft semantics in the backend (skip attach, decide whether a draft consumes
+the cap) plus the Published / Drafts grouping in UAT-03, which is batch 2. Both
+should land together; neither is a 75-minute change.
+
+Verified in a browser at 1440×900: bar pins while scrolling (`bottom: 899.5` in a
+900px viewport), Publish with an empty title still scrolls to the field and warns,
+and the readiness line tracks extraction. Build clean, no new warnings.
 
 **UAT-03 · Three tabs, one page.**
 Two bugs, one symptom. `const tab = params.get("tab")` is computed on

@@ -180,3 +180,35 @@ Not fixed on the spot because adding `unique=True` to an index that already exis
 without it makes the *startup* call fail on a live deployment — it needs a drop and
 recreate, which is a migration, not a one-word change. Do it with the next
 migration that runs anyway.
+
+
+### BL-10 · The responsive pass is not in the code
+
+**Raised:** 2026-09-12, measured in a browser. **Status:** not started.
+**Severity:** high if any recruiter opens this on a phone.
+
+`specs/launch-fix-plan.md` records P2-7 as closed, with *"30 browser cases across
+iPhone SE (375), iPhone 14 (390) and iPad mini (768). Every screen — dashboard,
+all three tabs, job setup, role page, candidate profile, login, onboarding and
+public apply — reports `scrollWidth === clientWidth`."*
+
+Measured on `main` today at a 390px viewport:
+
+| Screen | scrollWidth | clientWidth |
+|---|---|---|
+| `/app` dashboard | 772 | 390 |
+| `/app/jobs/new` | 772 | 390 |
+
+Both overflow by the same 382px, and the cause is visible in the source:
+`components/AppShell.js:12` is `<aside className="w-56 border-r hairline flex
+flex-col shrink-0 h-screen sticky top-0">`. There is no `md:` breakpoint, no
+drawer, no menu button — none of the off-canvas behaviour that entry describes.
+The `h-screen sticky top-0` from UAT-07 is there, so the rail *was* touched since;
+the responsive work simply is not.
+
+Most likely lost in "Port the UAT branch onto main's architecture (#1)". Worth
+confirming before rebuilding it — if that branch still exists, the work may be
+recoverable rather than rewritten.
+
+Measured with the pre-existing code, not introduced by any change in the UAT-02
+branch: the same 772px is present with `JobSetup.js` stashed.
