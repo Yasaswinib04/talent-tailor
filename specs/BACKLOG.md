@@ -153,12 +153,22 @@ The original entry had three parts. Two are now fixed:
   explicitly if the API doesn't come up, so `backend_test.py` can never skip its
   way to a green tick again.
 
-**Still open:** `smoke-test.yml` needs its three values set in
-**Settings → Secrets and variables → Actions** (`API_URL`, `TT_TEST_EMAIL`,
-`TT_TEST_PASSWORD`). It now fails loudly rather than skipping, so `main` shows a
-red X until they are set. That is deliberate, but it does mean the red X on
-`main` is currently a configuration gap, not a code regression — worth setting
-before it becomes background noise people learn to ignore.
+- ~~A permanent red X on `main` that says nothing about the code.~~ **Fixed
+  2026-09-12.** `smoke-test.yml` is now `workflow_dispatch` only.
+
+  Failing loudly on missing configuration was the right instinct and is kept —
+  but it was firing on every push to `main`, so an unconfigured repo showed a
+  standing red X that reported a settings gap, not a regression. That is the
+  failure mode the original entry warned about, arriving from the other
+  direction: a tick you can't trust and an X you learn to ignore are the same
+  problem. `tests.yml` now covers every push with a signal that needs no setup,
+  so the deployed-instance check runs on demand instead.
+
+**Still open:** the three values (`API_URL`, `TT_TEST_EMAIL`,
+`TT_TEST_PASSWORD`) are still unset, so the smoke test can't be run until they
+are. It needs a live API URL, so it can't be set up before there is something
+deployed to point it at. Not a launch gate — it verifies a deployment rather
+than gating one.
 
 ### BL-04 · `share_slug` is 8 hex characters with a non-unique index
 

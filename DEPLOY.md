@@ -260,20 +260,23 @@ Two workflows, and they answer different questions:
   (the version `render.yaml` pins), including an end-to-end pass against a real
   MongoDB, plus the frontend production build. **This is the one that says a commit
   is not broken.**
-- **`.github/workflows/smoke-test.yml`** runs after a backend deploy and proves the
-  *deployed* instance is healthy — data is really there, the paywall still redacts,
-  one workspace still can't read another's. It needs three values set under
-  **Settings → Secrets and variables → Actions**:
+- **`.github/workflows/smoke-test.yml`** proves a *deployed* instance is healthy —
+  data is really there, the paywall still redacts, one workspace still can't read
+  another's. **It runs only when you ask for it**: Actions tab → Smoke test
+  deployed API → Run workflow. Use it after a deploy you want to verify.
+
+  The first time you run it, set three values under **Settings → Secrets and
+  variables → Actions**:
 
   | Kind | Name | Value |
   |---|---|---|
   | Variable | `API_URL` | `https://talent-tailor-api.onrender.com` (no trailing slash) |
-  | Variable | `TT_TEST_EMAIL` | A throwaway address; the account is created on first run and reused |
+  | Variable | `TT_TEST_EMAIL` | Any throwaway address — `tt` is just Talent Tailor, not an account anywhere. Every recruiter route needs a login, so the suite needs one to sign in with. Created on first run, reused after. |
   | Secret | `TT_TEST_PASSWORD` | Any password, 8+ characters |
 
-  **Until those are set this workflow fails, by design.** It used to skip silently,
-  which meant months of green ticks that had tested nothing. A red X you can fix
-  beats a green tick you can't trust.
+  Unconfigured, it fails rather than skipping — you asked for the run, so it owes
+  you an answer rather than a green tick that tested nothing. **None of this is
+  needed to launch.** It verifies a deployment; it does not gate one.
 
 ---
 
