@@ -139,11 +139,44 @@ gate.
 
 ### BL-03 · CI has never actually run
 
-`.github/workflows/smoke-test.yml` skips itself unless the repo Actions
-*variable* `API_URL` is set — and it isn't. **Every green checkmark on `main` is
-a skip, not a pass.** Separately, `backend/tests/backend_test.py` predates the
-accounts work in PR #3: it calls recruiter endpoints with no `Authorization`
-header, so it would 401 across the board even if the variable were set.
+**Status: mostly closed 2026-09-12.** Kept here until the last part is done.
 
-Two jobs: set the variable, then bring the test file up to date with auth.
-Until both are done, green CI means nothing.
+The original entry had three parts. Two are now fixed:
+
+- ~~`backend_test.py` predates the accounts work and would 401 across the board.~~
+  **Fixed.** It signs in (or signs up) first and carries a bearer token; verified
+  27/27 passing against a live instance.
+- ~~Nothing runs the code on a push.~~ **Fixed** by
+  `.github/workflows/tests.yml`: the hermetic backend suite, an end-to-end pass
+  against a real MongoDB, and the frontend production build — on every push and
+  pull request, needing no configuration. 126 tests, zero skips. The job fails
+  explicitly if the API doesn't come up, so `backend_test.py` can never skip its
+  way to a green tick again.
+
+**Still open:** `smoke-test.yml` needs its three values set in
+**Settings → Secrets and variables → Actions** (`API_URL`, `TT_TEST_EMAIL`,
+`TT_TEST_PASSWORD`). It now fails loudly rather than skipping, so `main` shows a
+red X until they are set. That is deliberate, but it does mean the red X on
+`main` is currently a configuration gap, not a code regression — worth setting
+before it becomes background noise people learn to ignore.
+
+### BL-04 · `share_slug` is 8 hex characters with a non-unique index
+
+**Raised:** 2026-09-12. **Status:** not started. **Severity:** low, but the
+failure mode is bad.
+
+`specs/launch-fix-plan.md` records this as *"`share_slug` widened to 12 hex
+characters with a unique index"*. The code says otherwise:
+`server.py:217` is `uuid.uuid4().hex[:8]` and `server.py:659` is
+`create_index("share_slug")` with no `unique=True`.
+
+8 hex characters is 32 bits. A collision is very unlikely at any realistic number
+of roles — but there is nothing stopping one, and `find_one({"share_slug": slug})`
+(`:767`, `:1748`, `:1784`) would then serve whichever document Mongo returned
+first. That is one recruiter's apply link quietly resolving to another recruiter's
+role, which is the kind of bug you cannot explain to a customer.
+
+Not fixed on the spot because adding `unique=True` to an index that already exists
+without it makes the *startup* call fail on a live deployment — it needs a drop and
+recreate, which is a migration, not a one-word change. Do it with the next
+migration that runs anyway.

@@ -1,0 +1,152 @@
+name: Tests
+
+# The suite that runs on the code itself, before anything is deployed.
+#
+# This is deliberately separate from smoke-test.yml. That one proves a *deployed*
+# instance is healthy and needs a live URL and credentials to mean anything. This
+# one needs nothing: it runs on every push and every pull request, on a clean
+# checkout, and is the signal that says "this commit is not broken".
+#
+# Nothing here is allowed to skip quietly. backend_test.py drives a live instance
+# over HTTP and skips itself when there isn't one, so the API is booted against a
+# real MongoDB first and the health check below FAILS the job if it didn't come
+# up. A skip that looks like a pass is how this repo previously went green for
+# months without testing anything.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.13 is what render.yaml pins for production. 3.11 is the floor the
+        # README claims to support; testing both keeps that claim honest.
+        python-version: ["3.11", "3.13"]
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: talent_tailor_ci
+      SECRET_KEY: ci-only-secret-not-used-anywhere-real
+      # Left unset on purpose. The LLM path needs a key and a network call; the
+      # deterministic skills.py fallback is what these tests pin down.
+      OPENROUTER_API_KEY: ""
+      SEED_DEMO_DATA: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/tests/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt -r backend/tests/requirements.txt
+
+      - name: Unit and integration suite (in-memory Mongo)
+        # Everything except backend_test.py, which needs a running server and is
+        # handled below. --ignore rather than a skip, so this step's count is real.
+        run: pytest backend/tests -q --ignore=backend/tests/backend_test.py
+
+      - name: Boot the API against MongoDB
+        working-directory: backend
+        run: |
+          uvicorn server:app --host 127.0.0.1 --port 8000 --log-level warning \
+            > "$RUNNER_TEMP/api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/api.pid"
+
+      - name: Wait for the API to be healthy
+        # Fails the job if the server never came up. Without this, backend_test.py
+        # would skip itself and the run would go green having tested nothing.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8000/api/health > /dev/null; then
+              echo "API healthy after ${i}s"
+              curl -s http://127.0.0.1:8000/api/health
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API never became healthy — backend_test.py would have skipped silently."
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+
+      - name: End-to-end suite against the running API
+        env:
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+        run: pytest backend/tests/backend_test.py -q
+
+      - name: API logs
+        if: always()
+        run: cat "$RUNNER_TEMP/api.log" || true
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        env:
+          # Render sets CI=true, which turns ESLint warnings into build failures.
+          # render.yaml sets CI=false for the same reason; match it here so this
+          # job and the real deploy agree on what counts as a failure.
+          CI: "false"
+          # A stand-in origin. This job proves the bundle compiles; which backend
+          # it points at is a deploy-time choice made in the Render dashboard.
+          # It still has to satisfy scripts/check-env.js, which is the point.
+          REACT_APP_BACKEND_URL: https://talent-tailor-api.example.com
+        run: npm run build
+
+      - name: Check the bundle has a real API URL baked in
+        # P0-1 from the launch plan: an unset variable produces a bundle that
+        # calls "undefined/api" and fails only once deployed. Cheap to assert.
+        #
+        # Only the emitted .js is checked, never .js.map — the source map carries
+        # the original text of the guard in src/lib/api.js, which mentions the
+        # literal "undefined/api" and would match every time.
+        working-directory: frontend
+        run: |
+          if grep -q "undefined/api" build/static/js/*.js; then
+            echo "::error::Built bundle contains 'undefined/api' — REACT_APP_BACKEND_URL was not baked in."
+            exit 1
+          fi
+          if ! grep -q "talent-tailor-api.example.com" build/static/js/*.js; then
+            echo "::error::REACT_APP_BACKEND_URL is not present in the bundle — it was not inlined at build time."
+            exit 1
+          fi
+          echo "Backend URL correctly baked into the bundle."
