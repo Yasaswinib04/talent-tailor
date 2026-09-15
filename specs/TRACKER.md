@@ -20,16 +20,18 @@ one-line summary here.
 
 ---
 
-## 1 · Blocked on you — nothing else moves until these do
+## 1 · Blocked on you
 
-| # | What | Why it matters |
+Deploy setup reported done by the owner 2026-09-15, except where noted.
+
+| # | What | State |
 |---|---|---|
-| 1 | **Merge [PR #11](https://github.com/Yasaswinib04/talent-tailor/pull/11)** | It is green, mergeable, and a draft. Until it merges, the UAT-02 action bar, the CI workflow and the corrected runbook are not on `main`. |
-| 2 | **Set `MONGO_URL` + `REACT_APP_BACKEND_URL` on Render** | The only two variables the app genuinely cannot run without. [DEPLOY.md Step 3](../DEPLOY.md) |
-| 3 | **Open the deployed app and confirm it serves** | **Nobody has verified this.** The agent environment's network policy 403s `onrender.com` and the custom domain, so it could not be checked from a session. |
-| 4 | **Set `SECRET_KEY`, `OPENROUTER_API_KEY`, `CORS_ORIGINS`** | Not blockers. Without the OpenRouter key the app silently runs on the keyword fallback — check `"llm": true` at `/api/health`. |
-| 5 | **Cron pinger before any traffic push** | Free Render sleeps after 15 min; the next visitor waits ~50s. Do this *before* posting a link anywhere. [DEPLOY.md Step 7](../DEPLOY.md) |
-| 6 | **A payment rail before day 14 of the first trial** | Signups get 14 days free with no card, so this is not a launch-day item — but on day 14 you cannot take money without it. |
+| 1 | **Merge [PR #11](https://github.com/Yasaswinib04/talent-tailor/pull/11)** | **OPEN.** `main` is at `21d8cdc`; the PR's 4 commits are still on the branch. **Render deploys from `main`, so whatever is live does not have the UAT-02 action bar, the CI workflow, or the corrected runbook.** |
+| 2 | `MONGO_URL` + `REACT_APP_BACKEND_URL` on Render | Reported done |
+| 3 | Confirm the deployed app serves | Reported done. Never verified from a session — the network policy 403s `onrender.com` and the custom domain. |
+| 4 | `SECRET_KEY`, `OPENROUTER_API_KEY`, `CORS_ORIGINS` | Reported done. Worth one look at `/api/health` for `"llm": true` — `false` means it is silently running the keyword fallback. |
+| 5 | **Cron pinger** | **Deferred** — "will figure later". Free Render sleeps after 15 min idle and the next visitor waits ~50s, so this is the one to do before any link goes anywhere with traffic behind it. [DEPLOY.md Step 7](../DEPLOY.md) |
+| 6 | A payment rail before day 14 of the first trial | Reported done |
 
 ## 2 · Product — open findings
 
