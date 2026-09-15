@@ -8,10 +8,14 @@ one-line summary here.
 
 | Where the detail lives | What it holds |
 |---|---|
+| [`docs/session-log.md`](../docs/session-log.md) | **The decision record**, newest-first. Read it before re-opening a product decision — it records the *no*s too. |
 | [`UAT.md`](UAT.md) | Tester-raised findings, per round. `UAT-*` |
 | [`BACKLOG.md`](BACKLOG.md) | Ideas and known debt not in the build queue. `BL-*` |
 | [`PRICING.md`](PRICING.md) | The pricing decision and what it deliberately defers |
 | This file | Who is blocked on what, right now |
+
+Section 1 below folds in the open questions from session-log Entry 007a §5, so
+there is one list to work from rather than two that drift apart.
 
 > ⚠️ **[`launch-fix-plan.md`](launch-fix-plan.md) is a historical record and is
 > wrong in two places.** It records `share_slug` as "12 hex with a unique index"
@@ -32,6 +36,14 @@ Deploy setup reported done by the owner 2026-09-15, except where noted.
 | 4 | `SECRET_KEY`, `OPENROUTER_API_KEY`, `CORS_ORIGINS` | Reported done. Worth one look at `/api/health` for `"llm": true` — `false` means it is silently running the keyword fallback. |
 | 5 | **Cron pinger** | **Deferred** — "will figure later". Free Render sleeps after 15 min idle and the next visitor waits ~50s, so this is the one to do before any link goes anywhere with traffic behind it. [DEPLOY.md Step 7](../DEPLOY.md) |
 | 6 | A payment rail before day 14 of the first trial | Reported done |
+
+Carried in from session-log Entry 007a §5 — open, and not covered above:
+
+| What | Why it matters |
+|---|---|
+| **Parse 5 real resumes with a live OpenRouter key** | Open across seven entries. Every commercial claim rests on this path and it is still the least-exercised one — now in a paid product. |
+| **Take one real payment end to end** | Razorpay checkout and code redemption are both server-verified and unit-tested; neither has been run against real money. One ₹1,999 transaction, or one manual UPI + code redemption. |
+| **Rotate the Atlas password** | Carried from Entry 005. **Set `SECRET_KEY` first** — without it the key is derived from `MONGO_URL`, so rotating the password signs out every user. |
 
 ## 2 · Product — open findings
 
