@@ -105,8 +105,17 @@ Scanned-image PDFs aren't OCR'd — the applicant is asked to fill the form manu
 
 ## Monetization
 
-The shortlist is free to see, paid to use: every role reveals its top 3 candidates in full;
-the rest are ranked but identity-redacted (server-side) until the role is unlocked. Unlocking
-(₹`UNLOCK_PRICE_INR`, default 1999, one-time per role) reveals everyone and enables CSV
-export. Payment is currently manual: the buyer pays you directly, you share the `UNLOCK_CODE`,
-they enter it on the job page — swap that check for a Razorpay webhook to go fully self-serve.
+The shortlist is free to see, paid to use. Access is **time on the workspace, not a flag on a
+role**: every account starts with a `TRIAL_DAYS` (default 14) trial needing no card, after which
+a plan is ₹`PLAN_MONTHLY_INR` (default 1999) for 30 days. While lapsed, a workspace keeps a
+small, frozen free preview and everyone else is ranked but identity-redacted server-side; CSV
+export refuses with a 402.
+
+**Anyone revealed while paying stays revealed forever**, which is why the reveal set is
+persisted rather than recomputed — recruiters rotate candidate pools, so the pool is the asset,
+and pricing per role or per person would charge twice for the same person.
+
+Two rails, both server-verified: Razorpay checkout (set `RAZORPAY_KEY_ID` and
+`RAZORPAY_KEY_SECRET`) auto-grants on a verified HMAC signature, and a manual bridge where the
+buyer pays by UPI (`UPI_VPA`) and redeems `UNLOCK_CODE` — single-use per workspace, since it now
+grants days rather than flipping one boolean.
