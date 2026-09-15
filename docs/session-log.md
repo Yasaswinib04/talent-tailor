@@ -234,7 +234,7 @@ is the single fact about launch readiness that cannot be read from the repo and
 | Question | Why it matters | Next action |
 |---|---|---|
 | Does a real resume parse correctly with a live key? | **Open across seven entries.** Every commercial claim rests on it, it is still the least-exercised path, and it is now the least-exercised path *in a paid product* | Upload 5 real resumes. Unchanged, and more overdue than last time |
-| Set `API_URL`, `TT_TEST_EMAIL`, `TT_TEST_PASSWORD`? | CI is red and has never smoke-tested a deploy. The launch was verified by hand instead — that does not scale to the next one | Repo Settings → Secrets and variables → Actions. Two variables, one secret |
+| Merge PR #11 rather than configure the three CI settings? | **Mostly answered already — check before acting.** PR #11 (`claude/launch-today-qyx0r9`, draft, 2026-09-12) adds `tests.yml`: the suite on a clean checkout against a real MongoDB service, no credentials needed, explicitly failing rather than skipping. It is built on `21d8cdc`, passing, and merges cleanly into `main`. That covers "is this commit broken". The three settings remain needed only for `smoke-test.yml`, which answers the different question "is the *deployed* instance healthy" | Review and merge PR #11 first, then decide whether deploy-verification is still worth three settings |
 | Has anyone actually paid through the new rail end to end? | Razorpay checkout and code redemption are both server-verified and both unit-tested, but neither has been run against real money | One ₹1,999 test transaction, or one manual UPI + code redemption |
 | Rotate the Atlas password? | Carried from Entry 005, still open | Rotate — **set `SECRET_KEY` first**, or it signs out every user |
 
