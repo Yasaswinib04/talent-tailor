@@ -4,6 +4,9 @@ Ideas and known debt that are real but not in the current build queue. Anything
 actively being worked sits in [`UAT.md`](UAT.md) instead; items move from here to
 there when they're picked up.
 
+**For everything open at a glance, start at [`TRACKER.md`](TRACKER.md)** — it
+indexes this file, `UAT.md`, and the deploy chores that live in neither.
+
 ---
 
 ## BL-01 · Import a JD from a URL
@@ -222,3 +225,40 @@ recoverable rather than rewritten.
 
 Measured with the pre-existing code, not introduced by any change in the UAT-02
 branch: the same 772px is present with `JobSetup.js` stashed.
+
+### BL-11 · "Save draft" needs a draft to save
+
+**Raised:** 2026-09-12, while building UAT-02. **Status:** not started.
+**Blocks:** the third button in the agreed UAT-02 action bar.
+
+The round-2 design for the bottom action bar is Cancel · **Save draft** · Publish
+role. Only two shipped, because the third would have lied.
+
+There is no draft in the data model:
+
+| | |
+|---|---|
+| `server.py:214` | `Job.status` defaults to `"open"` |
+| `server.py:222` | `JobCreate` has no `status` field at all, so a client cannot ask for one |
+| `server.py:722` | `POST /api/jobs` runs `_attach_matching_candidates` on every create |
+| `server.py:700`, `:719` | …and the create is checked against `FREE_ROLE_LIMIT`, then increments `jobs_created_total` |
+
+So a "Save draft" button today would publish the role *and* spend one of the
+recruiter's free roles, while telling them it had done neither. That is the
+dead-and-dishonest control UAT-01 and decision 1 of round 2 exist to prevent.
+
+**What it needs:**
+
+1. `status` accepted on `JobCreate`, constrained to `Literal["open", "draft"]`.
+2. `create_job` skips `_attach_matching_candidates` for a draft.
+3. A decision, which is a pricing question rather than a code one: **does a draft
+   consume a free role?** It surfaces no candidates, so it is not the
+   pool-harvesting vector the cap exists to stop — but it is still a row someone
+   can create without limit. Recommend not counting it, and capping drafts
+   separately if it is ever abused.
+4. Publishing a draft later has to run the attach step that create skipped.
+5. The Published / Drafts grouping from **UAT-03** — a draft the Roles view
+   cannot distinguish from a live role is worse than no draft at all.
+
+Items 1–4 and 5 should land together; shipping either half alone leaves the
+product lying in a different direction.

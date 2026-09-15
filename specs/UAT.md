@@ -3,7 +3,8 @@
 The running record of every UAT round. One file, appended per round. Older
 round-specific reports (`uat-report-2026-08-08.md`) stay where they are; new
 rounds go here so there is one place to look. Ideas parked for later live in
-[`BACKLOG.md`](BACKLOG.md).
+[`BACKLOG.md`](BACKLOG.md), and [`TRACKER.md`](TRACKER.md) indexes everything
+still open across both.
 
 **Status legend:** `OPEN` · `AGREED` (signed off, not built) · `FIXED` · `DEFERRED` · `WONTFIX`
 

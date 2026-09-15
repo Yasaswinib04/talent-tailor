@@ -9,7 +9,8 @@ unlocks the full shortlist + CSV export per role (₹1,999 by default).
 - **Frontend** — React 18 (CRA) + Tailwind + Framer Motion + Radix UI
 - **Backend** — FastAPI + MongoDB (motor)
 - **Product context** — `memory/PRD.md`
-- **QA** — test plan and latest report in `specs/`
+- **Open work** — [`specs/TRACKER.md`](specs/TRACKER.md) indexes everything outstanding
+- **QA** — UAT log in [`specs/UAT.md`](specs/UAT.md), backlog in [`specs/BACKLOG.md`](specs/BACKLOG.md)
 - **Deploy** — [DEPLOY.md](DEPLOY.md) (free: Render + MongoDB Atlas)
 
 ## Prerequisites
