@@ -35,7 +35,7 @@ export default function Landing() {
           <div className="font-editorial text-xl leading-none tracking-tight">
             talent<span className="text-brand">.</span>tailor
           </div>
-          <Link to="/app" className="text-sm text-white/72 hover:text-white transition-colors">
+          <Link to="/login" className="text-sm text-white/72 hover:text-white transition-colors">
             Sign in
           </Link>
         </div>
@@ -57,11 +57,11 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-wrap items-center gap-4 mt-10">
-            <Link to="/app" data-testid="landing-primary-cta" className="btn btn-primary">
-              Try the live demo <ArrowRight size={15} />
+            <Link to="/signup" data-testid="landing-primary-cta" className="btn btn-primary">
+              Start free <ArrowRight size={15} />
             </Link>
             <span className="text-sm text-white/65">
-              Real data, no setup — takes about two minutes.
+              Sample data included — try it on 20 candidates, no data entry.
             </span>
           </div>
 
