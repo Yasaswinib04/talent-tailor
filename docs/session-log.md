@@ -120,6 +120,157 @@ data" button on an empty dashboard.
   user (→ login), hero = new user (→ signup). The one-screen hero keeps its CTA.
 - **No overpromising copy.** Drop "no setup"; name the sample data instead.
 
+## Entry 007a — The launch
+
+| | |
+|---|---|
+| **Recorded** | 2026-09-16 10:40 UTC |
+| **Session window** | 2026-09-09 (the launch) → 2026-09-16 (written up) |
+| **Session** | `cdf72084-2f85-410a-9fba-c55c061afa0c` · local session, no shareable URL |
+| **Commits** | `5ba3004`, `35148a5`, `c908a7d`, `21d8cdc` (2026-09-09) — pushed straight to `main`, no PR |
+| **Production at close** | `21d8cdc` — verified live on both services |
+| **Supersedes** | — (no decision reversed; two factual corrections in §3, one of them to this session's own earlier claim) |
+
+**Numbered `007a`, not `008`.** Entry 008 was written on 2026-09-16 and is
+referenced by name in `9c4ff13`'s commit message, which git will not let anyone
+edit. This session's work predates it (2026-09-09), so renumbering 008 would
+break an immutable reference to buy nothing. Same move as Entry 000: a
+retroactive entry takes a non-sequential number and sits in date order.
+
+### 1. Problems at hand
+Opened with "we ready to launch right?" after several weeks of work. The answer
+was no, for a reason nobody had stated: **the thing decided as the product to
+sell was not the thing deployed.** The ₹1,999/month pass (Entry 006, `specs/PRICING.md`)
+existed only as `07954d1` on an **unpushed local `main`**, which was itself four
+commits behind `origin/main`. Production was still serving the per-role one-time
+unlock — the model the pricing decision explicitly rejected ("never price per
+role or per person"). Merging the two conflicted.
+
+### 2. What was discussed
+Very little. The session was almost entirely verification and execution: read
+the real state, merge, resolve, test, review, deploy. The one question put to
+the PM was whether a payment rail was actually configured in Render, because it
+is the single fact about launch readiness that cannot be read from the repo and
+`/api/billing/config` requires a login.
+
+### 3. What was concluded
+
+- **The repo disagreed with itself across three refs, and the docs described the
+  one you could not check out.** `CLAUDE.md` documented `access_until`,
+  `grant_access`, `_visible_candidate` and `PLANS` — none of which existed on the
+  branch `CLAUDE.md` was committed to. They were on local `main`. Any claim in
+  this repo about "the other branch" needs its ref named before it can be
+  trusted.
+- **The paywall — the revenue mechanism — had zero passing test coverage and had
+  had none since `07954d1`.** That commit replaced the per-role unlock and left
+  the five tests pinning the old model behind. Verified by running the suite on
+  unmerged local `main`: **5 failed, 23 passed**. So the failures were inherited,
+  not introduced by the merge; but it meant `_redact`, `_has_access` and the
+  anti-harvesting preview shipped unverified.
+- **Tests that pass prove nothing until they are shown to fail.** The new paywall
+  suite went 16/16 green on first run, which is suspicious for regression tests.
+  Three mutants — a no-op `_visible_candidate`, a recomputed preview, a
+  string-comparing `_has_access` — were each caught, and the second exposed one
+  test as too weak to catch the mutation it was written for. It was rewritten.
+- **The startup migrations had no coverage at all**, and they rewrite the
+  production database on first boot. Now pinned: a pre-access-model account gets
+  a trial rather than a paywall, an account that already has access is neither
+  shortened nor extended, a role bought under the old price carries its
+  candidates into the permanent reveal set, and a crash-looping instance cannot
+  grant a month per boot.
+
+**Factual corrections — the earlier entries stand as written:**
+
+- **Entry 007 §3 has the access model on the wrong ref.** It states `07954d1`
+  "exists only on this branch and has never been pushed to `main`", verified with
+  `git merge-base --is-ancestor`. The commit is on **local `main`** and on no
+  other ref: `git branch -a --contains 07954d1` returned `main` alone, with no
+  remote. It was never on `claude/talent-tailor-monetization-c4qvat`. Entry 007's
+  underlying point — that it had not shipped — was right; the location was not.
+- **This session's own CI claim was wrong, and is corrected here rather than
+  edited out.** Mid-session this assistant told the PM that `CLAUDE.md`'s
+  "the workflow fails rather than skips" note was false, citing the guard step on
+  `origin/main` and eight green runs of 7–9 seconds against empty
+  `gh variable list` / `gh secret list`. That evidence was sound **for the code on
+  `origin/main`**, and the conclusion still wrong: a fail-loud version of the
+  workflow was sitting on unpushed local `main`, which is what the docs described
+  — the identical branch-confusion error this session had just diagnosed in
+  `CLAUDE.md`. Merging made fail-loud the only version. **CI is now red, and
+  correctly so**: the three settings are genuinely unset.
+
+### 4. What we achieved
+
+- **Shipped the pricing model that was decided six weeks ago.** `21d8cdc` merged
+  local `main`'s access model with `origin/main`'s PRs #1/#8/#9/#10 — six conflict
+  blocks across `server.py` and `JobDetail.js`, every one of them the same shape
+  (keep HEAD's access logic, keep origin's analytics, drop the per-job unlock).
+  Production verified live on both services: payment routes moved to
+  `/api/billing/{create-order,verify-payment,redeem}`, the per-role
+  `/api/jobs/{id}/unlock` returns 404, and the web bundle hash matched the local
+  build exactly.
+- **`tests/test_paywall.py`** (new, hermetic, mutation-checked) and
+  **`tests/test_migrations.py`** (new). Suite went from *5 failed / 23 passed* to
+  **126 collected, 99 of them hermetic and needing no server**.
+- **Two real bugs fixed in passing.** The paywall banner still gated on the
+  retired `job.unlocked`, so a paying workspace would have been shown the
+  "unlock for ₹1,999" CTA it had already paid to remove. And `/code-review low`
+  caught the merge loosening the bulk-upload throttle 12× (10 → 120 resumes a
+  minute of Opus-tier calls) on a tier that asks for no card; both bounds now apply.
+- **Analytics event renamed** `shortlist_unlocked` → `access_granted`, with
+  `rail`, `days` and `amount_inr`. The old name described a per-job unlock that no
+  longer exists and carried a `job_id` no longer in scope. Checked first that
+  nothing referenced it — PR #9 was one day old, so the rename cost nothing.
+  The revenue event now sits *inside* the atomic claim guard, so a replayed
+  payment callback cannot book a second sale.
+- **The record moved to trunk.** `docs/session-log.md`, `CLAUDE.md` and
+  `.claude/settings.json` were stranded on the monetization branch — Entry 007's
+  own closing finding. They belong on `main` now that `main` is what runs.
+  `CLAUDE.md` was rewritten for it: the scope warning is gone, the README gotcha
+  **inverted** (the README described per-role unlock and is now the stale one, so
+  its Monetization section was rewritten), and the CI note states the red.
+
+### 5. Open questions — for Yasaswini
+
+| Question | Why it matters | Next action |
+|---|---|---|
+| Does a real resume parse correctly with a live key? | **Open across seven entries.** Every commercial claim rests on it, it is still the least-exercised path, and it is now the least-exercised path *in a paid product* | Upload 5 real resumes. Unchanged, and more overdue than last time |
+| Set `API_URL`, `TT_TEST_EMAIL`, `TT_TEST_PASSWORD`? | CI is red and has never smoke-tested a deploy. The launch was verified by hand instead — that does not scale to the next one | Repo Settings → Secrets and variables → Actions. Two variables, one secret |
+| Has anyone actually paid through the new rail end to end? | Razorpay checkout and code redemption are both server-verified and both unit-tested, but neither has been run against real money | One ₹1,999 test transaction, or one manual UPI + code redemption |
+| Rotate the Atlas password? | Carried from Entry 005, still open | Rotate — **set `SECRET_KEY` first**, or it signs out every user |
+
+### 6. Decisions made
+
+**Scoped out (deliberate no — revisit only on evidence):**
+- **A PR for the launch merge.** Pushed straight to `main`. Justified by the
+  branch being a reconciliation of work the PM already owned, fully tested, and
+  reviewed — and by three draft PRs already open and stale. Would be the wrong
+  call with a second engineer on the repo.
+- **Renumbering Entry 008.** See the note under this entry's title.
+
+**Feature calls:**
+- **Redaction tests live in the hermetic suite, not `backend_test.py`.**
+  Structural, not stylistic: observing redaction needs a workspace whose plan has
+  expired, every workspace `backend_test.py` can create over HTTP has a live
+  14-day trial, and there is deliberately no endpoint that revokes access. The
+  HTTP suite now asserts only what a live server can honestly prove — the
+  entitlement is reported without leaking secrets, export agrees with it, and the
+  second paywall path is gone.
+- **Both rate limits on bulk upload.** Burst (12/min) and sustained (10 per 10
+  min). Not redundant: `PARSE_RATE_LIMIT` is env-configurable, so raising it for
+  the public apply endpoint would otherwise loosen the paid path silently.
+
+**Prioritisation:**
+- **Verification outranked shipping speed, in a session explicitly asked to hurry.**
+  The launch was one `git push`; roughly three quarters of the session went to
+  proving the thing being launched worked. The mutation pass and the migration
+  tests were both added *after* the code was otherwise ready to ship.
+- **Establish the baseline before claiming a regression.** The five failing tests
+  looked like merge damage. Checking out unmerged `main` and running the suite
+  there took two minutes and changed the diagnosis completely — from "I broke the
+  paywall" to "the paywall has been untested for three weeks".
+
+---
+
 ## Entry 007 — Session tooling, branch drift
 
 | | |
