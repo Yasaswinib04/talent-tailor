@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Talent Tailor — an HR candidate-shortlisting app. React (CRA) + FastAPI + MongoDB.
 Product context lives in `memory/PRD.md`, pricing reasoning in `specs/PRICING.md`, QA in `specs/`,
-and open work in `specs/BACKLOG.md`.
+and open work in `specs/TRACKER.md` — which indexes `specs/BACKLOG.md` (`BL-*`), `specs/UAT.md`
+(`UAT-*`) and the deploy chores that live in neither.
 
 > **This file describes `main`, and `main` is what production runs.** It was written on the
 > `claude/talent-tailor-monetization-c4qvat` branch while describing an access model that lived
@@ -54,12 +55,28 @@ workspace whose plan has expired, every workspace `backend_test.py` can create o
 live trial, and there is deliberately no endpoint that revokes access — so it can only be set up
 by reaching into the database. Put new paywall tests there.
 
-CI (`.github/workflows/smoke-test.yml`) runs `backend_test.py` against the deployed API on
-pushes to `main` touching `backend/**`. It **fails loudly** when the repo Actions variables
-(`API_URL`, `TT_TEST_EMAIL`) or secret (`TT_TEST_PASSWORD`) are unset — they are, so **the job
-is red and has never actually smoke-tested a deploy**. An earlier version of this workflow
-skipped instead, going green in 7 seconds having tested nothing; if you see a suspiciously fast
-green run in the history, that is what it was.
+**Two workflows, answering different questions. Do not conflate them.**
+
+`.github/workflows/tests.yml` answers *"is this commit broken"*. It runs on every push and
+pull request, on a clean checkout, needing **no configuration at all**: the 99 hermetic tests,
+then the API booted against a real `mongo:7` service so `backend_test.py`'s 27 run for real —
+126 in total, zero skipped — on Python 3.11 and 3.13 (3.13 is what `render.yaml` pins), plus
+the frontend production build with an assertion that the backend URL was actually inlined.
+The API boot is health-checked as **its own failing step**, because `backend_test.py` skips
+itself when no server is up and a skip that reads as a pass is how this repo previously went
+green having tested nothing.
+
+`.github/workflows/smoke-test.yml` answers the different question *"is the **deployed**
+instance healthy"* — data really there, paywall still redacting, one workspace still unable to
+read another's. It needs `API_URL`, `TT_TEST_EMAIL` and `TT_TEST_PASSWORD` in repo Actions
+settings, and **they are still unset, so it has never smoke-tested a deploy.** It is
+`workflow_dispatch` only: it used to fire on every push to `main` and fail on the missing
+config, so `main` carried a standing red X that reported a settings gap rather than anything
+about the code. Failing loudly on a run you asked for is right; failing loudly on every push
+for months is just an X people learn to scroll past. Run it from the Actions tab after a deploy.
+
+An older version of the smoke test *skipped* on missing config, going green in 7 seconds having
+tested nothing; a suspiciously fast green run in the history is that.
 
 ## Architecture
 
@@ -171,5 +188,8 @@ And two standing rules:
 
 - **Never report a UI bug observed only in the automated browser pane.** Confirm it server-side
   first (see Gotchas). Faded screens and stuck transitions are the harness, not the product.
-- **Never describe CI as passing** without checking that `API_URL`, `TT_TEST_EMAIL` and
-  `TT_TEST_PASSWORD` are actually configured on the repo. Until they are, the job is red.
+- **Never say "CI passes" without saying which workflow.** `tests.yml` going green is a real
+  signal about the code and needs no configuration. `smoke-test.yml` says nothing about any
+  deploy until `API_URL`, `TT_TEST_EMAIL` and `TT_TEST_PASSWORD` are set on the repo — they are
+  not, and it has never run against a live instance. A green `tests.yml` is **not** evidence
+  that anything is deployed or healthy.

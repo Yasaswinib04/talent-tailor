@@ -158,6 +158,28 @@ export default function JobSetup() {
 
   const weightsTotal = Object.values(form.scoring_weights).reduce((a, b) => a + b, 0);
 
+  // What the bottom bar reports before you commit. Only the title actually
+  // gates publishing; the rest are statements of what will happen, not gates —
+  // a recruiter is allowed to publish a thin role and fill it in later.
+  const jdGiven = (form.jd || "").trim().length >= 40;
+  const readiness = !form.title.trim()
+    ? { tone: "warn", text: "Add a role title to publish" }
+    : extracting
+    ? { tone: "muted", text: "Reading your job description…" }
+    : form.skills.length === 0
+    ? {
+        tone: "warn",
+        text: jdGiven
+          ? "No skills detected — candidates will be ranked on experience and filters alone"
+          : "No job description yet — without skills, every candidate scores the same",
+      }
+    : {
+        tone: "ok",
+        text: `${form.skills.length} skill${form.skills.length === 1 ? "" : "s"} · ${
+          form.screening_questions.length
+        } screening question${form.screening_questions.length === 1 ? "" : "s"}`,
+      };
+
   const publish = async () => {
     if (!form.title.trim()) {
       // Never a dead control: point at the field that is missing and focus it.
@@ -200,29 +222,11 @@ export default function JobSetup() {
             <div className="font-display text-lg font-medium">{form.title || "Untitled role"}</div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => nav("/app")} data-testid="js-cancel-btn" className="text-sm text-white/72 hover:text-white transition-colors">Cancel</button>
-          <button
-            onClick={publish}
-            disabled={saving}
-            data-testid="js-publish-btn"
-            className="btn btn-primary"
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            Publish role
-          </button>
-        </div>
+        {/* UAT-02: context only. Cancel and Publish live in one bar at the
+            bottom, where the form ends — splitting related actions across two
+            ends of a four-screen page makes people hunt for them. Room is left
+            here for a quiet "saved 2s ago" once drafts autosave. */}
       </div>
-
-      {publishError && (
-        <div
-          data-testid="js-publish-error"
-          className="mx-8 mt-4 flex items-start gap-2 text-[12px] text-amber-400 border border-amber-400/40 bg-amber-400/5 px-4 py-3"
-        >
-          <Info size={13} className="mt-0.5 shrink-0" />
-          <span>{publishError}</span>
-        </div>
-      )}
 
       {/* Split layout */}
       <div className="grid md:grid-cols-2 gap-0 min-h-[calc(100vh-8rem)]">
@@ -614,6 +618,64 @@ export default function JobSetup() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* UAT-02 · one action bar, where the work ends.
+          Sticky rather than fixed, so it pins while the form scrolls and then
+          settles at the true bottom. Publish stays clickable with a missing
+          title (UAT-01) — clicking scrolls to the field and says why. */}
+      <div
+        data-testid="js-action-bar"
+        className="sticky bottom-0 z-20 border-t hairline bg-app/95 backdrop-blur-sm px-8 py-4"
+      >
+        {publishError && (
+          <div
+            data-testid="js-publish-error"
+            className="mb-3 flex items-start gap-2 text-[12px] text-amber-400 border border-amber-400/40 bg-amber-400/5 px-4 py-3"
+          >
+            <Info size={13} className="mt-0.5 shrink-0" />
+            <span>{publishError}</span>
+          </div>
+        )}
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="min-w-0">
+            <div
+              data-testid="js-readiness"
+              className={`font-mono-label mb-1 ${
+                readiness.tone === "warn"
+                  ? "text-amber-400"
+                  : readiness.tone === "ok"
+                  ? "text-brand"
+                  : "text-white/72"
+              }`}
+            >
+              {readiness.text}
+            </div>
+            {/* Nothing else on this page says what the button actually does. */}
+            <div className="text-[12px] text-white/72 max-w-xl">
+              Publishing creates the role, opens its apply link, and adds everyone already
+              in your pool who clears the filters. You can edit all of it afterwards.
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => nav("/app")}
+              data-testid="js-cancel-btn"
+              className="text-sm text-white/72 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={publish}
+              disabled={saving}
+              data-testid="js-publish-btn"
+              className="btn btn-primary"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              Publish role
+            </button>
           </div>
         </div>
       </div>

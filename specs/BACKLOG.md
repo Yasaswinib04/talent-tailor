@@ -4,6 +4,9 @@ Ideas and known debt that are real but not in the current build queue. Anything
 actively being worked sits in [`UAT.md`](UAT.md) instead; items move from here to
 there when they're picked up.
 
+**For everything open at a glance, start at [`TRACKER.md`](TRACKER.md)** — it
+indexes this file, `UAT.md`, and the deploy chores that live in neither.
+
 ---
 
 ## BL-01 · Import a JD from a URL
@@ -139,11 +142,123 @@ gate.
 
 ### BL-03 · CI has never actually run
 
-`.github/workflows/smoke-test.yml` skips itself unless the repo Actions
-*variable* `API_URL` is set — and it isn't. **Every green checkmark on `main` is
-a skip, not a pass.** Separately, `backend/tests/backend_test.py` predates the
-accounts work in PR #3: it calls recruiter endpoints with no `Authorization`
-header, so it would 401 across the board even if the variable were set.
+**Status: mostly closed 2026-09-12.** Kept here until the last part is done.
 
-Two jobs: set the variable, then bring the test file up to date with auth.
-Until both are done, green CI means nothing.
+The original entry had three parts. Two are now fixed:
+
+- ~~`backend_test.py` predates the accounts work and would 401 across the board.~~
+  **Fixed.** It signs in (or signs up) first and carries a bearer token; verified
+  27/27 passing against a live instance.
+- ~~Nothing runs the code on a push.~~ **Fixed** by
+  `.github/workflows/tests.yml`: the hermetic backend suite, an end-to-end pass
+  against a real MongoDB, and the frontend production build — on every push and
+  pull request, needing no configuration. 126 tests, zero skips. The job fails
+  explicitly if the API doesn't come up, so `backend_test.py` can never skip its
+  way to a green tick again.
+
+- ~~A permanent red X on `main` that says nothing about the code.~~ **Fixed
+  2026-09-12.** `smoke-test.yml` is now `workflow_dispatch` only.
+
+  Failing loudly on missing configuration was the right instinct and is kept —
+  but it was firing on every push to `main`, so an unconfigured repo showed a
+  standing red X that reported a settings gap, not a regression. That is the
+  failure mode the original entry warned about, arriving from the other
+  direction: a tick you can't trust and an X you learn to ignore are the same
+  problem. `tests.yml` now covers every push with a signal that needs no setup,
+  so the deployed-instance check runs on demand instead.
+
+**Still open:** the three values (`API_URL`, `TT_TEST_EMAIL`,
+`TT_TEST_PASSWORD`) are still unset, so the smoke test can't be run until they
+are. It needs a live API URL, so it can't be set up before there is something
+deployed to point it at. Not a launch gate — it verifies a deployment rather
+than gating one.
+
+### BL-04 · `share_slug` is 8 hex characters with a non-unique index
+
+**Raised:** 2026-09-12. **Status:** not started. **Severity:** low, but the
+failure mode is bad.
+
+`specs/launch-fix-plan.md` records this as *"`share_slug` widened to 12 hex
+characters with a unique index"*. The code says otherwise:
+`server.py:217` is `uuid.uuid4().hex[:8]` and `server.py:659` is
+`create_index("share_slug")` with no `unique=True`.
+
+8 hex characters is 32 bits. A collision is very unlikely at any realistic number
+of roles — but there is nothing stopping one, and `find_one({"share_slug": slug})`
+(`:767`, `:1748`, `:1784`) would then serve whichever document Mongo returned
+first. That is one recruiter's apply link quietly resolving to another recruiter's
+role, which is the kind of bug you cannot explain to a customer.
+
+Not fixed on the spot because adding `unique=True` to an index that already exists
+without it makes the *startup* call fail on a live deployment — it needs a drop and
+recreate, which is a migration, not a one-word change. Do it with the next
+migration that runs anyway.
+
+
+### BL-10 · The responsive pass is not in the code
+
+**Raised:** 2026-09-12, measured in a browser. **Status:** not started.
+**Severity:** high if any recruiter opens this on a phone.
+
+`specs/launch-fix-plan.md` records P2-7 as closed, with *"30 browser cases across
+iPhone SE (375), iPhone 14 (390) and iPad mini (768). Every screen — dashboard,
+all three tabs, job setup, role page, candidate profile, login, onboarding and
+public apply — reports `scrollWidth === clientWidth`."*
+
+Measured on `main` today at a 390px viewport:
+
+| Screen | scrollWidth | clientWidth |
+|---|---|---|
+| `/app` dashboard | 772 | 390 |
+| `/app/jobs/new` | 772 | 390 |
+
+Both overflow by the same 382px, and the cause is visible in the source:
+`components/AppShell.js:12` is `<aside className="w-56 border-r hairline flex
+flex-col shrink-0 h-screen sticky top-0">`. There is no `md:` breakpoint, no
+drawer, no menu button — none of the off-canvas behaviour that entry describes.
+The `h-screen sticky top-0` from UAT-07 is there, so the rail *was* touched since;
+the responsive work simply is not.
+
+Most likely lost in "Port the UAT branch onto main's architecture (#1)". Worth
+confirming before rebuilding it — if that branch still exists, the work may be
+recoverable rather than rewritten.
+
+Measured with the pre-existing code, not introduced by any change in the UAT-02
+branch: the same 772px is present with `JobSetup.js` stashed.
+
+### BL-11 · "Save draft" needs a draft to save
+
+**Raised:** 2026-09-12, while building UAT-02. **Status:** not started.
+**Blocks:** the third button in the agreed UAT-02 action bar.
+
+The round-2 design for the bottom action bar is Cancel · **Save draft** · Publish
+role. Only two shipped, because the third would have lied.
+
+There is no draft in the data model:
+
+| | |
+|---|---|
+| `server.py:214` | `Job.status` defaults to `"open"` |
+| `server.py:222` | `JobCreate` has no `status` field at all, so a client cannot ask for one |
+| `server.py:722` | `POST /api/jobs` runs `_attach_matching_candidates` on every create |
+| `server.py:700`, `:719` | …and the create is checked against `FREE_ROLE_LIMIT`, then increments `jobs_created_total` |
+
+So a "Save draft" button today would publish the role *and* spend one of the
+recruiter's free roles, while telling them it had done neither. That is the
+dead-and-dishonest control UAT-01 and decision 1 of round 2 exist to prevent.
+
+**What it needs:**
+
+1. `status` accepted on `JobCreate`, constrained to `Literal["open", "draft"]`.
+2. `create_job` skips `_attach_matching_candidates` for a draft.
+3. A decision, which is a pricing question rather than a code one: **does a draft
+   consume a free role?** It surfaces no candidates, so it is not the
+   pool-harvesting vector the cap exists to stop — but it is still a row someone
+   can create without limit. Recommend not counting it, and capping drafts
+   separately if it is ever abused.
+4. Publishing a draft later has to run the attach step that create skipped.
+5. The Published / Drafts grouping from **UAT-03** — a draft the Roles view
+   cannot distinguish from a live role is worse than no draft at all.
+
+Items 1–4 and 5 should land together; shipping either half alone leaves the
+product lying in a different direction.

@@ -1,25 +1,27 @@
 name: Smoke test deployed API
 
-# Runs after Render finishes deploying a backend change, and tells you if the
-# deploy silently broke something. Render's own health check only proves the
-# process booted — this proves the data is actually there, the paywall still
+# Checks a DEPLOYED instance, on demand. Render's own health check only proves
+# the process booted — this proves the data is actually there, the paywall still
 # redacts, and one workspace still can't read another's.
 #
-# One-time setup (repo Settings → Secrets and variables → Actions):
+# Run it from the Actions tab (Run workflow) after a deploy you want to verify.
+#
+# Setup, the first time you run it (repo Settings → Secrets and variables → Actions):
 #   Variables → API_URL         https://talent-tailor-api.onrender.com   (no trailing slash)
-#   Variables → TT_TEST_EMAIL   qa@yourdomain.com   (a throwaway address — the
-#                               account is created on first run and reused after)
+#   Variables → TT_TEST_EMAIL   qa@yourdomain.com   ("tt" is just Talent Tailor —
+#                               a throwaway address, not an account anywhere. Every
+#                               recruiter route needs a login now, so the suite needs
+#                               one to sign in with. Created on first run, reused after.)
 #   Secrets   → TT_TEST_PASSWORD  any password, 8+ characters
 #
-# Missing configuration FAILS this job rather than skipping it. An earlier
-# version skipped silently, so every run went green for months without ever
-# testing anything — a red X you can fix beats a green tick you can't trust.
+# Missing configuration still FAILS rather than skipping: you asked for this run,
+# so it owes you an answer instead of a green tick that tested nothing. That was
+# always the point of failing loudly — but it used to apply on every push to main,
+# which meant an unconfigured repo showed a permanent red X that said nothing about
+# the code. tests.yml now covers every push with a signal that needs no setup, so
+# this one only runs when you ask for it.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
   workflow_dispatch:
 
 jobs:
