@@ -1,6 +1,6 @@
 # Talent Tailor — open work, one page
 
-**Updated 2026-09-15.** Everything not finished, in one place.
+**Updated 2026-09-18.** Everything not finished, in one place.
 
 This file is an **index, not a second copy**. Each row points at the detail; the
 detail stays where it lives. If you change something, change it there and fix the
@@ -30,7 +30,7 @@ Deploy setup reported done by the owner 2026-09-15, except where noted.
 
 | # | What | State |
 |---|---|---|
-| 1 | **Merge [PR #11](https://github.com/Yasaswinib04/talent-tailor/pull/11)** | **OPEN.** `main` is at `21d8cdc`; the PR's 4 commits are still on the branch. **Render deploys from `main`, so whatever is live does not have the UAT-02 action bar, the CI workflow, or the corrected runbook.** |
+| 1 | **Merge [PR #11](https://github.com/Yasaswinib04/talent-tailor/pull/11)** | **OPEN.** `main` is at `4d5bc28`; the PR's 7 commits are on the branch, green, and merge cleanly. **Render deploys from `main`, so what is live has no UAT-02 action bar, no `tests.yml`, and the pre-launch `DEPLOY.md`.** session-log Entry 007a §5 reaches the same conclusion: *"Review and merge PR #11 first."* |
 | 2 | `MONGO_URL` + `REACT_APP_BACKEND_URL` on Render | Reported done |
 | 3 | Confirm the deployed app serves | Reported done. Never verified from a session — the network policy 403s `onrender.com` and the custom domain. |
 | 4 | `SECRET_KEY`, `OPENROUTER_API_KEY`, `CORS_ORIGINS` | Reported done. Worth one look at `/api/health` for `"llm": true` — `false` means it is silently running the keyword fallback. |
